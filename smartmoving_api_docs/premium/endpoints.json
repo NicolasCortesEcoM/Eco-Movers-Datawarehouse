@@ -1,0 +1,117 @@
+{
+  "category": "premium",
+  "count": 3,
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/inventory[?Page][&PageSize]",
+      "title": "Get master inventory list",
+      "description": "Get the master inventory list with all the relevant information, and use its IDs to add inventory items.",
+      "category": "premium",
+      "tags": [
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-inventory",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Inventory",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"shortCode\": 0,\n        \"volume\": 0,\n        \"weight\": 0\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/tariffs/{tariffId}/materials[?Page][&PageSize]",
+      "title": "Get materials by tariff id",
+      "description": "Get all your tariff’s packing materials information.",
+      "category": "premium",
+      "tags": [
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-tariffs-tariffid-materials",
+      "parameters": [
+        {
+          "name": "tariffId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Tariff materials",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"rate\": 0,\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"packTimeInMinutes\": 0,\n        \"unpackTimeInMinutes\": 0,\n        \"carrierPackShortCode\": 0,\n        \"packByOwnerShortCode\": 0,\n        \"cost\": 0,\n        \"volume\": 0,\n        \"weight\": 0,\n        \"sortOrder\": 0\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/room-types[?Page][&PageSize]",
+      "title": "Get room types",
+      "description": "Get all the room types that are stored in your company’s inventory configuration.",
+      "category": "premium",
+      "tags": [
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-room-types",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Room Types",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\"\n    }]\n}"
+    }
+  ]
+}

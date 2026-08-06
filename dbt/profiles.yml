@@ -1,0 +1,16 @@
+# Local dev profile. Credentials come from env vars exported from the repo .env
+# (see how run below). On the droplet, point these at the managed Postgres and
+# connect as platform_rw.
+datawarehouse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | as_number }}"
+      user: "{{ env_var('POSTGRES_USER', 'postgres') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'datawarehouse') }}"
+      schema: staging
+      threads: 4
+      sslmode: prefer

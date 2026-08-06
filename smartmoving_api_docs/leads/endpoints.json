@@ -1,0 +1,154 @@
+{
+  "category": "leads",
+  "count": 5,
+  "endpoints": [
+    {
+      "method": "PUT",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/lead/{id}/convert",
+      "title": "Convert lead to opportunity",
+      "description": "Convert lead to opportunity",
+      "category": "leads",
+      "tags": [
+        "leads",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-lead-id-convert",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Opportunity details",
+      "response_schema_sample": "{\n    \"customerId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"tariffId\": \"string\",\n    \"branchId\": \"string\",\n    \"moveDate\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"serviceTypeId\": {},\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    }\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/leads",
+      "title": "Create a lead",
+      "description": "Submit a new lead to SmartMoving through the Premium API. Either ReferralSource or ReferralSourceId is required. For names, provide at least one of FullName, FirstName, or LastName.",
+      "category": "leads",
+      "tags": [
+        "leads",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-leads",
+      "parameters": [],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Lead created successfully",
+      "response_schema_sample": "{\n    \"firstName\": \"string\",\n    \"lastName\": \"string\",\n    \"fullName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"extension\": \"string\",\n    \"phoneType\": \"string\",\n    \"email\": \"string\",\n    \"moveDate\": \"string\",\n    \"leadCost\": 0,\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"bedrooms\": \"string\",\n    \"notes\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"affiliate\": \"string\",\n    \"affiliateId\": \"string\",\n    \"moveSize\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"serviceType\": \"string\",\n    \"branchId\": \"string\",\n    \"opportunityType\": \"string\",\n    \"trackingParameters\": \"string\",\n    \"userOptIn\": true,\n    \"utmAdGroup\": \"string\",\n    \"utmCampaign\": \"string\",\n    \"utmContent\": \"string\",\n    \"utmCustomTracking\": \"string\",\n    \"utmKeyword\": \"string\",\n    \"utmMedium\": \"string\",\n    \"utmSource\": \"string\"\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/leads/sales/{salesPersonId}[?Page][&PageSize]",
+      "title": "Get leads by sales person Id",
+      "description": "Get leads by sales person Id",
+      "category": "leads",
+      "tags": [
+        "leads",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-leads-sales-salespersonid",
+      "parameters": [
+        {
+          "name": "salesPersonId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Leads",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"customerName\": \"string\",\n        \"emailAddress\": \"string\",\n        \"referralSource\": \"string\",\n        \"referralSourceName\": \"string\",\n        \"affiliateId\": \"string\",\n        \"affiliateName\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {},\n        \"serviceDate\": 0,\n        \"salesPersonId\": \"string\",\n        \"salesPerson\": \"string\",\n        \"type\": {},\n        \"branchId\": \"string\",\n        \"branchName\": \"string\",\n        \"originAddressFull\": \"string\",\n        \"originStreet\": \"string\",\n        \"originCity\": \"string\",\n        \"originState\": \"string\",\n        \"originZip\": \"string\",\n        \"destinationAddressFull\": \"string\",\n        \"destinationStreet\": \"string\",\n        \"destinationCity\": \"string\",\n        \"destinationState\": \"string\",\n        \"destinationZip\": \"string\",\n        \"moveSizeId\": \"string\",\n        \"status\": {},\n        \"lostReason\": \"string\",\n        \"moveSizeName\": \"string\",\n        \"createdAtUtc\": \"string\"\n    }]\n}"
+    },
+    {
+      "method": "PATCH",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/leads/{leadId}",
+      "title": "Partially update lead",
+      "description": "Partially update a lead by its ID with only the fields you want to change",
+      "category": "leads",
+      "tags": [
+        "leads",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=patch-api-premium-leads-leadid",
+      "parameters": [
+        {
+          "name": "leadId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Lead updated",
+      "response_schema_sample": "{\n    \"customerName\": \"string\",\n    \"moveDate\": \"string\",\n    \"utmInformation\": {\n        \"utmAdGroup\": \"string\",\n        \"utmCampaign\": \"string\",\n        \"utmContent\": \"string\",\n        \"utmCustomTracking\": \"string\",\n        \"utmKeyword\": \"string\",\n        \"utmMedium\": \"string\",\n        \"utmSource\": \"string\"\n    },\n    \"emailAddress\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"branchId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"serviceTypeId\": {},\n    \"moveSizeId\": \"string\",\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"fromExternalApi\": true\n}"
+    },
+    {
+      "method": "PUT",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/leads/{leadId}",
+      "title": "Update lead",
+      "description": "Update a lead by its ID and easily modify its details",
+      "category": "leads",
+      "tags": [
+        "leads",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-leads-leadid",
+      "parameters": [
+        {
+          "name": "leadId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Lead updated",
+      "response_schema_sample": "{\n    \"customerName\": \"string\",\n    \"branchId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"moveDate\": \"string\",\n    \"utmInformation\": {\n        \"utmAdGroup\": \"string\",\n        \"utmCampaign\": \"string\",\n        \"utmContent\": \"string\",\n        \"utmCustomTracking\": \"string\",\n        \"utmKeyword\": \"string\",\n        \"utmMedium\": \"string\",\n        \"utmSource\": \"string\"\n    },\n    \"emailAddress\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"salesPersonId\": \"string\",\n    \"serviceTypeId\": {},\n    \"moveSizeId\": \"string\",\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    }\n}"
+    }
+  ]
+}

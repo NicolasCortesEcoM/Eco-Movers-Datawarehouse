@@ -1,0 +1,872 @@
+{
+  "category": "opportunities",
+  "count": 23,
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/inventory/rooms/{roomId}[?changeVolumeWeightCalculationMode][&markAsNeedsReview]",
+      "title": "Add inventory to an opportunity",
+      "description": "Add items to an existing opportunity: Include the ID if you want to add inventory from your master list, or create a custom inventory through the Name. Each custom inventory created can also be added to the master inventory list if desired.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-inventory-rooms-roomid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "roomId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "changeVolumeWeightCalculationMode",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "If true or not specified, the opportunity will be updated to calculate by inventory when items are added."
+        },
+        {
+          "name": "markAsNeedsReview",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "If true or not specified, the inventory will be marked as needing review"
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Item(s) added to room",
+      "response_schema_sample": "{\n    \"items\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"quantity\": 0,\n        \"quantityNotGoing\": 0,\n        \"saveToMaster\": false\n    }]\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/Estimated/jobs/{jobId}/materials",
+      "title": "Add materials to job",
+      "description": "Add packing materials to job based on its tariff. When using this endpoint, the materials added will overwrite the materials on the job, if there are any.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-estimated-jobs-jobid-materials",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "jobId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Materials added to job",
+      "response_schema_sample": "{\n    \"materials\": [{\n        \"quantity\": 0,\n        \"materialId\": \"string\"\n    }]\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/jobs/{jobId}/confirm[?category]",
+      "title": "Confirm a job",
+      "description": "Confirm a job by jobId and category (optional)",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-jobs-jobid-confirm",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "jobId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "category",
+          "location": "query",
+          "required": false,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "OK",
+      "response_schema_sample": "{opportunityId}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunity",
+      "title": "Create an opportunity",
+      "description": "Create an opportunity from scratch, indicating all the required fields. Continue to SmartMoving to get an estimate proposal sent to the customer, or retrieve the estimation from the Get opportunity details endpoint to handle the communication externally.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunity",
+      "parameters": [],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Opportunity details",
+      "response_schema_sample": "{\n    \"tariffId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"customerId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"affiliateId\": \"string\",\n    \"branchId\": \"string\",\n    \"moveDate\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"serviceTypeId\": {},\n    \"utmInformation\": {\n        \"utmAdGroup\": \"string\",\n        \"utmCampaign\": \"string\",\n        \"utmContent\": \"string\",\n        \"utmCustomTracking\": \"string\",\n        \"utmKeyword\": \"string\",\n        \"utmMedium\": \"string\",\n        \"utmSource\": \"string\"\n    },\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\"\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/followups",
+      "title": "Create follow-up",
+      "description": "Create follow-up for opportunityId",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-followups",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 201 Created",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": null,
+      "response_schema_sample": "{\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/jobs",
+      "title": "Create job",
+      "description": "Create job for opportunity",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-jobs",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 201 Created",
+        "Response: 404 Not Found",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": null,
+      "response_schema_sample": "{\n    \"serviceType\": {}\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/rooms",
+      "title": "Create rooms",
+      "description": "Add new rooms to your lead or opportunity, and use it to load your job’s inventory.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-rooms",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Room details",
+      "response_schema_sample": "[{\n    \"name\": \"string\",\n    \"roomTypeId\": \"string\"\n}]"
+    },
+    {
+      "method": "DELETE",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/followups/{followupId}",
+      "title": "Delete follow-up by id",
+      "description": "Delete single follow-up for opportunityId and follow-up Id",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-followups-followupid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "followupId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "OK",
+      "response_schema_sample": "{opportunityId}"
+    },
+    {
+      "method": "DELETE",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/jobs/{jobId}",
+      "title": "Delete job",
+      "description": "Remove job from opportunity",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-jobs-jobid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "jobId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 404 Not Found",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "OK",
+      "response_schema_sample": "{opportunityId}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/documents",
+      "title": "Get documents",
+      "description": "Get all (opportunity and job) documents for a given opportunity",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-opportunities-opportunityid-documents",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "List of opportunity and job documents",
+      "response_schema_sample": "{\n    \"opportunityDocuments\": [{\n        \"id\": \"string\",\n        \"title\": \"string\",\n        \"isComplete\": true,\n        \"url\": \"string\"\n    }],\n    \"jobDocuments\": [{\n        \"jobId\": \"string\",\n        \"id\": \"string\",\n        \"title\": \"string\",\n        \"isComplete\": true,\n        \"url\": \"string\"\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/followups/{followupId}",
+      "title": "Get follow-up by id",
+      "description": "Get single follow-up for opportunityId and follow-up Id",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-opportunities-opportunityid-followups-followupid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "followupId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Follow-up",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/followups",
+      "title": "Get follow-ups",
+      "description": "Get all follow-ups for a given opportunity",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-opportunities-opportunityid-followups",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "List of follow-ups",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/jobs/{jobId}[?IncludeEstimatedCharges][&IncludeActualCharges][&IncludeEstimatedMaterials][&IncludeActualMaterials][&IncludeStops][&IncludeDispatchInfo][&IncludeCharges][&IncludeNotes]",
+      "title": "Get job by id",
+      "description": "Get job details by Id",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-opportunities-opportunityid-jobs-jobid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "jobId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeEstimatedCharges",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeActualCharges",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeEstimatedMaterials",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeActualMaterials",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeStops",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeDispatchInfo",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeCharges",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeNotes",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Job",
+      "response_schema_sample": "{\n    \"opportunityId\": \"string\",\n    \"arrivalWindow\": \"string\",\n    \"dropOffDate\": 0,\n    \"stops\": [{\n        \"id\": \"string\",\n        \"isOrigin\": true,\n        \"isDestination\": true,\n        \"order\": 0,\n        \"addressFullAddress\": \"string\",\n        \"addressLat\": 0,\n        \"addressLng\": 0,\n        \"addressUnit\": \"string\",\n        \"propertyName\": \"string\",\n        \"propertyType\": {},\n        \"stairs\": 0,\n        \"parkingDescription\": \"string\",\n        \"hasElevator\": true,\n        \"notes\": \"string\"\n    }],\n    \"estimatedCharges\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"chargeCategory\": {},\n        \"chargeType\": {},\n        \"subtotal\": 0,\n        \"discountAmount\": 0,\n        \"discountPercent\": 0,\n        \"quantity\": 0,\n        \"totalCost\": 0\n    }],\n    \"actualCharges\": [{\n        \"estimatedJobChargeId\": \"string\",\n        \"estimatedJobCharge\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"chargeCategory\": {},\n            \"chargeType\": {},\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"discountPercent\": 0,\n            \"quantity\": 0,\n            \"totalCost\": 0\n        },\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"chargeCategory\": {},\n        \"chargeType\": {},\n        \"subtotal\": 0,\n        \"discountAmount\": 0,\n        \"discountPercent\": 0,\n        \"quantity\": 0,\n        \"totalCost\": 0\n    }],\n    \"estimatedMaterials\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"materialsQuantity\": 0,\n        \"materialsRate\": 0,\n        \"packingQuantity\": 0,\n        \"packingRate\": 0,\n        \"packingTimeMinutes\": 0,\n        \"unpackingQuantity\": 0,\n        \"unpackingRate\": 0,\n        \"unpackingTimeMinutes\": 0,\n        \"isContainer\": true\n    }],\n    \"actualMaterials\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"materialsQuantity\": 0,\n        \"materialsRate\": 0,\n        \"packingQuantity\": 0,\n        \"packingRate\": 0,\n        \"packingTimeMinutes\": 0,\n        \"unpackingQuantity\": 0,\n        \"unpackingRate\": 0,\n        \"unpackingTimeMinutes\": 0,\n        \"isContainer\": true\n    }],\n    \"crewMembers\": [\"string\"],\n    \"jobTime\": {\n        \"laborTime\": {\n            \"estimated\": 0,\n            \"actual\": 0\n        },\n        \"billableHours\": 0,\n        \"travelTime\": {\n            \"estimated\": 0,\n            \"actual\": 0\n        }\n    },\n    \"totalTips\": 0,\n    \"notes\": {\n        \"crewNotes\": \"string\",\n        \"customerNotes\": \"string\",\n        \"internalNotes\": \"string\",\n        \"crewFeedback\": \"string\",\n        \"accountingNotes\": \"string\",\n        \"dispatcherNotes\": \"string\"\n    },\n    \"id\": \"string\",\n    \"type\": {},\n    \"jobNumber\": \"string\",\n    \"jobDate\": 0,\n    \"startTimeUtc\": \"string\",\n    \"endTimeUtc\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"confirmedAtUtc\": \"string\",\n    \"closedAtUtc\": \"string\"\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/inventory",
+      "title": "Get opportunity inventory",
+      "description": "Get detailed information about opportunity inventory",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-opportunities-opportunityid-inventory",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Opportunity inventory",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"createdAtUtc\": \"string\",\n    \"lastModifiedById\": \"string\",\n    \"lastModifiedFromApplication\": {},\n    \"densityFactor\": 0,\n    \"boxes\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"shortCode\": 0,\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"imageUrl\": \"string\",\n        \"quantity\": 0,\n        \"inventoryItemId\": \"string\"\n    }],\n    \"rooms\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"roomType\": \"string\",\n        \"items\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"description\": \"string\",\n            \"notes\": \"string\",\n            \"shortCode\": 0,\n            \"quantity\": 0,\n            \"volume\": 0,\n            \"weight\": 0,\n            \"width\": 0,\n            \"depth\": 0,\n            \"height\": 0,\n            \"type\": {},\n            \"inventoryItemId\": \"string\",\n            \"imageUrls\": [\"string\"]\n        }]\n    }],\n    \"lockStatus\": true\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/payments/storage-accounts/{storageAccountId}",
+      "title": "Get payments by storage account Id",
+      "description": "Get storage payments by storage account Id",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-payments-storage-accounts-storageaccountid",
+      "parameters": [
+        {
+          "name": "storageAccountId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Job",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"storageAccountId\": \"string\",\n    \"source\": {},\n    \"paymentType\": {},\n    \"createdAtUtc\": \"string\",\n    \"amount\": 0,\n    \"balance\": 0,\n    \"takenByUserId\": \"string\",\n    \"description\": \"string\",\n    \"gatewayPaymentId\": \"string\",\n    \"refundsPaymentId\": \"string\",\n    \"amountRefunded\": 0,\n    \"isRefund\": true\n}]"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/communication/calls",
+      "title": "Log calls on an opportunity",
+      "description": "Log your calls in your opportunities to ensure your entire team stays updated on the latest events. These will appear as entries on the sales activity page.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-communication-calls",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Call added to opportunity",
+      "response_schema_sample": "{\n    \"callType\": {},\n    \"outcome\": {},\n    \"callDateTime\": \"string\",\n    \"description\": \"string\",\n    \"fromNumber\": \"string\",\n    \"toNumber\": \"string\",\n    \"createdBy\": \"string\"\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/communication/notes",
+      "title": "Log notes in an opportunity",
+      "description": "Log notes in your opportunities to ensure your entire team stays updated on the latest events. These will appear as entries on the sales activity page.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-communication-notes",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Note added to opportunity",
+      "response_schema_sample": "{\n    \"notes\": \"string\",\n    \"createdBy\": \"string\"\n}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/followups/{followupId}/mark-complete",
+      "title": "Mark follow-up completed",
+      "description": "Mark an opportunity follow-up as completed",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-followups-followupid-mark-compl",
+      "parameters": [
+        {
+          "name": "followupId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Follow-up marked as complete",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+    },
+    {
+      "method": "DELETE",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/inventory/rooms/{roomId}/items/{inventoryItemId}[?changeVolumeWeightCalculationMode][&markAsNeedsReview]",
+      "title": "Remove opportunity inventory",
+      "description": "Remove opportunity inventory",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-inventory-rooms-roomid-items",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "roomId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "inventoryItemId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "changeVolumeWeightCalculationMode",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "If true or not specified, the opportunity will be updated to calculate by inventory when items are deleted."
+        },
+        {
+          "name": "markAsNeedsReview",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "If true or not specified, the inventory will be marked as needing review"
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Item successfully deleted",
+      "response_schema_sample": "{opportunityId}"
+    },
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/inventory/submit",
+      "title": "Request inventory review",
+      "description": "Initiate an inventory review request for a specific opportunity, mirroring the functionality of the \"Submit Inventory\" button in the Customer Portal. Submissions can be resolved from the opportunity's Sales tab.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-inventory-submit",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Inventory submitted successfully",
+      "response_schema_sample": "{opportunityId}"
+    },
+    {
+      "method": "PUT",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/followups/{followupId}",
+      "title": "Update follow-up",
+      "description": "Update single follow-up for opportunityId and follow-up Id",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-opportunities-opportunityid-followups-followupid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "followupId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "OK",
+      "response_schema_sample": "{\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+    },
+    {
+      "method": "PUT",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/inventory/rooms/{roomId}/items/{inventoryItemId}[?changeVolumeWeightCalculationMode][&markAsNeedsReview]",
+      "title": "Update opportunity inventory",
+      "description": "Update opportunity inventory",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-opportunities-opportunityid-inventory-rooms-roomid-items-inv",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "roomId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "inventoryItemId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "changeVolumeWeightCalculationMode",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "If true or not specified, the opportunity will be updated to calculate by inventory when items are updated."
+        },
+        {
+          "name": "markAsNeedsReview",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "If true or not specified, the inventory will be marked as needing review"
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Item successfully updated",
+      "response_schema_sample": "{\n    \"notes\": \"string\",\n    \"volume\": 0,\n    \"weight\": 0,\n    \"quantity\": 0,\n    \"quantityNotGoing\": 0\n}"
+    },
+    {
+      "method": "PATCH",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}",
+      "title": "Update opportunity properties",
+      "description": "Update specific properties of an opportunity. Only updates properties that are provided in the request.",
+      "category": "opportunities",
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=patch-api-premium-opportunities-opportunityid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Opportunity updated successfully",
+      "response_schema_sample": "{\n    \"moveSizeId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"branchId\": \"string\",\n    \"opportunityType\": {},\n    \"volume\": 0,\n    \"weight\": 0,\n    \"isBinding\": true,\n    \"depositAmount\": 0,\n    \"referralSourceId\": \"string\",\n    \"affiliateId\": \"string\",\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\"\n}"
+    }
+  ]
+}

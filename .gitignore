@@ -1,0 +1,38 @@
+# Secrets — never commit
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Scratch / exploration output
+scratch/
+
+# Raw API dumps — contain customer PII, never commit (keep out of OneDrive too)
+test_*.json
+*_dump.json
+sm_exploration/
+
+# dlt / local warehouse artifacts
+.dlt/secrets.toml
+*.duckdb
+*.duckdb.wal
+
+# Live report exports — contain real customer PII (names, emails, phones)
+smartmoving_scheduble_reports/
+
+# Runtime call log — grows every pipeline run, not source
+scripts/api_call_log.jsonl
+
+# Browser automation snapshots — may capture on-screen PII, not source
+.playwright-mcp/
+
+# dbt build artifacts / local run state
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+
+# Python bytecode caches
+**/__pycache__/

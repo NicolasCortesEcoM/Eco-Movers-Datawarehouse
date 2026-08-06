@@ -1,0 +1,123 @@
+{
+  "category": "customers",
+  "count": 4,
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/customers",
+      "title": "Create a customer",
+      "description": "Create a customer",
+      "category": "customers",
+      "tags": [
+        "customers",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-customers",
+      "parameters": [],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Customer Id",
+      "response_schema_sample": "{\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/customers/{customerId}/service-tickets[?Page][&PageSize]",
+      "title": "Get service tickets by customer Id",
+      "description": "Get service tickets by customer Id",
+      "category": "customers",
+      "tags": [
+        "customers"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-customers-customerid-service-tickets",
+      "parameters": [
+        {
+          "name": "customerId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Service tickets",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"jobId\": \"string\",\n    \"name\": \"string\",\n    \"type\": {},\n    \"status\": {},\n    \"priority\": {},\n    \"createdAtUtc\": \"string\"\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/customers/search[?searchQuery]",
+      "title": "Search customers by name, email address or phone number",
+      "description": "Search customers by name, email address or phone number",
+      "category": "customers",
+      "tags": [
+        "customers",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-premium-customers-search",
+      "parameters": [
+        {
+          "name": "searchQuery",
+          "location": "query",
+          "required": false,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Matching customers",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}]"
+    },
+    {
+      "method": "PUT",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/customers/{customerId}",
+      "title": "Update a customer",
+      "description": "Update a customer",
+      "category": "customers",
+      "tags": [
+        "customers",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-customers-customerid",
+      "parameters": [
+        {
+          "name": "customerId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Success",
+      "response_schema_sample": "{\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}"
+    }
+  ]
+}

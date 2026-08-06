@@ -1,0 +1,1153 @@
+{
+  "category": "basic",
+  "count": 26,
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/affiliates[?Page][&PageSize][&referralSourceId][&branchId]",
+      "title": "Get affiliates",
+      "description": "Get all of your account's affiliates. Optionally filter by referral source or branch.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-affiliates",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "referralSourceId",
+          "location": "query",
+          "required": false,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "branchId",
+          "location": "query",
+          "required": false,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Affiliates",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"company\": \"string\",\n        \"email\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"branchId\": \"string\",\n        \"referralSourceId\": \"string\"\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/customers[?Page][&PageSize][&FromServiceDate][&ToServiceDate][&IncludeOpportunityInfo]",
+      "title": "Get all customers",
+      "description": "Get a list of all customers ordered by name. Optionally, you can filter them based on the job service date associated with each customer's opportunities. When filtered using service date(s), by default the opportunity info is included, to exclude it set IncludeOpportunityInfo = False.",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "customers"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-customers",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "FromServiceDate",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": "Format: yyyyMMdd, eg. 20240831"
+        },
+        {
+          "name": "ToServiceDate",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": "Format: yyyyMMdd, eg. 20240831"
+        },
+        {
+          "name": "IncludeOpportunityInfo",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Customers",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"opportunities\": [{\n        \"id\": \"string\",\n        \"quoteNumber\": \"string\",\n        \"status\": {},\n        \"jobs\": [{\n            \"id\": \"string\",\n            \"jobNumber\": \"string\",\n            \"serviceDate\": \"string\",\n            \"type\": {}\n        }]\n    }],\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/arrival-windows[?Page][&PageSize]",
+      "title": "Get arrival windows",
+      "description": "Get all the arrival windows that are configured for your company, including their description, start time, and end time.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-arrival-windows",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Arrival windows",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"description\": \"string\",\n        \"startTime\": 0,\n        \"endTime\": 0,\n        \"isDefault\": true\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/opportunities/{opportunityId}/audit-activity",
+      "title": "Get audit activity for opportunity",
+      "description": "Get audit activity for opportunity",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "opportunities"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-opportunities-opportunityid-audit-activity",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Opportunity audit activity",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"activityType\": {},\n    \"description\": \"string\",\n    \"changeMadeByUserId\": \"string\",\n    \"createdAtUtc\": \"string\"\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/bad-lead-reasons[?Page][&PageSize]",
+      "title": "Get bad lead reasons",
+      "description": "Get all of your company's bad lead reasons.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-bad-lead-reasons",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Bad lead reasons",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"sortOrder\": 0\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/branches[?Page][&PageSize]",
+      "title": "Get branches",
+      "description": "Get all your company branches, alongside their dispatch location, and phone number.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-branches",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "branches",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"dispatchLocation\": {\n            \"fullAddress\": \"string\",\n            \"street\": \"string\",\n            \"city\": \"string\",\n            \"state\": \"string\",\n            \"zip\": \"string\",\n            \"lat\": 0,\n            \"lng\": 0\n        },\n        \"isPrimary\": true\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/cancellation-reasons[?Page][&PageSize]",
+      "title": "Get cancellation reasons",
+      "description": "Get all of your company's job cancellation reasons.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-cancellation-reasons",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Cancellation reasons",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"sortOrder\": 0\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/crew-members/{crewMemberId}",
+      "title": "Get crew member by Id",
+      "description": "Get the crew member details of one of the configured members in your account, including their contact information, role, branch, and compensation settings.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-crew-members-crewmemberid",
+      "parameters": [
+        {
+          "name": "crewMemberId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Crew member",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"status\": \"string\",\n    \"mobile\": \"string\",\n    \"email\": \"string\",\n    \"role\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"branch\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"compensation\": {\n        \"labor\": {\n            \"method\": \"string\",\n            \"rate\": 0\n        },\n        \"movingLaborPercentage\": 0,\n        \"packingLaborPercentage\": 0,\n        \"transportationPercentage\": 0,\n        \"materialsPercentage\": 0,\n        \"servicesPercentage\": 0,\n        \"valuationPercentage\": 0,\n        \"tripFees\": {\n            \"rate\": 0,\n            \"method\": \"string\"\n        },\n        \"fuelSurchargeFeesPercentage\": 0,\n        \"prepaidStoragePercentage\": 0,\n        \"warehouseHandlingPercentage\": 0,\n        \"tripAndTravelPercentage\": 0,\n        \"bulkyItemPercentage\": 0,\n        \"shuttleFeePercentage\": 0,\n        \"storageInTransitPercentage\": 0,\n        \"insurancePercentage\": 0,\n        \"tipsEnabled\": true\n    }\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/crew-members[?Page][&PageSize][&Status][&BranchId]",
+      "title": "Get crew members",
+      "description": "Get all crew members configured in your account, including their contact information, role, branch, and compensation settings.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-crew-members",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "Status",
+          "location": "query",
+          "required": false,
+          "type_": "",
+          "example": null,
+          "description": "Filter by status: Active or Inactive"
+        },
+        {
+          "name": "BranchId",
+          "location": "query",
+          "required": false,
+          "type_": "string",
+          "example": null,
+          "description": "Filter by branch ID"
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Crew members",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"status\": \"string\",\n        \"mobile\": \"string\",\n        \"email\": \"string\",\n        \"role\": {\n            \"id\": \"string\",\n            \"name\": \"string\"\n        },\n        \"branch\": {\n            \"id\": \"string\",\n            \"name\": \"string\"\n        },\n        \"compensation\": {\n            \"labor\": {\n                \"method\": \"string\",\n                \"rate\": 0\n            },\n            \"movingLaborPercentage\": 0,\n            \"packingLaborPercentage\": 0,\n            \"transportationPercentage\": 0,\n            \"materialsPercentage\": 0,\n            \"servicesPercentage\": 0,\n            \"valuationPercentage\": 0,\n            \"tripFees\": {\n                \"rate\": 0,\n                \"method\": \"string\"\n            },\n            \"fuelSurchargeFeesPercentage\": 0,\n            \"prepaidStoragePercentage\": 0,\n            \"warehouseHandlingPercentage\": 0,\n            \"tripAndTravelPercentage\": 0,\n            \"bulkyItemPercentage\": 0,\n            \"shuttleFeePercentage\": 0,\n            \"storageInTransitPercentage\": 0,\n            \"insurancePercentage\": 0,\n            \"tipsEnabled\": true\n        }\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/customers/{customerId}",
+      "title": "Get customer by Id",
+      "description": "Get single customer by Id",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "customers"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-customers-customerid",
+      "parameters": [
+        {
+          "name": "customerId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Customer",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/crew-members/{crewMemberId}/jobs[?From][&To][&Page][&PageSize]",
+      "title": "Get jobs by crew member id",
+      "description": "Retrieve jobs associated with a specific crew member, filtered by service date.",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "crew-members"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-crew-members-crewmemberid-jobs",
+      "parameters": [
+        {
+          "name": "crewMemberId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "From",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "To",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Page result of Jobs",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"jobNumber\": \"string\",\n        \"opportunityId\": \"string\",\n        \"serviceType\": {},\n        \"serviceDate\": 0,\n        \"completedAtUtc\": \"string\",\n        \"confirmedAtUtc\": \"string\",\n        \"closedAtUtc\": \"string\"\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/opportunities/{opportunityId}/jobs",
+      "title": "Get jobs by opportunityId",
+      "description": "Get jobs by Opportunity Id",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "opportunities"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-opportunities-opportunityid-jobs",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Job",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"type\": {},\n    \"jobNumber\": \"string\",\n    \"jobDate\": 0,\n    \"startTimeUtc\": \"string\",\n    \"endTimeUtc\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"confirmedAtUtc\": \"string\",\n    \"closedAtUtc\": \"string\"\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/leads/{leadId}",
+      "title": "Get lead by Id",
+      "description": "Get single lead by Id",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "leads"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-leads-leadid",
+      "parameters": [
+        {
+          "name": "leadId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Lead",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"customerName\": \"string\",\n    \"emailAddress\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceName\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"serviceDate\": 0,\n    \"salesPersonId\": \"string\",\n    \"salesPerson\": \"string\",\n    \"type\": {},\n    \"branchId\": \"string\",\n    \"branchName\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"status\": {},\n    \"lostReason\": \"string\",\n    \"moveSizeName\": \"string\",\n    \"createdAtUtc\": \"string\"\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/leads[?Page][&PageSize][&From][&To][&IncludeBad][&IncludeLost]",
+      "title": "Get leads",
+      "description": "Retrieves leads created within a time range. By default, only New and In Progress leads are returned, but Lost and Bad Leads can be included through query parameters.",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "leads"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-leads",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "From",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": "Format: yyyyMMdd, eg. 20240831"
+        },
+        {
+          "name": "To",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": "Format: yyyyMMdd, eg. 20240831"
+        },
+        {
+          "name": "IncludeBad",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeLost",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Leads",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"customerName\": \"string\",\n        \"emailAddress\": \"string\",\n        \"referralSource\": \"string\",\n        \"referralSourceName\": \"string\",\n        \"affiliateId\": \"string\",\n        \"affiliateName\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {},\n        \"serviceDate\": 0,\n        \"salesPersonId\": \"string\",\n        \"salesPerson\": \"string\",\n        \"type\": {},\n        \"branchId\": \"string\",\n        \"branchName\": \"string\",\n        \"originAddressFull\": \"string\",\n        \"originStreet\": \"string\",\n        \"originCity\": \"string\",\n        \"originState\": \"string\",\n        \"originZip\": \"string\",\n        \"destinationAddressFull\": \"string\",\n        \"destinationStreet\": \"string\",\n        \"destinationCity\": \"string\",\n        \"destinationState\": \"string\",\n        \"destinationZip\": \"string\",\n        \"moveSizeId\": \"string\",\n        \"status\": {},\n        \"lostReason\": \"string\",\n        \"moveSizeName\": \"string\",\n        \"createdAtUtc\": \"string\"\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/lost-reasons[?Page][&PageSize]",
+      "title": "Get lost lead/opportunity reasons",
+      "description": "Get all of your company's lost lead/opportunity reasons.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-lost-reasons",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Lost reasons",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"description\": \"string\"\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/move-sizes[?Page][&PageSize]",
+      "title": "Get move sizes",
+      "description": "Get all the move sizes that are stored in your company, alongside their description, cubic feet, and weight.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-move-sizes",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Move sizes",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/customers/{customerId}/opportunities[?Page][&PageSize]",
+      "title": "Get opportunities by customer Id",
+      "description": "Get opportunities by customer Id",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "opportunities"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-customers-customerid-opportunities",
+      "parameters": [
+        {
+          "name": "customerId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Page result of Opportunities",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"quoteNumber\": \"string\",\n    \"serviceDate\": 0,\n    \"status\": {},\n    \"createdAtUtc\": \"string\"\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/opportunities/{opportunityId}[?IncludeTripInfo][&IncludePayments][&IncludeSurveys][&IncludeJobAddresses][&IncludeTasks][&IncludeFiles][&IncludePhotos][&IncludeDocuments][&IncludeCharges][&IncludeDispatchInfo]",
+      "title": "Get opportunity details",
+      "description": "Get detailed information about an opportunity",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "opportunities"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-opportunities-opportunityid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeTripInfo",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludePayments",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeSurveys",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeJobAddresses",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "List of job’s addresses/stops, returned in the order they were stored going from Origin, to Destination."
+        },
+        {
+          "name": "IncludeTasks",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeFiles",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludePhotos",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeDocuments",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeCharges",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeDispatchInfo",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Opportunity details",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"quoteNumber\": 0,\n    \"customer\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    },\n    \"branch\": {\n        \"name\": \"string\",\n        \"phoneNumber\": \"string\"\n    },\n    \"contacts\": [{\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }],\n    \"opportunityType\": {},\n    \"type\": {},\n    \"serviceDate\": 0,\n    \"status\": {},\n    \"leadStatus\": \"string\",\n    \"moveSize\": {\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"volume\": 0\n    },\n    \"volume\": 0,\n    \"weight\": 0,\n    \"volumeWeightCalculationMode\": {},\n    \"estimatedTotal\": {\n        \"subtotal\": 0,\n        \"taxableAmount\": 0,\n        \"tax\": 0,\n        \"finalTotal\": 0\n    },\n    \"estimator\": {\n        \"name\": \"string\",\n        \"mobileNumber\": \"string\",\n        \"branchId\": \"string\",\n        \"regionId\": \"string\",\n        \"title\": \"string\"\n    },\n    \"salesAssignee\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"hasTripInfo\": true,\n    \"referralSource\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"allowInventoryUpdates\": true,\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\",\n    \"cancellationReason\": \"string\",\n    \"jobs\": [{\n        \"id\": \"string\",\n        \"jobNumber\": \"string\",\n        \"jobDate\": 0,\n        \"type\": {},\n        \"confirmed\": true,\n        \"jobAddresses\": [\"string\"],\n        \"jobDocuments\": [{\n            \"title\": \"string\",\n            \"type\": {},\n            \"isComplete\": true\n        }],\n        \"estimatedCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"actualCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"arrivalWindow\": {\n            \"id\": \"string\",\n            \"description\": \"string\",\n            \"startTime\": 0,\n            \"endTime\": 0,\n            \"isDefault\": true\n        },\n        \"totalTips\": 0,\n        \"crewMembers\": [\"string\"],\n        \"jobTime\": {\n            \"laborTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            },\n            \"billableHours\": 0,\n            \"travelTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            }\n        }\n    }],\n    \"payments\": [{\n        \"source\": {},\n        \"paymentType\": {},\n        \"amount\": 0,\n        \"takenByUser\": \"string\",\n        \"isOutstanding\": true,\n        \"paidAtUtc\": \"string\",\n        \"refundsJobPaymentId\": \"string\",\n        \"amountRefunded\": 0,\n        \"paymentCategory\": {}\n    }],\n    \"tripInfo\": {\n        \"isTripInfoApplied\": true,\n        \"pickupSpreadFirstAvailableDate\": 0,\n        \"pickupSpreadLastAvailableDate\": 0,\n        \"confirmedPickupDate\": 0,\n        \"preferredPickupTime\": 0,\n        \"preferredPickupTimeDurationMinutes\": 0,\n        \"deliverySpreadFirstAvailableDate\": 0,\n        \"deliverySpreadLastAvailableDate\": 0,\n        \"confirmedDeliveryDate\": 0,\n        \"preferredDeliveryTime\": 0,\n        \"preferredDeliveryTimeDurationMinutes\": 0\n    },\n    \"opportunityFiles\": [\"string\"],\n    \"photos\": [\"string\"],\n    \"opportunityDocuments\": [{\n        \"title\": \"string\",\n        \"type\": {},\n        \"isComplete\": true\n    }],\n    \"surveys\": [{\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"type\": {},\n        \"title\": \"string\",\n        \"startAtUtc\": \"string\",\n        \"durationMinutes\": 0,\n        \"notes\": \"string\",\n        \"isConfirmed\": true\n    }],\n    \"tasks\": [{\n        \"title\": \"string\",\n        \"customer\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"emailAddress\": \"string\",\n            \"phoneNumber\": \"string\",\n            \"phoneType\": {}\n        },\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"taskItemType\": {},\n        \"taskItemStatus\": {},\n        \"notes\": \"string\"\n    }],\n    \"tariff\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"createdAtUtc\": \"string\"\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/opportunities/quote/{quoteNumber}[?IncludeTripInfo][&IncludePayments][&IncludeSurveys][&IncludeJobAddresses][&IncludeTasks][&IncludeFiles][&IncludePhotos][&IncludeDocuments][&IncludeCharges][&IncludeDispatchInfo]",
+      "title": "Get opportunity details by quote number",
+      "description": "Get detailed information about an opportunity",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "opportunities"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-opportunities-quote-quotenumber",
+      "parameters": [
+        {
+          "name": "quoteNumber",
+          "location": "template",
+          "required": true,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeTripInfo",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludePayments",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeSurveys",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeJobAddresses",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "List of job’s addresses/stops, returned in the order they were stored going from Origin, to Destination."
+        },
+        {
+          "name": "IncludeTasks",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeFiles",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludePhotos",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeDocuments",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeCharges",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeDispatchInfo",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Opportunity details",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"quoteNumber\": 0,\n    \"customer\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    },\n    \"branch\": {\n        \"name\": \"string\",\n        \"phoneNumber\": \"string\"\n    },\n    \"contacts\": [{\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }],\n    \"opportunityType\": {},\n    \"type\": {},\n    \"serviceDate\": 0,\n    \"status\": {},\n    \"leadStatus\": \"string\",\n    \"moveSize\": {\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"volume\": 0\n    },\n    \"volume\": 0,\n    \"weight\": 0,\n    \"volumeWeightCalculationMode\": {},\n    \"estimatedTotal\": {\n        \"subtotal\": 0,\n        \"taxableAmount\": 0,\n        \"tax\": 0,\n        \"finalTotal\": 0\n    },\n    \"estimator\": {\n        \"name\": \"string\",\n        \"mobileNumber\": \"string\",\n        \"branchId\": \"string\",\n        \"regionId\": \"string\",\n        \"title\": \"string\"\n    },\n    \"salesAssignee\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"hasTripInfo\": true,\n    \"referralSource\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"allowInventoryUpdates\": true,\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\",\n    \"cancellationReason\": \"string\",\n    \"jobs\": [{\n        \"id\": \"string\",\n        \"jobNumber\": \"string\",\n        \"jobDate\": 0,\n        \"type\": {},\n        \"confirmed\": true,\n        \"jobAddresses\": [\"string\"],\n        \"jobDocuments\": [{\n            \"title\": \"string\",\n            \"type\": {},\n            \"isComplete\": true\n        }],\n        \"estimatedCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"actualCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"arrivalWindow\": {\n            \"id\": \"string\",\n            \"description\": \"string\",\n            \"startTime\": 0,\n            \"endTime\": 0,\n            \"isDefault\": true\n        },\n        \"totalTips\": 0,\n        \"crewMembers\": [\"string\"],\n        \"jobTime\": {\n            \"laborTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            },\n            \"billableHours\": 0,\n            \"travelTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            }\n        }\n    }],\n    \"payments\": [{\n        \"source\": {},\n        \"paymentType\": {},\n        \"amount\": 0,\n        \"takenByUser\": \"string\",\n        \"isOutstanding\": true,\n        \"paidAtUtc\": \"string\",\n        \"refundsJobPaymentId\": \"string\",\n        \"amountRefunded\": 0,\n        \"paymentCategory\": {}\n    }],\n    \"tripInfo\": {\n        \"isTripInfoApplied\": true,\n        \"pickupSpreadFirstAvailableDate\": 0,\n        \"pickupSpreadLastAvailableDate\": 0,\n        \"confirmedPickupDate\": 0,\n        \"preferredPickupTime\": 0,\n        \"preferredPickupTimeDurationMinutes\": 0,\n        \"deliverySpreadFirstAvailableDate\": 0,\n        \"deliverySpreadLastAvailableDate\": 0,\n        \"confirmedDeliveryDate\": 0,\n        \"preferredDeliveryTime\": 0,\n        \"preferredDeliveryTimeDurationMinutes\": 0\n    },\n    \"opportunityFiles\": [\"string\"],\n    \"photos\": [\"string\"],\n    \"opportunityDocuments\": [{\n        \"title\": \"string\",\n        \"type\": {},\n        \"isComplete\": true\n    }],\n    \"surveys\": [{\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"type\": {},\n        \"title\": \"string\",\n        \"startAtUtc\": \"string\",\n        \"durationMinutes\": 0,\n        \"notes\": \"string\",\n        \"isConfirmed\": true\n    }],\n    \"tasks\": [{\n        \"title\": \"string\",\n        \"customer\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"emailAddress\": \"string\",\n            \"phoneNumber\": \"string\",\n            \"phoneType\": {}\n        },\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"taskItemType\": {},\n        \"taskItemStatus\": {},\n        \"notes\": \"string\"\n    }],\n    \"tariff\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"createdAtUtc\": \"string\"\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/payments/opportunities/{opportunityId}",
+      "title": "Get payments by opportunity Id",
+      "description": "Get opportunity payments by opportunity Id",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "opportunities"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-payments-opportunities-opportunityid",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Job",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"jobId\": \"string\",\n    \"source\": {},\n    \"paymentType\": {},\n    \"amount\": 0,\n    \"takenByUserId\": \"string\",\n    \"createdAtUtc\": \"string\",\n    \"customPaymentDescription\": \"string\",\n    \"gatewayPaymentId\": \"string\",\n    \"refundsJobPaymentId\": \"string\",\n    \"amountRefunded\": 0,\n    \"paymentCategory\": {},\n    \"isRefund\": true\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/referral-sources[?Page][&PageSize][&includePrivate][&includeLeadProviders]",
+      "title": "Get referral sources",
+      "description": "Get all of your account’s referral sources, with the option to retrieve all of them or only your public ones (users on public lead forms you might have embedded on your website). If desired, you can also include your active lead providers in the response.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-referral-sources",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "includePrivate",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "includeLeadProviders",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Referral sources",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"isLeadProvider\": true,\n        \"isPublic\": true\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/service-types[?Page][&PageSize]",
+      "title": "Get service types",
+      "description": "Get all your enabled service types, both system and custom ones.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-service-types",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "service types",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": {},\n        \"name\": \"string\",\n        \"scalingFactorPercentage\": 0,\n        \"hasActivityLoading\": true,\n        \"hasActivityFinishedLoading\": true,\n        \"hasActivityUnloading\": true,\n        \"order\": 0\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/leads/statuses",
+      "title": "Get statuses",
+      "description": "Get statuses",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "leads"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-leads-statuses",
+      "parameters": [],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Statuses",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"customerName\": \"string\",\n    \"emailAddress\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceName\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"serviceDate\": 0,\n    \"salesPersonId\": \"string\",\n    \"salesPerson\": \"string\",\n    \"type\": {},\n    \"branchId\": \"string\",\n    \"branchName\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"status\": {},\n    \"lostReason\": \"string\",\n    \"moveSizeName\": \"string\",\n    \"createdAtUtc\": \"string\"\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/customers/{customerId}/storage-accounts[?Page][&PageSize]",
+      "title": "Get storage accounts by customer Id",
+      "description": "Get storage accounts by customer Id",
+      "category": "basic",
+      "tags": [
+        "basic",
+        "customers"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-customers-customerid-storage-accounts",
+      "parameters": [
+        {
+          "name": "customerId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "Storage accounts",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"accountNumber\": \"string\",\n    \"status\": {},\n    \"jobId\": \"string\",\n    \"storageType\": {},\n    \"storageBillingPreOrPostPay\": {},\n    \"storageAndValuationTotal\": 0,\n    \"totalMonthlyCharges\": 0,\n    \"storageValuationMethod\": {},\n    \"nextInvoiceAt\": \"string\",\n    \"discounts\": [{\n        \"name\": \"string\",\n        \"storageDiscountType\": {},\n        \"discountAmountType\": {},\n        \"amount\": 0\n    }],\n    \"warehouseSalesTaxRate\": 0,\n    \"warehouseName\": \"string\"\n}]"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/tariffs[?Page][&PageSize][&IncludeDisabled][&IncludeTechMate]",
+      "title": "Get tariffs",
+      "description": "Get all the tariffs within your company, with the option to include disabled tariffs or not.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-tariffs",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeDisabled",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "IncludeTechMate",
+          "location": "query",
+          "required": false,
+          "type_": "boolean",
+          "example": null,
+          "description": "Include external tariffs created on TechMate in the response."
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Tariffs",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"isEnabled\": true,\n        \"appliesToOpportunityTypes\": [0],\n        \"appliesToBranches\": [{\n            \"branchId\": \"string\",\n            \"branchName\": \"string\"\n        }]\n    }]\n}"
+    },
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/users[?Page][&PageSize]",
+      "title": "Get users",
+      "description": "Get all the office users in your company, with all their key descriptive attributes such as title and role. Crew members are not included.",
+      "category": "basic",
+      "tags": [
+        "basic"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-users",
+      "parameters": [
+        {
+          "name": "Page",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "PageSize",
+          "location": "query",
+          "required": false,
+          "type_": "integer",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "Office users",
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"title\": \"string\",\n        \"email\": \"string\",\n        \"primaryBranch\": {\n            \"id\": \"string\",\n            \"name\": \"string\"\n        },\n        \"role\": {\n            \"id\": \"string\",\n            \"name\": \"string\"\n        }\n    }]\n}"
+    }
+  ]
+}

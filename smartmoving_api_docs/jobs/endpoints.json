@@ -1,0 +1,81 @@
+{
+  "category": "jobs",
+  "count": 2,
+  "endpoints": [
+    {
+      "method": "PATCH",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/jobs/{jobId}/notes",
+      "title": "Update job notes",
+      "description": "Update any of the note properties on a job such as CrewNotes, CustomerNotes, InternalNotes, AccountingNotes, or DispatcherNotes",
+      "category": "jobs",
+      "tags": [
+        "jobs",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=patch-api-premium-opportunities-opportunityid-jobs-jobid-notes",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "jobId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 404 Not Found",
+        "Response: 500 Internal Server Error"
+      ],
+      "response_description": "Notes updated successfully",
+      "response_schema_sample": "{\n    \"crewNotes\": \"string\",\n    \"customerNotes\": \"string\",\n    \"internalNotes\": \"string\",\n    \"accountingNotes\": \"string\",\n    \"dispatcherNotes\": \"string\"\n}"
+    },
+    {
+      "method": "PUT",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/jobs/{jobId}/stops",
+      "title": "Update job stops",
+      "description": "Update all stops for a job",
+      "category": "jobs",
+      "tags": [
+        "jobs",
+        "opportunities",
+        "premium"
+      ],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-opportunities-opportunityid-jobs-jobid-stops",
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "jobId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 200 OK",
+        "Response: 400 Bad Request",
+        "Response: 404 Not Found"
+      ],
+      "response_description": "Updated stops",
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"isOrigin\": true,\n    \"isDestination\": true,\n    \"order\": 0,\n    \"addressFullAddress\": \"string\",\n    \"addressLat\": 0,\n    \"addressLng\": 0,\n    \"addressUnit\": \"string\",\n    \"propertyName\": \"string\",\n    \"propertyType\": {},\n    \"stopType\": {},\n    \"stairs\": 0,\n    \"hasElevator\": true,\n    \"notes\": \"string\",\n    \"street\": \"string\",\n    \"city\": \"string\",\n    \"state\": \"string\",\n    \"zip\": \"string\",\n    \"county\": \"string\"\n}]"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+name: datawarehouse
+version: "1.0.0"
+config-version: 2
+
+profile: datawarehouse
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+# Layers map to Postgres schemas via the generate_schema_name macro (literal, not
+# prefixed). raw is dlt-loaded; dbt owns staging -> core -> marts -> serving.
+models:
+  datawarehouse:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: marts       # dbt-owned, analytical, may change freely (like marts)
+      +materialized: view
+    core:
+      +schema: core
+      +materialized: table
+    marts:
+      +schema: marts
+      +materialized: table
+    serving:
+      +schema: serving
+      +materialized: table   # table (not view) so RLS on entity_id applies to app_read

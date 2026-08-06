@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: jobs_upcoming_v1
+    description: >
+      Public serving contract: jobs scheduled in the next 10 days, one row per
+      job, for Operations. entity_id + synced_at present; RLS-scoped by entity_id.
+      Catalogued in serving_catalog.md. Grain: (source_instance_id, external_job_id).
+    columns:
+      - name: job_key
+        description: Stable unique row id (source_instance_id + external_job_id).
+        data_tests: [not_null, unique]
+      - name: entity_id
+        description: Business entity (RLS key). Consumers only ever see their own.
+        data_tests: [not_null]
+      - name: external_job_id
+        description: SmartMoving job id (unique within its instance).
+        data_tests: [not_null]
+      - name: service_date
+        description: Local date the job is scheduled for.
+        data_tests: [not_null]
+      - name: synced_at
+        description: When this row's source data was last extracted (freshness).
+        data_tests: [not_null]
+      - name: status
+        description: Opportunity status label (Booked/Closed/status_N).
+
+  - name: leads_today_v1
+    description: >
+      Public serving contract: leads created today (entity-local date), one row
+      per lead, for Sales. entity_id + synced_at present; RLS-scoped by entity_id.
+      Catalogued in serving_catalog.md. Grain: (source_instance_id, external_lead_id).
+    columns:
+      - name: lead_key
+        description: Stable unique row id (source_instance_id + external_lead_id).
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: external_lead_id
+        data_tests: [not_null]
+      - name: created_at_utc
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]
+      - name: lead_disposition
+        description: New / In Progress / Lost / Bad Lead (derived from reasons).

@@ -1,0 +1,25 @@
+version: 2
+
+sources:
+  - name: smartmoving
+    schema: raw_smartmoving
+    description: Raw SmartMoving payloads as loaded by dlt (dbt-only; no consumer reads this).
+    tables:
+      - name: customers_service_window
+        description: Customer sweep by service-date window (the cheapest reconciliation call).
+      - name: customers_service_window__opportunities
+        description: Opportunities nested under the customer sweep (dlt child table).
+      - name: customers_service_window__opportunities__jobs
+        description: Jobs nested under each opportunity (dlt grandchild table).
+      - name: dim_service_types
+        description: Service-type reference list per instance.
+      - name: dim_branches
+        description: Branch reference list per instance.
+      - name: leads
+        description: Leads created in the polled date window.
+      - name: webhook_events
+        description: >
+          SmartMoving webhook envelopes landed by n8n (Camino 1). One row per event;
+          carries event_type + resource_id + raw payload. The opportunity status int
+          rides inside payload->>'opportunity-status' for every opportunity-* event  - 
+          a zero-API status feed. See sql/20_webhook_events.sql.

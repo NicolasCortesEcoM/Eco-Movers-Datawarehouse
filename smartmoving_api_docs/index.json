@@ -1,0 +1,26 @@
+{
+  "api_name": "SmartMoving External API",
+  "version": "v1",
+  "base_url": "https://api-public.smartmoving.com/v1",
+  "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1",
+  "total_endpoints": 65,
+  "categories": [
+    "basic",
+    "customers",
+    "general",
+    "jobs",
+    "leads",
+    "opportunities",
+    "premium"
+  ],
+  "category_counts": {
+    "basic": 26,
+    "customers": 4,
+    "general": 2,
+    "jobs": 2,
+    "leads": 5,
+    "opportunities": 23,
+    "premium": 3
+  },
+  "scraped_at": "2026-06-22T20:34:28"
+}

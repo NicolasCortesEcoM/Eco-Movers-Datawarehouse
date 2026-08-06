@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: int_opportunity_status_latest
+    description: >
+      Last-observation-wins opportunity status derived only from the webhook log
+      (zero API cost). Grain: one row per (source_instance_id, external_opportunity_id).
+      Real-time count-by-status feed between the hourly /customers sweeps.
+    columns:
+      - name: opportunity_key
+        description: Surrogate key source_instance_id:external_opportunity_id.
+        tests: [not_null, unique]
+      - name: external_opportunity_id
+        tests: [not_null]
+      - name: source_instance_id
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ld', 'local']
+      - name: opportunity_status_code
+        tests: [not_null]

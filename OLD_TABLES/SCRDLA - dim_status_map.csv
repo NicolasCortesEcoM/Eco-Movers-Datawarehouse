@@ -1,0 +1,43 @@
+status_raw,status_category,status_subcategory,is_valid_lead,is_booked,is_completed,is_cancelled,is_lost,is_bad_lead,is_open,description
+Bad lead,bad_lead,general,0,0,0,0,0,1,0,General invalid lead.
+Bad lead 3rd party referred,bad_lead,bad_referred_out,0,0,0,0,0,1,0,Referred to another company.
+Bad lead bad email address,bad_lead,bad_contact_info,0,0,0,0,0,1,0,Email invalid — exclude from all metrics.
+Bad lead bad email phone number,bad_lead,bad_contact_info,0,0,0,0,0,1,0,Phone & email invalid.
+Bad lead bad phone number,bad_lead,bad_contact_info,0,0,0,0,0,1,0,Phone invalid.
+Bad lead crew dispatch call,bad_lead,not_a_moving_customer,0,0,0,0,0,1,0,Not a moving customer — internal/ops call.
+Bad lead duplicate lead,bad_lead,bad_duplicate,0,0,0,0,0,1,0,Duplicate CRM entry.
+Bad lead employment inquiry,bad_lead,not_a_moving_customer,0,0,0,0,0,1,0,Not a moving customer — employment inquiry.
+Bad lead local move transferred to main smart moving,bad_lead,bad_referred_out,0,0,0,0,0,1,0,Transferred to main branch.
+Bad lead moved to LD smart moving,bad_lead,bad_referred_out,0,0,0,0,0,1,0,Transferred to LD branch.
+Bad lead outside service territory,bad_lead,bad_service,0,0,0,0,0,1,0,Outside service area.
+Bad lead sent to mini moves,bad_lead,bad_referred_out,0,0,0,0,0,1,0,Referred to mini moves.
+Bad lead single item move,bad_lead,bad_not_fit,0,0,0,0,0,1,0,Local — too few items.
+Bad lead spam,bad_lead,bad_spam,0,0,0,0,0,1,0,Spam / non-moving inquiry.
+Bad lead training lead,bad_lead,bad_test,0,0,0,0,0,1,0,Internal test entry.
+Bad lead we don t offer service requested,bad_lead,bad_service,0,0,0,0,0,1,0,Service type not available.
+Booked,booked,booked,1,1,0,0,0,0,0,Lead converted to confirmed job.
+Closed,closed,closed,1,1,0,0,0,0,0,Job closed successfully.
+Completed,completed,completed,1,1,1,0,0,0,0,Job fully completed and invoiced.
+Cancelled decided to go with another mover,cancelled,cancelled_competitor,1,0,0,1,0,0,0,Chose competitor post-booking.
+Cancelled didn t close on house,cancelled,cancelled_external,1,0,0,1,0,0,0,Real estate deal fell through.
+Cancelled price was to high,cancelled,cancelled_price,1,0,0,1,0,0,0,Price objection post-booking.
+Cancelled service no longer needed,cancelled,cancelled_external,1,0,0,1,0,0,0,Situation changed post-booking.
+Cancelled unable to confirm move date,cancelled,cancelled_ops,1,0,0,1,0,0,0,Could not confirm exact dates post-booking.
+Cancelled unable to contact client on move day,cancelled,cancelled_contact,1,0,0,1,0,0,0,Client unreachable on move day.
+Lead in progress,open,in_progress,1,0,0,0,0,0,1,Active pipeline — being worked.
+New lead,open,new,1,0,0,0,0,0,1,"Just received, not yet contacted."
+Opportunity,open,opportunity,1,0,0,0,0,0,1,Quoted and actively pursuing.
+Lost,lost,general,1,0,0,0,1,0,0,General lost lead.
+Lost already booked with another mover,lost,lost_competitor,1,0,0,0,1,0,0,Went with competitor.
+Lost CMET 3 no response,lost,lost_contact,1,0,0,0,1,0,0,Could not reach after 3 attempts.
+Lost customer had unreasonable expectations for the move,lost,lost_not_fit,1,0,0,0,1,0,0,Unreasonable expectations / not a good fit.
+Lost duplicate booked under different name,lost,lost_duplicate,1,0,0,0,1,0,0,Duplicate lead booked under another name.
+Lost follow up 3 no response,lost,lost_contact,1,0,0,0,1,0,0,Could not reach after 3 follow-ups.
+Lost no availability,lost,lost_ops,1,0,0,0,1,0,0,No capacity on requested date.
+Lost no longer moving,lost,lost_cancelled,1,0,0,0,1,0,0,Customer cancelled move entirely.
+Lost only in planning stages set follow up for later,lost,lost_postponed,1,0,0,0,1,0,0,Planning stages — follow up later.
+Lost price too high,lost,lost_price,1,0,0,0,1,0,0,Price objection — competitor cheaper.
+Lost service no longer needed moving themselves,lost,lost_diy,1,0,0,0,1,0,0,DIY move.
+Lost STOP requested,lost,lost_stop_requested,1,0,0,0,1,0,0,Opted out of communications.
+Lost unable to contact,lost,lost_contact,1,0,0,0,1,0,0,Could not reach after attempts.
+Lost unable to service,lost,lost_no_service,1,0,0,0,1,0,0,Ops could not fulfill the job.

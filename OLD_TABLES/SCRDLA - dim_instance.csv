@@ -1,0 +1,4 @@
+instance_id,entity_id,entity_name,timezone,lob_hint,api_key_env,notes
+PK — id corto de la instancia SmartMoving,FK — entidad de negocio (una entidad puede tener varias instancias),Nombre para reportes,IANA timezone para derivar fechas locales,Señal primaria de LOB cuando la instancia separa líneas de negocio (prevalece sobre dim_lob_map),Variable de entorno con el API key,
+ld,ecomovers,EcoMovers,America/Los_Angeles,long_distance,SMARTMOVING_API_KEY_LD,Instancia solo Long Distance / Interstate
+local,ecomovers,EcoMovers,America/Los_Angeles,local_commercial,SMARTMOVING_API_KEY_LOCAL,Instancia Local + Commercial. ⚠️ tiene branch 'Long Distance Team' — no usar branch para LOB

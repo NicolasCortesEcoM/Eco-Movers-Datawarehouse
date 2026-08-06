@@ -1,0 +1,34 @@
+{
+  "category": "general",
+  "count": 2,
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "https://api-public.smartmoving.com/v1/api/ping",
+      "title": "/api/ping - GET",
+      "description": "ping",
+      "category": "general",
+      "tags": [],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-ping",
+      "parameters": [],
+      "response_codes": [
+        "Response: 200 OK"
+      ],
+      "response_description": "OK",
+      "response_schema_sample": null
+    },
+    {
+      "method": "POST",
+      "path": "",
+      "title": "Add attachment to opportunity",
+      "description": null,
+      "category": "general",
+      "tags": [],
+      "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-attachments",
+      "parameters": [],
+      "response_codes": [],
+      "response_description": null,
+      "response_schema_sample": "{\n    \"base64Contents\": \"string\",\n    \"fileName\": \"string\",\n    \"category\": {}"
+    }
+  ]
+}
