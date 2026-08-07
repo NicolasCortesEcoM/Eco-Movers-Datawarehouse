@@ -1,6 +1,111 @@
 version: 2
 
 models:
+  - name: branches
+    description: >
+      Canonical branches, and THE TIMEZONE AUTHORITY (CLAUDE.md). Grain: one row
+      per (source_instance_id, external_branch_id). Everything downstream that
+      needs a local date resolves its zone here rather than hardcoding one.
+      Carries the only free geocoded address the API exposes (dispatch lat/lng).
+    columns:
+      - name: branch_key
+        description: Grain key, source_instance_id + external_branch_id.
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: source_instance_id
+        data_tests: [not_null]
+      - name: external_branch_id
+        data_tests: [not_null]
+      - name: branch_name
+        description: >
+          Not a line-of-business signal. The `local` instance has a branch named
+          "Long Distance Team" (decisions/0002) - use instance + service type.
+        data_tests: [not_null]
+      - name: timezone
+        description: >
+          IANA operating timezone: per-branch seed override, else the instance
+          default. Drives operational local dates.
+        data_tests: [not_null]
+      - name: crm_timezone
+        description: >
+          IANA zone the SmartMoving instance renders in. What the scheduled-report
+          "* at Utc" columns are actually in. NOT the same as `timezone`.
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]
+
+  - name: opportunities
+    description: >
+      Canonical opportunity. Grain: (source_instance_id, external_opportunity_id).
+      Every field resolved independently by pick_latest across all sources that
+      reported it - see dbt/macros/pick_latest.sql. Separate from core.leads by
+      design; there is no lead->opportunity map in this phase.
+      Status: status_code is authoritative, pipeline_status is context only.
+    columns:
+      - name: opportunity_key
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: source_instance_id
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['ld', 'local']}
+      - name: external_opportunity_id
+        data_tests: [not_null]
+      - name: status_code
+        description: The authoritative outcome int. Drives every is_* flag.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_opportunity_status')
+              field: status_code
+      - name: status_label
+        data_tests: [not_null]
+      - name: is_booked
+        description: Real boolean. True for Booked, Completed and Closed.
+        data_tests: [not_null]
+      - name: synced_at
+        description: Newest moment any source spoke about this opportunity.
+        data_tests: [not_null]
+
+  - name: opportunity_charges
+    description: >
+      Charge lines, estimated and actual, separated by charge_kind. Grain:
+      (source_instance_id, external_job_id, charge_kind, charge_seq). Single-source,
+      so no observation layer.
+    columns:
+      - name: charge_key
+        data_tests: [not_null, unique]
+      - name: charge_kind
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['estimated', 'actual']}
+      - name: total_cost
+        data_tests: [not_null]
+      - name: external_opportunity_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('opportunities')
+              field: external_opportunity_id
+
+  - name: opportunity_payments
+    description: >
+      Payments per opportunity. Grain: (source_instance_id,
+      external_opportunity_id, payment_seq) - the payload has no payment id.
+    columns:
+      - name: payment_key
+        data_tests: [not_null, unique]
+      - name: amount
+        data_tests: [not_null]
+      - name: external_opportunity_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('opportunities')
+              field: external_opportunity_id
+
   - name: jobs
     description: >
       Canonical upcoming-jobs entity from the SmartMoving service-date sweep.

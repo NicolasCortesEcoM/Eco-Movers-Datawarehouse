@@ -52,6 +52,12 @@ def main() -> None:
     ap.add_argument("--ids", default=None, help="comma-separated opportunity ids: targeted enrichment, no sweep (webhook worker)")
     ap.add_argument("--budget", type=int, default=300, help="max API calls per instance per run")
     ap.add_argument("--pace", type=float, default=0.6, help="seconds between API calls (rate-limit throttle)")
+    ap.add_argument("--hot-ttl-hours", type=float, default=24.0,
+                    help="re-enrich opps with a service date in [today-3, today+21] older than this")
+    ap.add_argument("--cold-ttl-hours", type=float, default=336.0,
+                    help="re-enrich every other opp in the sweep window older than this (safety net)")
+    ap.add_argument("--refresh-stale-hours", type=float, default=None,
+                    help="force re-enrichment of anything last enriched more than N hours ago")
     args = ap.parse_args()
 
     # Targeted enrichment (--ids) runs enrichment only, no sweep/leads/dims.
@@ -91,6 +97,9 @@ def main() -> None:
             opp_ids=opp_ids,
             call_budget=args.budget,
             pace=args.pace,
+            hot_ttl_hours=args.hot_ttl_hours,
+            cold_ttl_hours=args.cold_ttl_hours,
+            refresh_stale_hours=args.refresh_stale_hours,
         )
         info = pipeline.run(source)
         print(f"[{inst}] {info}")

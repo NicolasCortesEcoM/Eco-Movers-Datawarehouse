@@ -1,0 +1,9 @@
+source_instance_id,branch_name,timezone,notes
+ld,Main Office,America/Los_Angeles,
+ld,South Sound LD,America/Los_Angeles,
+local,Bremerton,America/Los_Angeles,
+local,Kirkland,America/Los_Angeles,
+local,Long Distance Team,America/Los_Angeles,Nombre enganoso: es una branch de la instancia local. No usar branch para inferir LOB (decisions/0002).
+local,Lynnwood,America/Los_Angeles,
+local,Seattle,America/Los_Angeles,
+local,South Sound,America/Los_Angeles,

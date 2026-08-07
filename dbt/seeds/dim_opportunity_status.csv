@@ -1,0 +1,10 @@
+status_code,status_name,status_category,is_valid_lead,is_booked,is_completed,is_cancelled,is_lost,is_bad_lead,is_open,sort_order,description
+0,NewLead,open,1,0,0,0,0,0,1,10,Lead just received; nobody has worked it yet.
+1,LeadInProgress,open,1,0,0,0,0,0,1,20,Lead is being worked by sales.
+3,Opportunity,open,1,0,0,0,0,0,1,30,Qualified and quoted; still winnable.
+4,Booked,booked,1,1,0,0,0,0,0,40,Customer committed. The revenue milestone.
+10,Completed,completed,1,1,1,0,0,0,0,50,Move performed. Counts as booked because it passed through booking.
+11,Closed,closed,1,1,0,0,0,0,0,60,Job finished and closed out. Counts as booked for the same reason.
+20,Cancelled,cancelled,1,0,0,1,0,0,0,70,Was booked then cancelled. A valid lead that did not convert to revenue.
+30,Lost,lost,1,0,0,0,1,0,0,80,A real lead that chose someone else or stopped moving.
+50,BadLead,bad_lead,0,0,0,0,0,1,0,90,"Not a real lead (spam, duplicate, wrong service). Excluded from conversion denominators."

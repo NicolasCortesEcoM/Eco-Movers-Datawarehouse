@@ -23,12 +23,60 @@ Typical cost of `--job all --instance all`: **~30 calls** logged in `../scripts/
 
 ### `--job enrich` - the "All Jobs"-style detail layer (Path 1 body)
 
-The cheap `/api/customers?IncludeOpportunityInfo` sweep over `[today+from_offset, today+to_offset]` (default `[-7,+30]`) is the **change detector**. Only opportunities whose `(status, serviceDate, set of jobs)` signature changed since the previous run receive the expensive `GET /api/opportunities/{id}` call with **all 10 `Include*` flags** (estimates, origin/destination addresses, rates/charges, payments, trip info, documents; they do not cost extra quota). It lands in `raw_smartmoving.opportunities_enriched` plus child tables such as `__jobs`, `__jobs__estimated_charges`, `__jobs__job_addresses`, and `__payments`.
+The cheap `/api/customers?IncludeOpportunityInfo` sweep over `[today+from_offset, today+to_offset]` (default `[-7,+30]`) is the **change detector**. Only opportunities that changed or went stale receive the expensive `GET /api/opportunities/{id}` call with **all 10 `Include*` flags** (estimates, origin/destination addresses, rates/charges, payments, trip info, documents; they do not cost extra quota). It lands in `raw_smartmoving.opportunities_enriched` plus child tables such as `__jobs`, `__jobs__estimated_charges`, `__jobs__job_addresses`, and `__payments`.
 
-- **Watermark in dlt state** (`opp_hashes`): persists in the destination and works the same in duckdb and postgres. In steady state, an unchanged run costs **only the sweep pages** (0 enrichment calls).
-- **Soft-delete:** opportunities present in the previous run and absent in the current sweep are recorded in `raw_smartmoving.opportunity_deletions` (raw never physically deletes); a later enriched snapshot revives them in dbt.
-- **Initial seed (one time):** `python run.py --job enrich --dest postgres` with `local`. Because all opportunities are "new" the first time, it enriches the whole window; budget accordingly with `--budget` (see the quota section in the strategy). Later hourly runs only touch changes.
-- `--ids ...` skips the sweep and enriches concrete ids. This is what the webhook worker (Path 1) invokes after debounce.
+#### Three change detectors, because no single one is sufficient
+
+1. **Sweep hash.** A signature of *everything* the sweep returns for an opportunity. Cheap and immediate.
+   **It is structurally blind to money and to the custom `leadStatus`** — the sweep returns only
+   `{id, quoteNumber, status}` and `{job id, jobNumber, serviceDate, type}`. A re-quote, a charge edit, a
+   payment, or `leadStatus` moving CMET -> Booked produces an identical hash. No widening can fix this;
+   do not try.
+2. **Staleness TTL.** Bounded blindness. `--hot-ttl-hours` (default 24) refreshes opportunities with a
+   service date in `[today-3, today+21]`; `--cold-ttl-hours` (default 336 = 14 d) is the safety net for
+   the rest of the window. Tiered on purpose: a flat 24 h TTL over the whole window costs roughly
+   42k calls/month on `local`. `--refresh-stale-hours N` forces anything older than N hours.
+3. **Report-driven queue.** `marts.mart_enrichment_candidates`, fed by the daily zero-quota reports,
+   targets exactly the opportunities whose money or status the sweep cannot see. This is the real fix
+   for detector 1's blind spot.
+
+#### State schema (`dlt` source state, persisted in the destination)
+
+```
+st["opps"][<opportunity id>] = {
+    "h":    sweep hash of the last successful enrichment
+    "t":    ISO timestamp of that enrichment   (drives the TTL)
+    "seen": ISO timestamp of the last sighting (drives deletion detection)
+    "sd", "sdx": min/max service date YYYYMMDD (which sweep windows could see it)
+    "ls":   last known trimmed leadStatus
+    "gone", "gp", "g404": soft-delete marker, pending-emit flag, 404 origin
+}
+st["sweep"] = {"at": ISO, "from": YYYYMMDD, "to": YYYYMMDD}   # last COMPLETED sweep
+```
+
+Migrated automatically from the old `{opp_hashes, seen_ids, prior_ids}` layout on first run, seeding
+`t` to now so the upgrade does not re-enrich the whole window at once.
+
+#### Soft-delete
+
+Recorded in `raw_smartmoving.opportunity_deletions`; raw never physically deletes, and a later enriched
+snapshot revives the opportunity in dbt. Two independent triggers:
+
+- **`detail_404`** — the detail endpoint returned 404. Direct proof, immediate. This is the path an
+  `opportunity-deleted` webhook takes.
+- **`sweep_disappearance`** — a **completed** sweep whose window could have reached the opportunity did
+  not return it.
+
+> **Do not reintroduce a within-run presence diff.** dlt extracts resources **round-robin, interleaved** —
+> a resource yielded last can and does run before the sweep next to it has finished. Deletion is
+> therefore evaluated against the last sweep *recorded as complete in state*, which is correct whether
+> this resource runs early (detection lands next run) or late (immediate). Absence is also ignored for
+> opportunities whose service span falls outside the sweep window, because the window slides daily and
+> `opps_sweep [-7,+30]` and `nightly_reconciliation [-7,+45]` disagree. An ungated diff marks every
+> opportunity that merely aged out as deleted.
+
+- **Initial seed (one time):** `python run.py --job enrich --dest postgres` with `local`. Because all opportunities are "new" the first time, it enriches the whole window; budget accordingly with `--budget` (see the quota section in the strategy). Later runs only touch changes.
+- `--ids ...` skips the sweep and enriches concrete ids. This is what the webhook worker (Path 1) invokes after debounce. A 404 on one id no longer kills the batch.
 
 ## Destinations
 

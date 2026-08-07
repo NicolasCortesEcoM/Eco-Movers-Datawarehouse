@@ -1,0 +1,164 @@
+version: 2
+
+# Hand-maintained business mappings, originally the Google-Sheet dimension tables
+# under OLD_TABLES/. The column notes that used to live in a second header row of
+# those CSVs encode real business rules - they are preserved as descriptions here
+# rather than shipped as a phantom data row (CLAUDE.md: preserve the encoded rules).
+# Source CSVs stay in OLD_TABLES/ as the editing surface; these are the loaded copies.
+
+seeds:
+  - name: dim_instance
+    description: >
+      SmartMoving instance -> business entity. An instance is an API key/account, an
+      entity is a business: this company runs two instances for one entity, split by
+      line of business (decisions/0002). Must stay in sync with
+      pipeline/sm_pipeline/instances.py.
+    columns:
+      - name: instance_id
+        description: PK - id corto de la instancia SmartMoving.
+        data_tests: [not_null, unique]
+      - name: entity_id
+        description: FK - entidad de negocio (una entidad puede tener varias instancias).
+        data_tests: [not_null]
+      - name: entity_name
+        description: Nombre para reportes.
+      - name: timezone
+        description: >
+          IANA timezone para derivar fechas locales - the OPERATING timezone, used as
+          the fallback when a branch has no explicit zone. Authority for operational
+          local dates is core.branches.timezone.
+        data_tests: [not_null]
+      - name: crm_timezone
+        description: >
+          IANA timezone the SmartMoving instance itself is configured with. This is
+          what every scheduled-report column renders in - including the ones the
+          vendor misleadingly names "* at Utc", which are NOT UTC. Distinct from
+          `timezone`: branches can operate in zones the CRM does not render in, and a
+          future company will run its CRM in a different zone entirely. Never hardcode
+          a zone in a report cast; resolve it from here per source_instance_id.
+        data_tests: [not_null]
+      - name: lob_hint
+        description: >
+          Senal primaria de LOB cuando la instancia separa lineas de negocio (prevalece
+          sobre dim_lob_map).
+      - name: api_key_env
+        description: Variable de entorno con el API key.
+
+  - name: branch_timezone
+    description: >
+      Per-branch timezone override. Only needed where a branch operates in a zone
+      other than its instance default; core.branches falls back to
+      dim_instance.timezone when there is no row here. Everything is Pacific today -
+      the table exists so onboarding a company that spans zones is a seed edit, not a
+      model rewrite.
+    columns:
+      - name: source_instance_id
+        data_tests: [not_null]
+      - name: branch_name
+        data_tests: [not_null]
+      - name: timezone
+        description: IANA name, e.g. America/Chicago.
+        data_tests: [not_null]
+
+  - name: dim_opportunity_status
+    description: >
+      THE authoritative status enum, straight from the SmartMoving API contract.
+      One row per integer `status` value; this is the field every metric counts on,
+      for both leads and opportunities.
+
+      Note two rules that are easy to get wrong: Completed (10) and Closed (11) both
+      carry is_booked=1, because a job that finished necessarily passed through
+      booking - excluding them would under-count revenue. And BadLead (50) is the
+      only status with is_valid_lead=0, so it is the one to exclude from
+      conversion-rate denominators.
+    columns:
+      - name: status_code
+        description: The integer as the API returns it.
+        data_tests: [not_null, unique]
+      - name: status_name
+        description: Official enum name (NewLead, Booked, Cancelled, Lost, BadLead...).
+        data_tests: [not_null, unique]
+      - name: status_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['open', 'booked', 'completed', 'closed', 'cancelled', 'lost', 'bad_lead']
+
+  - name: dim_status_map
+    description: >
+      Business classification of the STATUS STRING as the scheduled reports emit it -
+      the enum name plus a lost/cancelled subcategory, e.g. "Lost price too high",
+      "Cancelled no availability". Measured coverage against the Lead Status export:
+      99% of 5,278 rows.
+
+      This is NOT a map of the CRM's `leadStatus` pipeline label (CMET, Follow Up).
+      That field is context, not a metric, and deliberately has no mapping here.
+
+      Use dim_opportunity_status when you have the integer, and this seed when you
+      have a report string and want the subcategory too. Both resolve to the same
+      status_category vocabulary, so counts agree whichever side you come from.
+
+      Keys mix plain statuses with subcategory concatenations, and the report's
+      casing/punctuation drifts, so joins go through the norm_text macro on both sides.
+    columns:
+      - name: status_raw
+        description: PK - the status string exactly as the report emits it.
+        data_tests: [not_null, unique]
+      - name: status_category
+        description: Same vocabulary as dim_opportunity_status.status_category.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['open', 'booked', 'completed', 'closed', 'cancelled', 'lost', 'bad_lead']
+
+  - name: dim_lob_map
+    description: >
+      Rule-based line-of-business classification, evaluated by priority (lowest first).
+      service_type is the reliable signal; branch_name is NOT - the `local` instance has
+      a branch literally named "Long Distance Team" (decisions/0002).
+    columns:
+      - name: rule_id
+        data_tests: [not_null, unique]
+      - name: priority
+        data_tests: [not_null]
+
+  - name: dim_referral_source
+    description: >
+      Referral source -> marketing channel mapping and historical LOB mix. Rows whose
+      every column was blank in the source sheet are dropped on load; is_placeholder
+      marks CRM values that mean "field not filled in".
+    columns:
+      - name: referral_source_raw
+        description: PK - valor exacto del campo 'Referral Source' en bz_leads.
+        data_tests: [not_null, unique]
+      - name: source_clean
+        description: Nombre para reportes.
+      - name: channel_group
+        description: "Paid Search | Paid Social | GBP | Organic | Referral | Direct | Affiliate | AI | Internal | Unknown"
+      - name: platform
+        description: "Google | Meta | Bing | Yelp | Word of Mouth | Return | etc."
+      - name: is_paid
+        description: TRUE si requiere spend de marketing para generar el lead.
+      - name: campaign_clean_fk
+        description: FK -> dim_campaign.campaign_clean (solo si is_paid=TRUE).
+      - name: lob_affinity
+        description: Primary LOB que esta fuente tiende a generar (Local/LD/Commercial/Mixed).
+      - name: pct_commercial
+        description: "% leads Commercial historico (calculado de sv_campaign_lob_mix)."
+      - name: pct_ld
+        description: "% leads Long Distance historico."
+      - name: pct_local
+        description: "% leads Local historico."
+      - name: is_placeholder
+        description: TRUE si este valor es un placeholder del CRM (= campo no llenado).
+      - name: data_quality_flag
+        description: "OK | PLACEHOLDER | AMBIGUOUS | NEEDS_SPLIT"
+
+  - name: dim_sales_team
+    description: >
+      Sales/admin team assignment keyed on the same raw referral-source string as
+      dim_referral_source (the source sheet overloads that column to carry rep and
+      team names alongside true marketing sources).
+    columns:
+      - name: referral_source_raw
+        data_tests: [not_null, unique]

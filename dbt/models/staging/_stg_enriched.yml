@@ -1,0 +1,165 @@
+version: 2
+
+# Staging for the opportunity-enrichment payload. Every grain claim below is
+# tested, not asserted - these models are the foundation the observation layer and
+# every money metric sit on, so an undetected fan-out here corrupts everything
+# downstream.
+
+models:
+  - name: stg_smartmoving__opportunities_enriched
+    description: >
+      Enriched opportunities from GET /api/opportunities/{id} with all 10 Include*
+      flags. Grain: (source_instance_id, external_opportunity_id). Renamed and typed
+      only - no business logic.
+    columns:
+      - name: opportunity_key
+        description: Grain key. Composite because SmartMoving GUIDs are unique only within an instance.
+        data_tests: [not_null, unique]
+      - name: source_instance_id
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['ld', 'local']}
+      - name: entity_id
+        data_tests: [not_null]
+      - name: external_opportunity_id
+        data_tests: [not_null]
+      - name: opportunity_dlt_id
+        description: dlt row id; the join handle every child table uses.
+        data_tests: [not_null, unique]
+      - name: quote_number
+        description: >
+          Normalised to text. bigint at source here, varchar on the sweep - the
+          crosswalk cannot join without this cast.
+        data_tests:
+          - unique:
+              config:
+                where: "quote_number is not null"
+      - name: pipeline_status
+        description: >
+          The CRM's free-form pipeline label ("CMET", "Follow Up"). Context only -
+          NEVER count metrics on it; it is independent of the outcome, so a Lost
+          opportunity can still read 'Booked' here. Trimmed, because both 'Booked'
+          and 'Booked ' occur at source and untrimmed they split into two values.
+      - name: status_code
+        description: >
+          THE authoritative outcome. Int enum joined to dim_opportunity_status for
+          labels and is_* flags. Verified identical to the sweep's status for all
+          657 opportunities.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_opportunity_status')
+              field: status_code
+      - name: estimated_final_total
+        description: The money. 100% populated.
+        data_tests: [not_null]
+      - name: observed_at
+        description: Snapshot time; the ordering key for the Phase 4 observation layer.
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]
+
+  - name: stg_smartmoving__opportunity_jobs
+    description: "Jobs under an enriched opportunity. Grain: (source_instance_id, external_job_id)."
+    columns:
+      - name: job_key
+        data_tests: [not_null, unique]
+      - name: external_job_id
+        data_tests: [not_null]
+      - name: job_dlt_id
+        data_tests: [not_null, unique]
+      - name: external_opportunity_id
+        description: Every job must resolve to its parent opportunity.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_smartmoving__opportunities_enriched')
+              field: external_opportunity_id
+      - name: job_date
+        description: Local business date. Never timezone-converted.
+        data_tests: [not_null]
+
+  - name: stg_smartmoving__opportunity_job_charges
+    description: >
+      Estimated and actual charge lines in one model, separated by charge_kind.
+      Grain: (source_instance_id, external_job_id, charge_kind, charge_seq).
+    columns:
+      - name: charge_key
+        data_tests: [not_null, unique]
+      - name: charge_kind
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['estimated', 'actual']}
+      - name: external_job_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_smartmoving__opportunity_jobs')
+              field: external_job_id
+      - name: charge_category_code
+        description: Int enum (observed 1,2,3,4,7,9,10). Unlabelled pending a verified seed.
+        data_tests: [not_null]
+      - name: total_cost
+        data_tests: [not_null]
+
+  - name: stg_smartmoving__opportunity_job_addresses
+    description: >
+      Flat address strings per job. Grain: (source_instance_id, external_job_id,
+      address_seq). Origin/destination is NOT inferable from the ordinal.
+    columns:
+      - name: address_key
+        data_tests: [not_null, unique]
+      - name: address_full
+        data_tests: [not_null]
+      - name: external_job_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_smartmoving__opportunity_jobs')
+              field: external_job_id
+
+  - name: stg_smartmoving__opportunity_job_crew
+    description: "Crew names per job. Grain: (source_instance_id, external_job_id, crew_seq)."
+    columns:
+      - name: crew_key
+        data_tests: [not_null, unique]
+
+  - name: stg_smartmoving__opportunity_payments
+    description: >
+      Payments per opportunity. Grain: (source_instance_id, external_opportunity_id,
+      payment_seq) - the payload carries no payment id.
+    columns:
+      - name: payment_key
+        data_tests: [not_null, unique]
+      - name: amount
+        data_tests: [not_null]
+      - name: external_opportunity_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_smartmoving__opportunities_enriched')
+              field: external_opportunity_id
+
+  - name: stg_smartmoving__opportunity_contacts
+    description: >
+      Extra named contacts per opportunity. Grain: (source_instance_id,
+      external_opportunity_id, contact_seq). No list endpoint exposes these.
+    columns:
+      - name: contact_key
+        data_tests: [not_null, unique]
+
+  - name: stg_smartmoving__opportunity_surveys
+    description: >
+      Surveys/estimates per opportunity. Grain: (source_instance_id,
+      external_opportunity_id, survey_seq). start_at_utc is a genuine UTC instant.
+    columns:
+      - name: survey_key
+        data_tests: [not_null, unique]
+
+  - name: stg_smartmoving__branches
+    description: Branch reference list, renamed and typed. Feeds core.branches.
+    columns:
+      - name: external_branch_id
+        data_tests: [not_null, unique]
+      - name: branch_name
+        data_tests: [not_null]

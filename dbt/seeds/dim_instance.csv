@@ -1,0 +1,3 @@
+instance_id,entity_id,entity_name,timezone,crm_timezone,lob_hint,api_key_env,notes
+ld,ecomovers,EcoMovers,America/Los_Angeles,America/Los_Angeles,long_distance,SMARTMOVING_API_KEY_LD,Instancia solo Long Distance / Interstate
+local,ecomovers,EcoMovers,America/Los_Angeles,America/Los_Angeles,local_commercial,SMARTMOVING_API_KEY_LOCAL,Instancia Local + Commercial. ⚠️ tiene branch 'Long Distance Team' — no usar branch para LOB

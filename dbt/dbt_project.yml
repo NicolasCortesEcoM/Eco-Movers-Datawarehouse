@@ -9,6 +9,51 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
 
+# dbt drops and recreates core/serving tables, which drops their RLS policies.
+# Re-apply them in the same invocation - otherwise app_read can read every
+# entity's rows until someone remembers to run sql/10_apply_rls.sql by hand.
+on-run-end:
+  - "{{ apply_rls() }}"
+
+seeds:
+  datawarehouse:
+    +schema: staging      # hand-maintained dimensions live alongside staging views
+    dim_instance:
+      +column_types:
+        instance_id: text
+        entity_id: text
+        timezone: text
+        crm_timezone: text
+    branch_timezone:
+      +column_types:
+        source_instance_id: text
+        branch_name: text
+        timezone: text
+    # The is_* flags are written as 0/1 in the CSVs (they came from spreadsheets).
+    # Load them as real booleans so `where is_booked` just works - forcing every
+    # consumer to remember `= 1` is exactly the kind of papercut that makes a
+    # warehouse feel hostile to someone new to it.
+    dim_opportunity_status:
+      +column_types:
+        status_code: integer
+        sort_order: integer
+        is_valid_lead: boolean
+        is_booked: boolean
+        is_completed: boolean
+        is_cancelled: boolean
+        is_lost: boolean
+        is_bad_lead: boolean
+        is_open: boolean
+    dim_status_map:
+      +column_types:
+        is_valid_lead: boolean
+        is_booked: boolean
+        is_completed: boolean
+        is_cancelled: boolean
+        is_lost: boolean
+        is_bad_lead: boolean
+        is_open: boolean
+
 # Layers map to Postgres schemas via the generate_schema_name macro (literal, not
 # prefixed). raw is dlt-loaded; dbt owns staging -> core -> marts -> serving.
 models:

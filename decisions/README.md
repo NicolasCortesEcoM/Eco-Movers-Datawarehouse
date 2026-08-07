@@ -10,3 +10,4 @@ If you're about to argue for a separate analytical warehouse, Dagster, per-compa
 | [0002](0002-instance-not-entity.md) | A SmartMoving instance is not a business entity | Accepted |
 | [0003](0003-hybrid-serving-plus-core-read.md) | App teams read `serving` **and** read-only `core` | Accepted |
 | [0004](0004-n8n-not-dagster.md) | n8n orchestrates Phase 1; Dagster is deferred | Accepted |
+| [0005](0005-latest-observation-wins-is-per-field.md) | "Latest observation wins" resolves **per field**, not per row | Accepted |

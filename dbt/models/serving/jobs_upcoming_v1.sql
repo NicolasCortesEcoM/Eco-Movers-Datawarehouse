@@ -3,11 +3,9 @@
 -- via the app_read role (RLS-scoped by entity_id). Additive changes ship freely;
 -- breaking changes require a v2 with 90-day overlap.
 --
--- "Today" is evaluated in the entity's operating timezone (all EcoMovers
--- branches are America/Los_Angeles). When an entity in another timezone is
--- onboarded, this generalizes to a per-branch/per-entity timezone join.
-
-{% set today_local = "(now() at time zone 'America/Los_Angeles')::date" %}
+-- "Today" is evaluated per row in that job's own timezone, carried through
+-- core.jobs from core.branches / dim_instance. No zone is hardcoded, so a
+-- company operating in another zone gets the right day without a model change.
 
 select
     job_key,
@@ -16,9 +14,9 @@ select
     external_job_id,
     job_number,
     quote_number,
-    opportunity_status_label            as status,
+    opportunity_status_label                    as status,
     service_date,
-    (service_date - {{ today_local }})  as days_until_service,
+    (service_date - {{ entity_today('timezone') }}) as days_until_service,
     service_type_name,
     customer_name,
     customer_phone,
@@ -26,5 +24,5 @@ select
     customer_address,
     synced_at
 from {{ ref('jobs') }}
-where service_date >= {{ today_local }}
-  and service_date <  {{ today_local }} + 11
+where service_date >= {{ entity_today('timezone') }}
+  and service_date <  {{ entity_today('timezone') }} + 11

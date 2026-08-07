@@ -1,9 +1,11 @@
 -- serving.leads_today_v1 - PUBLIC CONTRACT (Sales).
--- Leads received today (created_date_local = today in the entity timezone),
--- one row per lead. Consumed via app_read (RLS-scoped by entity_id).
--- Additive changes ship freely; breaking changes require v2 + 90-day overlap.
-
-{% set today_local = "(now() at time zone 'America/Los_Angeles')::date" %}
+-- Leads received today, one row per lead. Consumed via app_read (RLS-scoped by
+-- entity_id). Additive changes ship freely; breaking changes require v2 + 90-day
+-- overlap.
+--
+-- "Today" is evaluated per row in that lead's own branch timezone (core.branches,
+-- carried through core.leads), not in one hardcoded zone - so a company spanning
+-- zones gets the right day on every row.
 
 select
     lead_key,
@@ -31,4 +33,4 @@ select
     created_at_local,
     synced_at
 from {{ ref('leads') }}
-where created_date_local = {{ today_local }}
+where created_date_local = {{ entity_today('timezone') }}

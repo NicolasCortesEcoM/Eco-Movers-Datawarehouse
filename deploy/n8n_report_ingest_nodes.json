@@ -1,0 +1,68 @@
+{
+  "meta": { "instanceId": "report_ingest_patch" },
+  "nodes": [
+    {
+      "parameters": {
+        "url": "={{ $json.download_url }}",
+        "options": { "timeout": 120000, "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } } }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -100],
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Download Report File",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "data",
+        "options": {
+          "headerRow": true,
+          "includeEmptyCells": true,
+          "readAsString": true,
+          "sheetName": "={{ $('Resolve Report Metadata').item.json.sheet_name }}"
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [880, -100],
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Extract Report Rows"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT\n  {{ $('Resolve Report Metadata').first().json.expected_records }}::int AS expected_records,\n  (SELECT count(*)\n     FROM raw_smartmoving.{{ $('Resolve Report Metadata').first().json.target_table }}\n    WHERE source_instance_id  = $1\n      AND report_generated_at = $2::timestamptz) AS landed_records",
+        "options": {
+          "queryReplacement": "={{ [$('Resolve Report Metadata').first().json.source_instance_id, $('Resolve Report Metadata').first().json.report_generated_at] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [1540, -100],
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Verify Landed Row Count",
+      "executeOnce": true,
+      "credentials": { "postgres": { "id": "V1zOLBFlGPXLCEWH", "name": "Datawarehouse Postgres" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $input.first().json;\nconst meta = $('Resolve Report Metadata').first().json;\n\nconst expected = (r.expected_records === null || r.expected_records === undefined)\n  ? null\n  : Number(r.expected_records);\nconst landed = Number(r.landed_records);\n\n// SmartMoving states the record count in the email body. A mismatch means rows were\n// dropped somewhere between the download and the insert. Throwing routes this to\n// datawarehouse_error_handler, which alerts on Slack: a truncated report that lands\n// quietly is far worse than one that fails loudly, because every downstream number\n// silently becomes wrong.\nif (expected !== null && landed !== expected) {\n  throw new Error(\n    'Row count mismatch for ' + meta.report_type + ' / ' + meta.source_instance_id +\n    ': SmartMoving reported ' + expected + ' records, ' + landed + ' landed. ' +\n    'Do not trust downstream numbers for this report until resolved.'\n  );\n}\n\nreturn [{\n  json: {\n    report_type: meta.report_type,\n    source_instance_id: meta.source_instance_id,\n    report_generated_at: meta.report_generated_at,\n    expected_records: expected,\n    landed_records: landed,\n    verified: true,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, -100],
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Assert Row Count Matches"
+    }
+  ],
+  "connections": {
+    "Download Report File": { "main": [[{ "node": "Extract Report Rows", "type": "main", "index": 0 }]] },
+    "Verify Landed Row Count": { "main": [[{ "node": "Assert Row Count Matches", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {}
+}

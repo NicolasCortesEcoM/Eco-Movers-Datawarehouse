@@ -17,6 +17,67 @@ sources:
         description: Branch reference list per instance.
       - name: leads
         description: Leads created in the polled date window.
+      # --- Opportunity enrichment: GET /api/opportunities/{id} with all 10 Include*
+      # flags, landed by dlt as a parent plus 12 child tables. This is the richest
+      # data the warehouse holds. Child tables carry no instance stamp of their own -
+      # dlt stamps only the root row - so every child model joins back up through
+      # _dlt_parent_id / _dlt_root_id. Verified: those keys resolve 100% (765/765
+      # jobs, 1458/1458 charges).
+      - name: opportunities_enriched
+        description: >
+          Full opportunity payload per id. Grain (source_instance_id, id), verified
+          unique. Carries the money (estimated_total__*), the custom pipeline status
+          (lead_status), contacts, branch, tariff, estimator and sales assignee.
+        columns:
+          - name: lead_status
+            description: >
+              The custom pipeline status STRING - a different namespace from the
+              `status` int. Arrives with inconsistent trailing whitespace: both
+              'Booked' (283) and 'Booked ' (51) occur in the same column, so it must
+              be trimmed before any grouping or join or booked counts run ~15% low.
+          - name: quote_number
+            description: >
+              bigint here, but character varying on customers_service_window__opportunities.
+              Cast to text on this side when joining the two.
+      - name: opportunities_enriched__jobs
+        description: Jobs under an enriched opportunity. job_date is a YYYYMMDD int (ISO string in the sweep).
+      - name: opportunities_enriched__jobs__estimated_charges
+        description: Quoted charge lines per job. Identical shape to actual_charges.
+      - name: opportunities_enriched__jobs__actual_charges
+        description: Billed charge lines per job. Identical shape to estimated_charges.
+      - name: opportunities_enriched__jobs__job_addresses
+        description: >
+          Flat address STRINGS per job, ordered by _dlt_list_idx. Not an
+          origin/destination pair: 84 jobs carry one address, 645 two, 29 three, 2 four.
+          Structured components come from the All Jobs report, not from here.
+      - name: opportunities_enriched__jobs__crew_members
+        description: Crew member names per job (flat strings).
+      - name: opportunities_enriched__jobs__job_documents
+        description: Document titles per job. High volume (~12 per job); only counted, not modeled row-by-row.
+      - name: opportunities_enriched__opportunity_documents
+        description: Document titles per opportunity. Counted, not modeled row-by-row.
+      - name: opportunities_enriched__opportunity_files
+        description: Blob URLs of files attached to the opportunity. Counted only.
+      - name: opportunities_enriched__photos
+        description: Blob URLs of photos attached to the opportunity. Counted only.
+      - name: opportunities_enriched__payments
+        description: >
+          Payments recorded against the opportunity. No natural id in the payload,
+          so the grain is (opportunity, _dlt_list_idx).
+      - name: opportunities_enriched__contacts
+        description: Additional named contacts on the opportunity. Not available from any list endpoint.
+      - name: opportunities_enriched__surveys
+        description: Scheduled surveys/estimates with assignee and notes.
+
+      # --- Scheduled reports, landed by n8n from email. Zero API quota.
+      - name: report_lead_status
+        description: >
+          THE MOST IMPORTANT REPORT. Keyed on lead RECEIVED date, so one export
+          returns every lead and opportunity received in a period regardless of
+          outcome - the denominator for any conversion rate. Carries the
+          authoritative `Status` with its lost/cancelled subcategory. 16 columns;
+          the sample export is 5,278 rows. See sql/33_report_lead_status.sql.
+
       - name: webhook_events
         description: >
           SmartMoving webhook envelopes landed by n8n (Camino 1). One row per event;

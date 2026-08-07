@@ -80,11 +80,16 @@ class SmartMoving:
         m = _RETRY_SECS_RE.search(r.text or "")
         return int(m.group(1)) + 1 if m else 30
 
-    def get(self, path: str, **params):
+    def get(self, path: str, *, allow_missing: bool = False, **params):
         # SmartMoving enforces a short-window rate limit (429 "Try again in N
         # seconds") on top of the monthly quota - confirmed live 2026-07-22 when a
         # burst of enrichment calls tripped it. 429 is retryable (respect the
         # advised wait); 5xx is retryable with backoff; other 4xx are a hard stop.
+        #
+        # allow_missing=True turns a 404 into None instead of an exception. Used by
+        # enrichment: an `opportunity-deleted` webhook feeds the id straight back to
+        # GET /api/opportunities/{id}, and without this one 404 kills the whole run
+        # and takes every other id batched into the same --ids call with it.
         for attempt in range(self.max_retries + 1):
             if self.calls_made >= self.budget:
                 raise BudgetExceeded(f"session budget of {self.budget} calls reached")
@@ -113,6 +118,8 @@ class SmartMoving:
             if r.status_code >= 500 and attempt < self.max_retries:
                 time.sleep(2 ** attempt)  # exponential backoff on transient server errors
                 continue
+            if r.status_code == 404 and allow_missing:
+                return None  # gone at source - caller records a soft-delete marker
             if r.status_code >= 400:
                 raise requests.HTTPError(f"{r.status_code} on {path}: {r.text[:300]}", response=r)
             return body

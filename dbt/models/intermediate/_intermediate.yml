@@ -20,3 +20,89 @@ models:
                 values: ['ld', 'local']
       - name: opportunity_status_code
         tests: [not_null]
+
+  - name: int_opportunity_observations
+    description: >
+      Every observation any source has made about an opportunity. One row =
+      "source S said this about opportunity O at time T". Wide and nullable on
+      purpose: a source contributes NULL for fields it does not know, and
+      pick_latest skips nulls, which is what lets a report add invoiced_amount
+      without erasing the API's estimated_total. Nothing is resolved here.
+      Adding a source is a `union all` arm and nothing else.
+    columns:
+      - name: opportunity_key
+        data_tests: [not_null]
+      - name: source
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['api_enrichment', 'api_webhook', 'api_sweep', 'api_deletion']
+      - name: observed_at
+        data_tests: [not_null]
+      - name: source_priority
+        description: Tie-breaker when two sources share an observed_at. Lower wins.
+        data_tests: [not_null]
+
+  - name: int_opportunity_latest_by_source
+    description: >
+      Newest observation per (opportunity, source). The fan-in point every field in
+      core.opportunities reads through; materialized as a table for that reason.
+    columns:
+      - name: opportunity_key
+        data_tests: [not_null]
+      - name: source
+        data_tests: [not_null]
+
+  - name: int_job_observations
+    description: >
+      Every observation any source has made about a job. Same shape and rules as
+      int_opportunity_observations. The Phase 5 report_all_jobs arm lands here and
+      brings structured origin/destination, actual costs and lifecycle timestamps.
+    columns:
+      - name: job_key
+        data_tests: [not_null]
+      - name: source
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['api_enrichment', 'api_sweep', 'report_all_jobs']}
+      - name: observed_at
+        data_tests: [not_null]
+
+  - name: int_job_latest_by_source
+    description: Newest observation per (job, source). Fan-in point for core.jobs.
+    columns:
+      - name: job_key
+        data_tests: [not_null]
+
+  - name: int_opportunity_quote_crosswalk
+    description: >
+      (source_instance_id, quote_number) -> external_opportunity_id. The bridge every
+      Quote#-keyed scheduled report needs in order to attach to anything. Built from
+      API sources only; a report must resolve against the API, never against another
+      report. The composite key is mandatory - quote numbers are unique only within
+      an instance.
+    columns:
+      - name: quote_key
+        description: Grain key, source_instance_id:quote_number.
+        data_tests: [not_null, unique]
+      - name: source_instance_id
+        data_tests: [not_null]
+      - name: quote_number
+        data_tests: [not_null]
+      - name: external_opportunity_id
+        data_tests: [not_null]
+      - name: resolved_at
+        data_tests: [not_null]
+
+  - name: int_opportunity_attachment_counts
+    description: >
+      Documents, files and photos per opportunity as COUNTS. job_documents alone is
+      ~12 rows per job and carries no URL or id, so the rows themselves are not worth
+      modeling; URLs need a Premium call that is out of scope.
+    columns:
+      - name: external_opportunity_id
+        data_tests: [not_null, unique]
+      - name: document_count
+        data_tests: [not_null]
+      - name: job_document_count
+        data_tests: [not_null]

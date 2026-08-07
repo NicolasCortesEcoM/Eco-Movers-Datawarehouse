@@ -1,0 +1,5 @@
+rule_id,client_id,lob_category,field_name,match_type,match_value,priority,notes
+1,client_template,interstate,service_type,contains,LD,1,"Primary. e.g. 'LD Load', 'Moving LD'. More reliable than branch_name."
+2,client_template,interstate,service_type,contains,International,1,Long distance international jobs.
+3,client_template,local,service_type,default,*,99,Catch-all: any service_type not matched above → local.
+4,client_template,AVOID,branch_name,contains,MMM Interstate,2,⚠️ UNRELIABLE: agents sometimes use MMM Interstate branch for local jobs. Use service_type rules instead (priority 1).

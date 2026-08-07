@@ -1,0 +1,26 @@
+{
+ "dim_instance.csv": {
+  "instance_id": "PK — id corto de la instancia SmartMoving",
+  "entity_id": "FK — entidad de negocio (una entidad puede tener varias instancias)",
+  "entity_name": "Nombre para reportes",
+  "timezone": "IANA timezone para derivar fechas locales",
+  "lob_hint": "Señal primaria de LOB cuando la instancia separa líneas de negocio (prevalece sobre dim_lob_map)",
+  "api_key_env": "Variable de entorno con el API key",
+  "notes": ""
+ },
+ "dim_referral_source.csv": {
+  "referral_source_raw": "PK — valor exacto del campo 'Referral Source' en bz_leads",
+  "source_clean": "Nombre para reportes",
+  "channel_group": "Paid Search | Paid Social | GBP | Organic | Referral | Direct | Affiliate | AI | Internal | Unknown",
+  "platform": "Google | Meta | Bing | Yelp | Word of Mouth | Return | etc.",
+  "is_paid": "TRUE si requiere spend de marketing para generar el lead",
+  "campaign_clean_fk": "FK → dim_campaign.campaign_clean (solo si is_paid=TRUE)",
+  "lob_affinity": "Primary LOB que este fuente tiende a generar (Local/LD/Commercial/Mixed)",
+  "pct_commercial": "% leads Commercial histórico (calculado de sv_campaign_lob_mix)",
+  "pct_ld": "% leads Long Distance histórico",
+  "pct_local": "% leads Local histórico",
+  "is_placeholder": "TRUE si este valor es un placeholder del CRM (= campo no llenado)",
+  "data_quality_flag": "OK | PLACEHOLDER | AMBIGUOUS | NEEDS_SPLIT",
+  "notes": ""
+ }
+}

@@ -1,4 +1,4 @@
-﻿status_raw,status_category,status_subcategory,is_valid_lead,is_booked,is_completed,is_cancelled,is_lost,is_bad_lead,is_open,description
+status_raw,status_category,status_subcategory,is_valid_lead,is_booked,is_completed,is_cancelled,is_lost,is_bad_lead,is_open,description
 Bad lead,bad_lead,general,0,0,0,0,0,1,0,General invalid lead.
 Bad lead 3rd party referred,bad_lead,bad_referred_out,0,0,0,0,0,1,0,Referred to another company.
 Bad lead bad email address,bad_lead,bad_contact_info,0,0,0,0,0,1,0,Email invalid — exclude from all metrics.
