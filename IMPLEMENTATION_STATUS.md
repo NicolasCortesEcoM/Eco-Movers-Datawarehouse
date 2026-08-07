@@ -43,33 +43,72 @@ and Premium per-job calls. These are all reachable later; none is required for t
 
 ---
 
+## Working rule: the droplet is the environment
+
+**We do not work locally.** Every structural change - a dbt model, a seed, a file in `sql/` - is
+applied to the droplet in the same session it is made. Nothing is live for consumers yet, and the
+point of the rule is that "going live" should be a permissions change rather than a migration.
+
+One command does it:
+
+```bash
+python deploy/sync_droplet.py          # sync + dbt seed + build + test, under flock
+python deploy/sync_droplet.py --sql    # also replay sql/*.sql (idempotent DDL)
+```
+
+See [deploy/README.md](deploy/README.md). **Evidence of completion must come from querying the
+droplet**, not from a local build.
+
+> The failure this prevents actually happened: on 2026-08-07 the report ingestion landed 4,801
+> verified rows on the droplet while the droplet was still running the pre-Phase-2 dbt project.
+> Everything was green locally and nothing there consumed the report.
+
+---
+
 ## Next Immediate Step
 
-**Phase 0 - unblock the cadence.** Everything else is gated on these.
+**Wire the report into the observation layer.** `staging.stg_smartmoving__report_lead_status` is
+live on the droplet and typing all 4,801 rows correctly, but `marts.int_opportunity_observations`
+still has only the three API arms (`api_enrichment` 657, `api_sweep` 708, `api_webhook` 33,240) and
+**zero report rows**. The report is landed, typed, and read by nothing. Adding the
+`report_lead_status` arm (priority 5) is what turns it into data other teams can see.
 
-1. **Deploy dbt to the droplet host.** `deploy/host_bootstrap.sh` currently ships only `pipeline/` +
-   `scripts/`. **Nothing on the droplet runs `dbt build`** - the five n8n workflows only call `run.py`.
-   A 4-5x/day refresh is meaningless while `serving` is rebuilt by hand from the laptop.
-   Add `dbt-postgres` to the venv, `scp` the `dbt/` directory, and wrap every dbt SSH node in
-   `flock -w 600 /var/lock/dw-dbt.lock -c '<cmd>'` so two builds never overlap.
+Then, in order:
 
-   > **This is now the single binding constraint, confirmed by audit on 2026-08-07.** Report
-   > ingestion lands 4,801 verified rows on the droplet, but the droplet is still running the
-   > **pre-Phase-2 dbt project** - `core` holds only `jobs` and `leads`, `staging` only 6 views,
-   > `marts` only `int_opportunity_status_latest`, and **no seeds at all**. Every Phase 2-4 model
-   > (`core.branches`, `core.opportunities`, the observation layer) and the report staging model
-   > exist in git and are green locally, but **nothing on the droplet consumes the landed report**.
-   > Until dbt runs there, `report_lead_status` is a table nobody reads.
-2. **Deploy the pipeline on the host** (`/opt/datawarehouse`) per [deploy/README.md](deploy/README.md),
-   then **confirm the n8n SSH credential** (`SSH Password account`, id `1wkrc8PhMPB14wEp`) points at the
-   droplet host, and **publish the 6 draft workflows**.
-3. **Run the four read-only probes** in "Open Questions" below - each can invalidate a design choice.
-4. **Start decision H1 immediately** (mailbox -> instance mapping). It is the only external blocker, and
-   everything through Phase 4 ships without it.
+1. **Import `deploy/n8n_dbt_build_reports.json`** and activate it (07:00 PT daily) - see "What you
+   need to do" at the end of this section.
+2. **Schedule the reports in the SmartMoving UI** (H2). Lead Status first: it is the denominator.
+3. **Remove the temporary `reporting@ecomoversmoving.com` alias** from `Resolve Report Metadata`
+   once the two per-instance aliases are live, and clear the one stale row in
+   `report_ingest_errors` before that table is wired to an alert.
+4. **Deploy the pipeline schedules**: confirm the n8n SSH credential (`SSH Password account`, id
+   `1wkrc8PhMPB14wEp`) points at the droplet host and publish the 6 draft workflows. Note their
+   paths must change from `/opt/datawarehouse` to `/home/datawarehouse_user/datawarehouse`.
+5. **The other three report staging models** + the Playwright bot for All Jobs.
 
-> The warehouse is **migrated and live on the droplet**. Local access: SSH tunnel in **Windows
-> PowerShell** (not WSL), `ssh -L 5433:localhost:5432 <droplet_ssh_user>@<droplet_ssh_host>` (values in
-> laptop `.env`); the laptop connects to `127.0.0.1:5433`.
+> Local read access when needed: SSH tunnel in **Windows PowerShell** (not WSL),
+> `ssh -L 5433:localhost:5432 <droplet_ssh_user>@<droplet_ssh_host>` (values in laptop `.env`);
+> the laptop connects to `127.0.0.1:5433`. Port 5432 is not exposed publicly, by design.
+
+### dbt on the droplet - DONE 2026-08-07
+
+`deploy/sync_droplet.py` created and run. **`PASS=198 WARN=0 ERROR=0 SKIP=0` on the droplet**,
+identical to local. Verified by querying the droplet directly:
+
+| | |
+|---|---|
+| dbt objects | **38** (6 `core` tables, 7 `marts`, 2 `serving`, 16 staging views, 7 seeds) |
+| `core` row counts | opportunities 2,093 - jobs 835 - charges 1,579 - payments 41 - branches 8 - leads 48 |
+| Report staging | 4,801 rows, **4,801 with quote / status / received_at / revenue** - no parse gaps |
+| Timezone | `crm_timezone` resolves to `America/Los_Angeles`; `8/7/2026 7:16 AM` wall clock stores as `14:16Z` and renders back to `07:16` Pacific |
+| RLS | enabled on all 8 `core` + `serving` tables; `core.entity_access` correctly exempt |
+| `app_read` | `raw_smartmoving` USAGE = **false**, `core` + `serving` = true |
+
+Deployment lives at **`/home/datawarehouse_user/datawarehouse`**, not `/opt/datawarehouse` as every
+earlier draft of the docs said: `/opt` on this droplet is mode 700 owned by another application's
+service user, and claiming space there would mean loosening permissions on a directory that is not
+ours. `sql/00_bootstrap.sql` is excluded from the routine sync - it needs a superuser and ran once
+at provisioning.
 
 ---
 
@@ -323,7 +362,7 @@ one-liner. Flags load as booleans (not 0/1) so `where is_booked` works without `
 | `nightly_reconciliation` (02:00) | add `--refresh-stale-hours 336`; full `dbt build` + `dbt test` |
 | `weekly_dims` | unchanged |
 | **`report_ingest`** | NEW, IMAP trigger |
-| **`dbt_build_reports`** | NEW, daily 07:00 PT (~50 min after the report sends) |
+| **`dbt_build_reports`** | **BUILT 2026-08-07**, daily 07:00 PT (~50 min after the report sends). JSON at [deploy/n8n_dbt_build_reports.json](deploy/n8n_dbt_build_reports.json) - import and activate. |
 | **`enrichment_from_reports`** | NEW, daily 07:20 PT |
 
 **Monthly estimate:** `local` ~= **21,800 (17%)**, `ld` ~= **9,250 (7%)** of 125,000. Dropping `opps_sweep`

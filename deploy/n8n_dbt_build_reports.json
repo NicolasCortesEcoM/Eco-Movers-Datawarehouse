@@ -1,0 +1,99 @@
+{
+  "name": "dbt_build_reports",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 7 * * *" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "b1000000-0000-4000-8000-000000000001",
+      "name": "Daily 07:00 PT"
+    },
+    {
+      "parameters": {
+        "authentication": "password",
+        "resource": "command",
+        "command": "out=$(flock -w 900 /tmp/dw-dbt.lock -c 'cd /home/datawarehouse_user/datawarehouse/dbt && set -a && . /home/datawarehouse_user/datawarehouse/.env && set +a && /home/datawarehouse_user/datawarehouse/venv/bin/dbt seed --profiles-dir . --target dev --no-use-colors && /home/datawarehouse_user/datawarehouse/venv/bin/dbt build --profiles-dir . --target dev --no-use-colors' 2>&1); rc=$?; echo \"$out\" | tail -60; exit $rc",
+        "cwd": "/home/datawarehouse_user/datawarehouse"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [240, 0],
+      "id": "b1000000-0000-4000-8000-000000000002",
+      "name": "Run dbt seed + build",
+      "alwaysOutputData": true,
+      "credentials": {
+        "sshPassword": { "id": "1wkrc8PhMPB14wEp", "name": "SSH Password account" }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $input.first().json;\nconst out = String(r.stdout || '') + '\\n' + String(r.stderr || '');\nconst code = Number(r.code ?? r.exitCode ?? 0);\n\n// The SSH node reports the remote exit status but does NOT fail the workflow on a\n// non-zero one. Without this check a failed dbt build looks exactly like a\n// successful one: the schedule goes green, serving keeps yesterday's numbers, and\n// nobody finds out until an analyst notices the data stopped moving.\nconst summary = (out.match(/Done\\. PASS=\\d+ WARN=\\d+ ERROR=\\d+ SKIP=\\d+.*/) || [null])[0];\nconst m = summary ? summary.match(/PASS=(\\d+) WARN=(\\d+) ERROR=(\\d+) SKIP=(\\d+)/) : null;\n\nif (code !== 0 || !m) {\n  throw new Error(\n    'dbt build FAILED (exit ' + code + '). Serving layer is stale — do not trust it ' +\n    'until this is resolved.\\n\\n' + out.slice(-3000)\n  );\n}\n\nconst [, pass, warn, error, skip] = m.map(Number);\n\n// A test that ERRORs or a model that is SKIPped means part of the graph did not\n// build. dbt still exits 0 when tests merely warn, so exit code alone is not enough.\nif (error > 0 || skip > 0) {\n  throw new Error(\n    'dbt build completed with ERROR=' + error + ' SKIP=' + skip + '. Part of the ' +\n    'graph did not build.\\n\\n' + out.slice(-3000)\n  );\n}\n\nreturn [{ json: { ok: true, pass, warn, error, skip, summary, built_at: new Date().toISOString() } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0],
+      "id": "b1000000-0000-4000-8000-000000000003",
+      "name": "Assert dbt Succeeded"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  (SELECT count(*) FROM serving.jobs_upcoming_v1)  AS jobs_upcoming,\n  (SELECT count(*) FROM serving.leads_today_v1)   AS leads_today,\n  (SELECT count(*) FROM core.opportunities)       AS opportunities,\n  (SELECT max(synced_at) FROM core.opportunities) AS opportunities_synced_at",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [720, 0],
+      "id": "b1000000-0000-4000-8000-000000000004",
+      "name": "Serving Freshness Check",
+      "executeOnce": true,
+      "credentials": {
+        "postgres": { "id": "V1zOLBFlGPXLCEWH", "name": "Datawarehouse Postgres" }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $input.first().json;\nconst dbt = $('Assert dbt Succeeded').first().json;\n\n// An empty serving view after a green build is the failure mode a row-count check\n// exists to catch: every model \"succeeded\", but a broken upstream filter silently\n// emptied the contract other teams read. Fail loudly rather than publish nothing.\nif (Number(r.opportunities) === 0) {\n  throw new Error('core.opportunities is EMPTY after a successful dbt build. The serving contract is broken.');\n}\n\nconst syncedAt = r.opportunities_synced_at ? new Date(r.opportunities_synced_at) : null;\nconst ageHours = syncedAt ? (Date.now() - syncedAt.getTime()) / 3600000 : null;\n\n// The published freshness target for SmartMoving dimensions is < 24 h.\nif (ageHours !== null && ageHours > 26) {\n  throw new Error(\n    'core.opportunities.synced_at is ' + ageHours.toFixed(1) + ' h old, past the 24 h ' +\n    'freshness target. dbt built fine, so the problem is upstream: extraction is not running.'\n  );\n}\n\nreturn [{ json: {\n  ok: true,\n  dbt_pass: dbt.pass, dbt_warn: dbt.warn,\n  opportunities: Number(r.opportunities),\n  jobs_upcoming: Number(r.jobs_upcoming),\n  leads_today: Number(r.leads_today),\n  synced_age_hours: ageHours === null ? null : Number(ageHours.toFixed(2)),\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 0],
+      "id": "b1000000-0000-4000-8000-000000000005",
+      "name": "Assert Serving Is Fresh"
+    },
+    {
+      "parameters": {
+        "content": "## dbt cascade — runs AFTER the reports arrive\n\n07:00 PT daily, ~50 min after the SmartMoving scheduled reports send. Reports arrive on a schedule we control, so a fixed time beats building debounce machinery.\n\n**`flock` is not optional.** The enrichment worker also triggers dbt builds. Two overlapping runs drop and recreate the same tables, and the loser writes into objects the winner already replaced. `flock -w 900` makes the second run wait rather than corrupt.\n\n**Nothing here transforms data** — that is dbt's job. This workflow only decides whether the build can be trusted, and shouts if it cannot.\n\nThree things must all hold, and each catches a different silent failure:\n1. **exit code 0** — the SSH node reports the remote status but does not fail on it. Without the check, a broken build looks green forever.\n2. **ERROR=0 and SKIP=0** — dbt exits 0 when tests only warn, so the summary line must be parsed, not just the exit code.\n3. **serving is non-empty and fresh** — every model can succeed while a broken filter empties the contract other teams read.\n\n⚠️ **Do not simplify the command to `dbt … | tail -60`.** A pipeline returns the exit code of its LAST stage, so `tail` would report success no matter how badly dbt failed. The `out=$(…); rc=$?; echo \"$out\" | tail; exit $rc` shape exists to preserve dbt's status. Verified by deliberately failing the remote command.\n\nHost path: `/home/datawarehouse_user/datawarehouse` (not `/opt` — that directory belongs to another application).",
+        "height": 620,
+        "width": 460,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-40, -700],
+      "id": "b1000000-0000-4000-8000-000000000006",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "Daily 07:00 PT": { "main": [[{ "node": "Run dbt seed + build", "type": "main", "index": 0 }]] },
+    "Run dbt seed + build": { "main": [[{ "node": "Assert dbt Succeeded", "type": "main", "index": 0 }]] },
+    "Assert dbt Succeeded": { "main": [[{ "node": "Serving Freshness Check", "type": "main", "index": 0 }]] },
+    "Serving Freshness Check": { "main": [[{ "node": "Assert Serving Is Fresh", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "timezone": "America/Los_Angeles",
+    "executionOrder": "v1",
+    "errorWorkflow": "J1y2uCUFvCcNkZjZ"
+  },
+  "pinData": {}
+}
