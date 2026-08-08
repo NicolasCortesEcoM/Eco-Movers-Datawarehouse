@@ -49,7 +49,7 @@ Should an analytical warehouse ever be needed, the move is deliberately cheap: d
 
 1. **ELT, never ETL.** Raw preserves the source payload as received. Business logic lives only in dbt.
 2. **All SmartMoving API calls go through `scripts/sm_client.py`.** Never ad-hoc curl, never a second client. This is the mechanism that prevents duplicate extraction across teams.
-3. **SmartMoving quota is 125,000 calls/month.** Prefer reprocessing from raw over re-calling the API. Every call is logged to `scripts/api_call_log.jsonl`.
+3. **API quota is finite and metered per instance.** Prefer reprocessing from raw over re-calling the API. Every call is logged to `scripts/api_call_log.jsonl`. The budget, the cost of each mechanism, and what may trigger an expensive call live in [`crm_sync_contract.md`](crm_sync_contract.md) - that file has precedence over every other document in this repo on those questions.
 4. **Single database, `entity_id` on every table, Row-Level Security.** Never separate schemas or databases per company.
 5. **Composite primary keys, merge write disposition, idempotent loads.** Every load must be safely re-runnable.
 6. **No consumer reads `raw_*` or `core`.** Other teams read `serving` only.
@@ -113,16 +113,17 @@ This is the deliverable other teams depend on. A `serving` view is not finished 
 
 ## Freshness targets
 
-Published, monitored targets - not aspirations. Extend this table as sources are added.
+**Defined in [`crm_sync_contract.md`](crm_sync_contract.md) - the single authority on
+which mechanism feeds each entity, at what cadence, and at what quota cost.** Do not
+restate cadence, quota figures or sweep windows here or anywhere else; link instead.
+`scripts/check_sync_contract.py` fails the build when those facts are duplicated,
+because twelve copies of them once drifted into six contradictions.
 
-| Source      | Entity               | Mechanism                    | Target   |
-| ----------- | -------------------- | ---------------------------- | -------- |
-| SmartMoving | Opportunities / jobs | Webhook + windowed polling   | < 15 min |
-| SmartMoving | Leads                | Webhook + windowed polling   | < 15 min |
-| SmartMoving | Dimensions           | Scheduled daily pull         | < 24 h   |
-| SmartMoving | Scheduled reports    | File/email ingestion via n8n | < 24 h   |
+The principle behind the contract, which does belong here:
 
 **Webhooks provide freshness; polling provides correctness.** Never rely on webhooks alone - they drop, arrive out of order, and replay. Every webhook-fed entity must also have a reconciling poll. Webhook handlers must be idempotent and must write to raw before any processing.
+
+Note that **SmartMoving has no lead-created webhook**: leads are polling-only, always.
 
 ## Adding a new source
 
@@ -146,7 +147,8 @@ Follow this order. Skipping steps produces sources that each behave differently 
 
 ## Repository layout
 
-- `smartmoving_sync_strategy.md` - CDC/freshness design for SmartMoving: webhooks + window-based polling + scheduled-report ingestion, per-entity mechanisms, quota budget, phased rollout. Read before any ingestion work.
+- **`crm_sync_contract.md` - THE AUTHORITY on how CRM data is refreshed.** Which mechanism feeds each entity, the schedule, the quota model, the enrichment-trigger allowlist, and - the section that prevents wrong answers - what each mechanism *cannot* do. It has precedence over every other file here, including this one. Read it before any ingestion work, and never copy its numbers into another document.
+- `smartmoving_sync_strategy.md` - CDC design rationale: webhook replay/ordering, reconciliation-by-diff, phased rollout. The *why* behind the contract; the contract holds the current *what*.
 - `decisions/` - ADR log: settled architecture decisions (Postgres as the store, instance- entity, hybrid serving+core access, n8n-not-Dagster) so they are not re-litigated.
 - `serving_catalog.md` - the published catalog of `serving` views. The contract other teams read. Keep current; a view that is not catalogued does not exist.
 - `consuming_serving_data.md` - the guide for app teams: how to connect with the read-only `app_read` role, what RLS/`entity_id` scoping means, reading `synced_at`, and the versioning/deprecation policy.

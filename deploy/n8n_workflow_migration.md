@@ -47,14 +47,48 @@ so nothing in the host `.env` is exported unless the command does it.
 
 Apply Change 1 and Change 2 to every SSH node below. `<ARGS>` is all that differs.
 
-| Workflow | `<ARGS>` | Schedule change |
-|---|---|---|
-| `Enrichment_worker` | `--ids <ids> --instance <inst> --dest postgres --budget 200 --pace 0.6` | keep 5 min |
-| `leads_poll` | `--job leads --instance <inst> --dest postgres --budget 60` | 30 min -> **5x/day**, aligned with the sweep |
-| `opps_sweep` | `--job opps-window --instance <inst> --dest postgres --budget 200` | hourly -> **06:30, 10:30, 13:30, 16:30, 20:30 PT** |
-| `nightly_reconciliation` | `--job enrich --instance <inst> --dest postgres --budget 400 --refresh-stale-hours 336` | keep 02:00 |
-| `weekly_dims` | `--job dims --instance <inst> --dest postgres --budget 60` | unchanged |
-| `Reporting_datawarehouse` | no SSH node - webhook only | unchanged |
+**Cron times are defined in [`crm_sync_contract.md`](../crm_sync_contract.md) section 6 and nowhere
+else.** Read them from there; this table gives only the arguments.
+
+| Workflow | `<ARGS>` |
+|---|---|
+| `Enrichment_worker` | `--ids <ids> --instance <inst> --dest postgres --budget 200 --pace 0.6` |
+| `leads_poll` | `--job leads --instance <inst> --dest postgres --budget 60` |
+| `opps_sweep` | `--job enrich --instance <inst> --dest postgres --budget 300` |
+| `nightly_reconciliation` | `--job enrich --instance <inst> --dest postgres --budget 400 --refresh-stale-hours 336` |
+| `weekly_dims` | `--job dims --instance <inst> --dest postgres --budget 60` |
+| `Reporting_datawarehouse` | no SSH node - webhook only |
+
+**Do not pass `--from-offset` / `--to-offset`.** The defaults in `run.py` are the contract's window,
+and `scripts/check_sync_contract.py` fails the build if they drift. Overriding them per workflow is
+how the codebase ended up with two schedules using different windows and deleting each other's rows.
+
+## Change 3 - the enrichment worker needs an allowlist
+
+`Enrichment_worker` must only enrich on `job-closed`, `job-finalized` and `payment-made`.
+
+⚠️ **`opportunity-changed` must never trigger a detail call.** It is 31,085 of the 43,338 events
+captured - 72% - and fires on every UI edit. Enriching on it costs more calls per day than the
+allowlist costs per month, and it is the single realistic way to exhaust the quota. The full table
+is in the contract, section 5.
+
+The SQL the worker uses to pick up work should filter explicitly rather than take "unprocessed":
+
+```sql
+SELECT DISTINCT resource_id, source_instance_id
+  FROM raw_smartmoving.webhook_events
+ WHERE processed_at IS NULL
+   AND event_type IN ('job-closed', 'job-finalized', 'payment-made')
+ LIMIT 150
+```
+
+Everything else is drained by marking `processed_at` without spending a call — the status ledger
+already gets what it needs from dbt reading `webhook_events` directly.
+
+## Change 4 - report retention
+
+Add `sql/34_report_retention.sql` to the daily `dbt_build_reports` workflow, after the build. Six
+sends a day is ~10M rows a year from Lead Status alone and the droplet is at 90% disk.
 
 ### Also add to every one of them
 

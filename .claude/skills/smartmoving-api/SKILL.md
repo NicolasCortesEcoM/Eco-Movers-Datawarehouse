@@ -31,7 +31,7 @@ Other group companies will have a single instance. Everything is parametrized by
 - `/api/customers?IncludeOpportunityInfo=true` is slow (3 - 6 s/page) - don't parallelize aggressively.
 - Dates: filters are **integers `YYYYMMDD`** (e.g. `20260718`). Timestamps `*_Utc` are ISO strings in UTC. `serviceDate` is a local business date - never timezone-convert it.
 - Enum fields appear as `{}` in the scraped docs (`smartmoving_api_docs/`) - real values must come from live responses or the reference-list endpoints.
-- No per-second rate limit documented; back off on 5xx, hard-stop on 4xx (they still consume quota).
+- **~120 calls/minute trips `429 Rate limit is exceeded`** - measured live, not documented by the vendor. Throttle with `pace`; back off on 5xx, hard-stop on 4xx. **429s and 4xx still consume quota.**
 - `Include*` flags on opportunity detail do NOT change quota cost - always request all of them when enriching.
 
 ## Reusable client

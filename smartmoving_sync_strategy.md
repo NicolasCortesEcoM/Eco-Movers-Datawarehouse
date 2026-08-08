@@ -30,7 +30,7 @@ The answer is a hybrid architecture with **three paths that have different roles
 | **Date-window polling** | Primary for new leads; reconciliation for everything else | 15-60 min | ~250-400 calls/day |
 | **Scheduled Reports by email** | Storage, historical backfill, audit | Daily | **Zero** |
 
-Estimated steady-state budget: **~57,000 calls/month (~46% of quota)**, with an internal usage ledger and prorated kill-switch at 85%. Free reserve >=35%.
+Steady-state budget, the mechanism costs and the kill-switch thresholds live in [`crm_sync_contract.md`](crm_sync_contract.md) section 7 - the authority. Do not restate them here.
 
 **Critical finding:** SmartMoving does **not** offer a lead-created webhook. The 17 available events start at `opportunity-created` (see `smartmoving_api_findings.md`). Therefore "leads received today" is handled by polling `GET /api/leads?From=today` every 15-30 min.
 
@@ -89,18 +89,16 @@ API implementation notes:
 
 ---
 
-## 4. Quota Budget (125,000 calls/month per instance)
+## 4. Quota Budget
 
-| Item | Calculation | Monthly |
-| --- | --- | --- |
-| Same-day leads poll | 64 sweeps/day * ~1.5 pages | ~2,900 |
-| +10 day jobs sweep | 24/day * ~4 pages | ~2,900 |
-| Debounced webhook enrichment | Configurable hard cap | <=45,000 |
-| Nightly reconciliation | ~100-300/day | ~6,000 |
-| Weekly dimensions | ~50/week | ~200 |
-| **Steady-state subtotal** | | **~57,000 (46%)** |
-| Initial backfill, month 1 only | One-off across several days | <=15,000 |
-| **Free reserve** | | **>=35%** |
+**Moved to [`crm_sync_contract.md`](crm_sync_contract.md) section 7.**
+
+The budget table that used to live here was superseded twice and each time a stale copy
+survived in another file. The contract now holds the only version, and
+`scripts/check_sync_contract.py` fails the build if a second one appears.
+
+What is still true, and belongs to this document because it is design rather than
+arithmetic:
 
 Spend controls:
 

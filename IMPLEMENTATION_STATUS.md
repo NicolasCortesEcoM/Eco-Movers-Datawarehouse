@@ -22,7 +22,7 @@ logic lives in dbt.
 this phase. Note that the *lost-leads* report keys on `Quote #`, so despite its name it enriches
 **opportunities**, not leads.
 
-**Refresh cadence:** 4-5 times per day, plus webhooks for near-real-time status at zero quota cost.
+**Refresh cadence:** defined in [`crm_sync_contract.md`](crm_sync_contract.md) section 6. Webhooks carry near-real-time status at zero quota cost.
 
 ### Explicitly out of scope for now
 Notes, follow-ups, customer interaction history, audit activity, inventory item lines, document URLs,
@@ -37,9 +37,9 @@ and Premium per-job calls. These are all reachable later; none is required for t
 2. **`opportunities_enriched` and its 10 child tables are already in raw and completely unmodeled.**
    Estimates, charges, payments, job addresses, contacts, and the custom `leadStatus` are sitting in
    Postgres today with zero dbt models reading them. This is the largest available win at **zero API cost**.
-3. **At 4-5 runs/day, quota stops being the binding constraint.** The design below lands at ~21,800
-   calls/month on `local` (17%) and ~9,250 on `ld` (7%), against 125,000 each. That buys *deeper* change
-   detection, not less.
+3. **Quota is not the binding constraint.** The measured model in
+   [`crm_sync_contract.md`](crm_sync_contract.md) section 7 lands at roughly 6% of the available
+   calls. That buys *deeper* change detection, not less - and it is why the sweep window is wide.
 
 ---
 
@@ -124,13 +124,55 @@ use `out=$(cmd 2>&1); rc=$?; echo "$out" | tail -N; exit $rc`.
 
 ---
 
+## The sweep was the bottleneck, not the quota - 2026-08-08
+
+The single most consequential correction so far, and it came from the business side, not the code.
+
+`GET /api/customers?IncludeOpportunityInfo=true` returns the opportunity **GUID and quote number**
+for every row - 685/685 on `ld`, 514/514 on `local`. That makes the *sweep*, not the per-opportunity
+detail call, the cheap way to build the crosswalk that lets report rows attach to opportunities.
+
+It had never been used that way because the sweep and the detail call were welded together in
+`--job enrich`: widening the window dragged one detail call per opportunity with it, so the window
+stayed pinned at 37 days and the crosswalk starved. `--sweep-only` separates them.
+
+**Measured, both instances, 730-day window:**
+
+| | Before | After | Cost |
+|---|---|---|---|
+| Report resolution | 10.2% | **41.0%** | |
+| Crosswalk entries | 1,199 | **13,157** | |
+| `core.opportunities` | 2,169 | **14,014** | |
+| …with a customer | 708 | **13,157** | |
+| …with money | 691 | **2,679** | |
+| Webhook-only shells | 1,461 | **857** | |
+| `core.leads` | 48 | **2,708** | |
+| **Total API calls** | | | **81** |
+
+A previously-proposed backfill of 1,461 targeted detail calls was **cancelled** - the sweep does
+more, for ~5% of the cost.
+
+**The structural limit this exposed, now recorded in the contract:** the sweep is *job-anchored*.
+All 14,572 opportunities it returned have at least one job; none had zero. An opportunity that never
+got a job scheduled is unreachable by the sweep at any window width - bad leads resolve at only
+**5.6%** for exactly this reason. That population is what the reports exist to cover, which is the
+strongest argument for treating reports as the backbone rather than a supplement.
+
+> **Open, deliberately not papered over:** 2,458 report rows remain unmatched with no clean
+> explanation - service dates inside the swept span, non-lead statuses. Job-anchoring explains bad
+> leads and some lost opportunities, not all of it. One focused investigation is owed. Nothing is
+> blocked: those rows surface in `marts.mart_unmatched_report_rows`.
+
+---
+
 ## Next Immediate Step
 
-**Restart extraction and let it catch up.** The `GRANT` above unblocked it, but the API-side data
-is still 17 days stale: `api_enrichment` and `api_sweep` last observed 2026-07-22. Until the
-schedules run, `core.opportunities` is carrying July numbers for every field the reports do not
-cover. Publish the extraction workflows (see the migration steps below), then run one manual
-`--job enrich` per instance to close the gap.
+**Migrate the n8n workflows.** Extraction is healthy again and the model is corrected, but nothing is
+running on a schedule: the 6 workflows are drafts, still pointing at the old host path, and still
+using the command shape that hides failures. Until they run, every number above is a snapshot that
+will go stale exactly as it did on 2026-07-22.
+
+Follow [deploy/n8n_workflow_migration.md](deploy/n8n_workflow_migration.md).
 
 Then, in order:
 
@@ -157,7 +199,8 @@ Then, in order:
 | `serving.jobs_upcoming_v1` | unchanged |
 
 **Resolution rate is 10.2% (489 of 4,801), and that is expected.** The Lead Status export spans
-three months of received dates; the API sweep only covers a `[-7,+30]` **service**-date window, so
+three months of received dates; the API sweep is keyed on **service** date and only reaches
+opportunities that have a job at all, so
 most report rows describe opportunities the API has never been asked about. That history at zero
 quota is the point. The unmatched rows are surfaced in `marts.mart_unmatched_report_rows` with a
 reason, never dropped. The number to watch is `no_quote_number` (currently 0) - a rise there means
@@ -213,7 +256,7 @@ at provisioning.
 |---|---|---|---|
 | 1 | `pipeline/sm_pipeline/source.py` | Change-hash covered only `(status, serviceDate, job ids/dates)` - all sweep-visible. A re-quote, charge edit, payment, or `leadStatus` CMET->**Booked** never triggered re-enrichment. | Hash widened to everything the sweep returns, **plus** a tiered staleness TTL. The structural blind spot is closed by the Phase 6 report queue. |
 | 2 | `source.py` | `seen_ids` was `setdefault`-ed and appended every run, never reset. After run 2, `prior - seen` was permanently empty -> **soft-delete detection silently dead**; state grew unboundedly. | Presence now tracked as a per-record `seen` timestamp; state pruned at 120 days. |
-| 3 | `source.py` | The sliding window caused **false deletions** - anything aging past `today-7` looked "disappeared", and `opps_sweep [-7,+30]` vs `nightly_reconciliation [-7,+45]` thrashed each other. | Deletion is gated on the record's service span overlapping the window of the sweep being evaluated. |
+| 3 | `source.py` | The sliding window caused **false deletions** - anything aging past the window start looked "disappeared", and two schedules using *different* windows thrashed each other. Every schedule now shares one window. | Deletion is gated on the record's service span overlapping the window of the sweep being evaluated. |
 | 4 | `source.py` | `BudgetExceeded` mid-sweep soft-deleted every unseen opportunity. The hash was banked *before* `enrich_one` succeeded, so a failed detail call was never retried. | Only a sweep that paginates to completion is recorded as complete; watermarks are written only after a successful call. |
 | 5 | `pipeline/sm_pipeline/client.py` | `get()` raised on any 4xx. An `opportunity-deleted` webhook -> `--ids <deleted>` -> 404 -> whole run died, taking every other batched id with it. | `get(..., allow_missing=True)` returns `None` on 404; the caller records a `detail_404` marker. |
 | 6 | `source.py` | **Found during testing.** The original design assumed "dlt extracts resources in yield order, so `seen_ids` is fully populated when the deletions resource runs". **This is false** - dlt interleaves resources round-robin; a resource yielded last routinely runs before the sweep beside it has finished. Any within-run presence diff was a coin flip. | Deletion is evaluated against the last sweep *recorded complete in state*, making it independent of extraction order. |
@@ -295,7 +338,7 @@ P0  probes + deploy dbt + on-run-end RLS        <- blocks everything
 - **P1 - Fix `source.py`.** Replace `opp_hashes`/`seen_ids`/`prior_ids` with one `st["opps"]` map holding
   hash, last-enrichment time, service date, `leadStatus`, and a soft-delete marker. `seen` becomes a
   run-scoped set, never state. Widen the hash to *everything the sweep returns*. Add a tiered staleness
-  TTL (24 h for `[today-3, today+21]`, 14 d elsewhere - a flat 24 h on `local`'s window would be ~42k
+  TTL (24 h for `[today-3, today+21]`, 14 d elsewhere - a flat 24 h across the whole window would be
   calls/month). Gate deletions on the service date being inside *this* sweep's window; add a `sweep_ok`
   flag; move hash writes to after a successful call; add `allow_missing=True` for 404s.
 - **P2 - Seeds and timezone authority.** Load the five `OLD_TABLES/SCRDLA - *.csv` files as dbt seeds
@@ -314,7 +357,7 @@ P0  probes + deploy dbt + on-run-end RLS        <- blocks everything
   macros and staging model are already built ahead of schedule - only the n8n IMAP flow is missing.
 - **P6 - Report-driven enrichment queue.** The real fix for bug 1.
 - **P7 - Serving.** Additive columns on both existing views; two new views.
-- **P8 - Schedules.** Rewrite to the 4-5x/day cadence.
+- **P8 - Schedules.** Align n8n with [`crm_sync_contract.md`](crm_sync_contract.md) section 6.
 
 ### Design correction to sync strategy 12.3 - BUILT AND PROVEN (2026-08-05)
 
@@ -346,7 +389,7 @@ Recorded as [decisions/0005](decisions/0005-latest-observation-wins-is-per-field
 | P1 | Does `_dlt_list_idx` exist on the charge/address child tables? | **ANSWERED - yes**, on every child table, and unique per parent (1458/1458, 1469/1469). Used as `charge_seq` / `address_seq`. |
 | P2 | `quote_number` type on both sides | **ANSWERED - they differ.** `bigint` on `opportunities_enriched`, `character varying` on the sweep child. Normalised to text in staging; without that cast the crosswalk silently returns nothing. |
 | P3 | Does the report's `Job Id` GUID equal `external_job_id`? | **Still open** - needs a real report file. Note `opportunities_enriched__jobs.id` and the sweep's job ids overlap 765/765, so the internal job identity is consistent. |
-| P4 | True opportunity count in a full `[-7,+30]` sweep | **Partially answered** from the dev warehouse: 708 opportunities in the sweep, 657 enriched (51 not yet). Re-measure on the droplet after the P1 pipeline fixes run. |
+| P4 | True opportunity count in a full sweep | **Partially answered** from the dev warehouse: 708 opportunities in the sweep, 657 enriched (51 not yet). Re-measure on the droplet after the P1 pipeline fixes run. |
 
 ### The status model (read [status_model.md](status_model.md) before counting anything)
 
@@ -448,30 +491,17 @@ one-liner. Flags load as booleans (not 0/1) so `where is_booked` works without `
 
 ## Target Schedule and Quota
 
-| Workflow | Change |
-|---|---|
-| `Reporting_datawarehouse` (webhook) | unchanged |
-| `Enrichment_worker` (5 min) | append a scoped `dbt build` |
-| `leads_poll` | **-> 5x/day**, aligned with the sweep. Leads have no webhook, so polling is their only freshness path; 5x/day meets the requirement. Keeping 30 min costs only ~1,300 calls/month if fresher leads are wanted. |
-| `opps_sweep` | **hourly -> 5x/day: 06:30, 10:30, 13:30, 16:30, 20:30 PT** |
-| `nightly_reconciliation` (02:00) | add `--refresh-stale-hours 336`; full `dbt build` + `dbt test` |
-| `weekly_dims` | unchanged |
-| **`report_ingest`** | NEW, IMAP trigger |
-| **`dbt_build_reports`** | **BUILT 2026-08-07**, daily 07:00 PT (~50 min after the report sends). JSON at [deploy/n8n_dbt_build_reports.json](deploy/n8n_dbt_build_reports.json) - import and activate. |
-| **`enrichment_from_reports`** | NEW, daily 07:20 PT |
+**Moved to [`crm_sync_contract.md`](crm_sync_contract.md) sections 5-7.**
 
-**Monthly estimate:** `local` ~= **21,800 (17%)**, `ld` ~= **9,250 (7%)** of 125,000. Dropping `opps_sweep`
-from hourly to 5x/day alone saves ~4,560 calls/month on `local` - that funds the report queue and the TTL
-backstop.
+The schedule, the quota model and the enrichment-trigger allowlist now live in exactly
+one file. They used to be restated here, in `smartmoving_sync_strategy.md`,
+`pipeline/README.md` and `serving_catalog.md`, and the four copies disagreed about both
+cadence and cost. `scripts/check_sync_contract.py` fails the build if they reappear.
 
-Webhook enrichment (~12,000/month on `local`) is the largest line and the only one that can run away -
-422 events in 25 min observed, `opportunity-changed` is 73% noise. Keep `--budget 200` per run **and** add
-a daily ledger gate reading `scripts/api_call_log.jsonl` that skips the worker past 400/150 calls/day.
-Cheap leads and sweeps never pause.
-
-With `local` already at 45% from the legacy consumer, the total lands ~62% - comfortable.
-
----
+Still true and specific to this status document: the webhook enrichment worker is the
+only line item that can run away, so it keeps a per-run `--budget` **and** a daily
+ledger gate reading `scripts/api_call_log.jsonl`. Cheap sweeps and leads polls are
+never paused.
 
 ## Completed
 
@@ -484,7 +514,7 @@ With `local` already at 45% from the legacy consumer, the total lands ~62% - com
 
 ### RAW Layer + Enrichment (validated end-to-end)
 - [x] dlt extraction: `leads`, `customers_service_window` (thin sweep), 11 dimensions - `pipeline/sm_pipeline/source.py`
-- [x] **Diff-driven enrichment** `--job enrich`: `[-7,+30]` sweep as change detector -> only changed
+- [x] **Diff-driven enrichment** `--job enrich`: customers sweep as change detector -> only changed
       opportunities call `GET /api/opportunities/{id}` with all 10 `Include*` flags. Output:
       `raw_smartmoving.opportunities_enriched` plus child tables.
 - [x] dlt-state watermark persists in the destination; unchanged reruns cost only the sweep, 0 enrichment calls.
@@ -642,7 +672,7 @@ With `local` already at 45% from the legacy consumer, the total lands ~62% - com
       Remaining for P5: the n8n IMAP flow, the other three reports, and the observation arms.
 - [ ] **P6** `mart_enrichment_candidates` + `enrichment_from_reports` workflow.
 - [ ] **P7** Additive columns on both serving views; new `serving.opportunities_v1` and `serving.jobs_v1`.
-- [ ] **P8** Rewrite schedules to the 4-5x/day cadence; update `serving_catalog.md`.
+- [ ] **P8** Align schedules with the sync contract; update `serving_catalog.md`.
 - [ ] Complete the sweep `status` enum mapping (3/10/20/30/50).
 
 ### Deferred, deliberately

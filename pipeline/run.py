@@ -6,7 +6,8 @@ Examples:
     python run.py --job leads --leads-from 20260601 --leads-to 20260718 --instance all
     python run.py --job jobs --days-ahead 10 --instance all
     python run.py --job enrich --instance all --dest postgres      # wide sweep + full enrichment of changed opps
-    python run.py --job enrich --from-offset -7 --to-offset 30 --instance all
+    python run.py --job enrich --from-offset -180 --to-offset 60 --instance all
+    python run.py --job enrich --sweep-only --instance all --dest postgres    # crosswalk only, no detail calls
     python run.py --ids 1a2b,3c4d --instance ld --dest postgres    # targeted enrichment (webhook worker)
     python run.py --job dims --instance all
 
@@ -47,8 +48,15 @@ def main() -> None:
     ap.add_argument("--leads-from", type=int, default=None, help="YYYYMMDD; default: today (entity tz)")
     ap.add_argument("--leads-to", type=int, default=None, help="YYYYMMDD; default: today (entity tz)")
     ap.add_argument("--days-ahead", type=int, default=10, help="service-date window size for the jobs sweep")
-    ap.add_argument("--from-offset", type=int, default=-7, help="enrich sweep start, days from today (entity tz)")
-    ap.add_argument("--to-offset", type=int, default=30, help="enrich sweep end, days from today (entity tz)")
+    # ONE window on EVERY run - the authority is crm_sync_contract.md section 6,
+    # and scripts/check_sync_contract.py fails the build if these defaults drift
+    # from it. The sweep costs ~1 call per 200 customers, so a wide window is
+    # nearly free, while a narrow one starves the GUID<->quote crosswalk the
+    # reports need. Using a single window everywhere also removes the old
+    # two-different-narrow-windows bug, where the scheduled sweep and the nightly
+    # reconciliation thrashed each other's presence set into false deletions.
+    ap.add_argument("--from-offset", type=int, default=-180, help="enrich sweep start, days from today (entity tz)")
+    ap.add_argument("--to-offset", type=int, default=60, help="enrich sweep end, days from today (entity tz)")
     ap.add_argument("--ids", default=None, help="comma-separated opportunity ids: targeted enrichment, no sweep (webhook worker)")
     ap.add_argument("--budget", type=int, default=300, help="max API calls per instance per run")
     ap.add_argument("--pace", type=float, default=0.6, help="seconds between API calls (rate-limit throttle)")
@@ -58,6 +66,11 @@ def main() -> None:
                     help="re-enrich every other opp in the sweep window older than this (safety net)")
     ap.add_argument("--refresh-stale-hours", type=float, default=None,
                     help="force re-enrichment of anything last enriched more than N hours ago")
+    ap.add_argument("--sweep-only", action="store_true",
+                    help="run ONLY the customers sweep - no per-opportunity detail calls, no "
+                         "deletion pass. The sweep returns the opportunity GUID and quote number "
+                         "for ~1 call per 200 customers, so this is the cheap way to widen the "
+                         "GUID<->quote crosswalk over a long history.")
     args = ap.parse_args()
 
     # Targeted enrichment (--ids) runs enrichment only, no sweep/leads/dims.
@@ -100,6 +113,7 @@ def main() -> None:
             hot_ttl_hours=args.hot_ttl_hours,
             cold_ttl_hours=args.cold_ttl_hours,
             refresh_stale_hours=args.refresh_stale_hours,
+            sweep_only=args.sweep_only,
         )
         info = pipeline.run(source)
         print(f"[{inst}] {info}")

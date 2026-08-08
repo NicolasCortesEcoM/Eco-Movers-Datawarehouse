@@ -154,7 +154,13 @@ def main() -> int:
         "set -euo pipefail",
         f"cd {APP_DIR}",
         # Replace only the synced trees, so target/ and the venv survive.
-        "rm -rf dbt/models dbt/macros dbt/seeds pipeline scripts sql",
+        #
+        # scripts/ is NOT wiped. api_call_log.jsonl lives there and is the only
+        # record of API quota already spent this month - excluding it from the
+        # tarball is not enough if the directory itself is deleted first.
+        # Overwriting file-by-file is sufficient: nothing in scripts/ is stale
+        # state, unlike dbt's target/.
+        "rm -rf dbt/models dbt/macros dbt/seeds pipeline sql",
         "tar xzf _sync.tar.gz && rm -f _sync.tar.gz",
         "if [ ! -x venv/bin/dbt ]; then python3 -m venv venv; "
         "  ./venv/bin/pip -q install --upgrade pip; "

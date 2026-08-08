@@ -15,7 +15,8 @@ python run.py --job all --dest postgres        # production destination, if env 
 python run.py --job leads --instance local     # today's leads only, one instance
 python run.py --job leads --leads-from 20260601 --leads-to 20260718 --instance all   # leads backfill
 python run.py --job jobs --days-ahead 30       # thin sweep (customer -> opp -> job), +N day window
-python run.py --job enrich --instance all      # [-7,+30] sweep + full enrichment for changed opps
+python run.py --job enrich --instance all      # sweep + full enrichment for changed opps
+python run.py --job enrich --sweep-only --instance all   # sweep ONLY - crosswalk, no detail calls
 python run.py --ids 1a2b,3c4d --instance ld    # targeted enrichment for concrete ids (webhook worker)
 ```
 
@@ -23,7 +24,7 @@ Typical cost of `--job all --instance all`: **~30 calls** logged in `../scripts/
 
 ### `--job enrich` - the "All Jobs"-style detail layer (Path 1 body)
 
-The cheap `/api/customers?IncludeOpportunityInfo` sweep over `[today+from_offset, today+to_offset]` (default `[-7,+30]`) is the **change detector**. Only opportunities that changed or went stale receive the expensive `GET /api/opportunities/{id}` call with **all 10 `Include*` flags** (estimates, origin/destination addresses, rates/charges, payments, trip info, documents; they do not cost extra quota). It lands in `raw_smartmoving.opportunities_enriched` plus child tables such as `__jobs`, `__jobs__estimated_charges`, `__jobs__job_addresses`, and `__payments`.
+The cheap `/api/customers?IncludeOpportunityInfo` sweep over `[today+from_offset, today+to_offset]` is the **change detector** (window defined in [`crm_sync_contract.md`](../crm_sync_contract.md), enforced by `scripts/check_sync_contract.py`). Only opportunities that changed or went stale receive the expensive `GET /api/opportunities/{id}` call with **all 10 `Include*` flags** (estimates, origin/destination addresses, rates/charges, payments, trip info, documents; they do not cost extra quota). It lands in `raw_smartmoving.opportunities_enriched` plus child tables such as `__jobs`, `__jobs__estimated_charges`, `__jobs__job_addresses`, and `__payments`.
 
 #### Three change detectors, because no single one is sufficient
 
@@ -34,8 +35,9 @@ The cheap `/api/customers?IncludeOpportunityInfo` sweep over `[today+from_offset
    do not try.
 2. **Staleness TTL.** Bounded blindness. `--hot-ttl-hours` (default 24) refreshes opportunities with a
    service date in `[today-3, today+21]`; `--cold-ttl-hours` (default 336 = 14 d) is the safety net for
-   the rest of the window. Tiered on purpose: a flat 24 h TTL over the whole window costs roughly
-   42k calls/month on `local`. `--refresh-stale-hours N` forces anything older than N hours.
+   the rest of the window. Tiered on purpose: a flat 24 h TTL over the whole sweep window would cost
+   an order of magnitude more than the whole budget allows. `--refresh-stale-hours N` forces anything
+   older than N hours.
 3. **Report-driven queue.** `marts.mart_enrichment_candidates`, fed by the daily zero-quota reports,
    targets exactly the opportunities whose money or status the sweep cannot see. This is the real fix
    for detector 1's blind spot.
@@ -71,11 +73,11 @@ snapshot revives the opportunity in dbt. Two independent triggers:
 > a resource yielded last can and does run before the sweep next to it has finished. Deletion is
 > therefore evaluated against the last sweep *recorded as complete in state*, which is correct whether
 > this resource runs early (detection lands next run) or late (immediate). Absence is also ignored for
-> opportunities whose service span falls outside the sweep window, because the window slides daily and
-> `opps_sweep [-7,+30]` and `nightly_reconciliation [-7,+45]` disagree. An ungated diff marks every
-> opportunity that merely aged out as deleted.
+> opportunities whose service span falls outside the sweep window, because the window slides daily.
+> An ungated diff marks every opportunity that merely aged out as deleted. Every schedule now uses the
+> SAME window (see the contract) precisely so two schedules cannot disagree about what absence means.
 
-- **Initial seed (one time):** `python run.py --job enrich --dest postgres` with `local`. Because all opportunities are "new" the first time, it enriches the whole window; budget accordingly with `--budget` (see the quota section in the strategy). Later runs only touch changes.
+- **Initial seed (one time):** `python run.py --job enrich --dest postgres` with `local`. Because all opportunities are "new" the first time, it enriches the whole window; budget accordingly with `--budget`. Prefer `--sweep-only` first: it builds the crosswalk cheaply and lets the staleness TTL absorb the detail calls gradually (see [`crm_sync_contract.md`](../crm_sync_contract.md)). Later runs only touch changes.
 - `--ids ...` skips the sweep and enriches concrete ids. This is what the webhook worker (Path 1) invokes after debounce. A 404 on one id no longer kills the batch.
 
 ## Destinations
@@ -102,8 +104,8 @@ dlt injects configuration into **resource function arguments**: an argument name
 
 1. Done. Local seed: `leads`, `customers_service_window`, dims in duckdb.
 2. Done. Postgres bootstrap (`sql/00_bootstrap.sql`) + dlt destination env + first `--dest postgres` run.
-3. Done. Diff-driven opportunity enrichment (`--job enrich`): `[-7,+30]` sweep + `GET /api/opportunities/{id}` with all 10 `Include*` flags -> `raw_smartmoving.opportunities_enriched`.
+3. Done. Diff-driven opportunity enrichment (`--job enrich`): customers sweep + `GET /api/opportunities/{id}` with all 10 `Include*` flags -> `raw_smartmoving.opportunities_enriched`.
 4. Done. Direct n8n landing DDL: `../sql/20_webhook_events.sql` (Path 1) and `../sql/30_report_landing.sql` (Path 3).
 5. Pending. n8n webhook receiver -> `raw_smartmoving.webhook_events` + debounced enrichment worker invoking `run.py --ids ...`.
-6. Pending. **n8n** schedules (Dagster deferred, `decisions/0004`): `leads` every 30 min, `enrich` every 60 min, `dims` weekly, nightly reconciliation.
+6. Pending. **n8n** schedules (Dagster deferred, `decisions/0004`). Cadence is defined in [`crm_sync_contract.md`](../crm_sync_contract.md) section 6 - not here.
 7. Pending. Scheduled Reports IMAP flow -> `raw_smartmoving.report_all_jobs` and schedule the reports in the SmartMoving UI.

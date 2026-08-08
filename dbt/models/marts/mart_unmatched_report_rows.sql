@@ -5,12 +5,12 @@
 -- int_opportunity_observations would quietly discard everything that fails to
 -- resolve, and nobody would know the coverage number.
 --
--- MOST ROWS HERE ARE EXPECTED, and that is the point of reporting the reason rather
--- than the count. The Lead Status export spans three months of received dates while
--- the API sweep only covers a [-7,+30] SERVICE-date window, so the overwhelming
--- majority of report rows describe opportunities the API has never been asked about.
--- Today that is ~90% of them - normal, and it is precisely the history the reports
--- exist to supply at zero quota.
+-- MANY ROWS HERE ARE EXPECTED, and that is the point of reporting the reason rather
+-- than the count. The Lead Status export is keyed on RECEIVED date and covers every
+-- lead and opportunity in the period; the API sweep is keyed on SERVICE date and only
+-- reaches opportunities that have a job at all. Bad leads never get a job, so they
+-- resolve at ~6%. That gap is precisely the history the reports exist to supply at
+-- zero quota. See crm_sync_contract.md section 3.
 --
 -- WHAT TO ACTUALLY WATCH: `no_quote_number`. The crosswalk cannot even be attempted
 -- for those, and a rise means the export shape changed. And watch the resolution

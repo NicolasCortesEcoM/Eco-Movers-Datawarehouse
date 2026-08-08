@@ -128,7 +128,9 @@ sweep as (
 ),
 
 -- The Lead Status scheduled report. Zero API quota, and the only source that keeps
--- covering an opportunity after it leaves the sweep's [-7,+30] service-date window.
+-- covering an opportunity after it leaves the sweep's service-date window - or that
+-- never entered it, since the sweep only reaches opportunities that HAVE A JOB.
+-- See crm_sync_contract.md for what each mechanism can and cannot reach.
 --
 -- Resolves through the quote crosswalk because the report carries no GUID. Rows that
 -- do not resolve are NOT dropped silently - they surface in

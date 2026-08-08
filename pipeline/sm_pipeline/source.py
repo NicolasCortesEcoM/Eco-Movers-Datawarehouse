@@ -143,14 +143,16 @@ def smartmoving_source(
     leads_from: int | None = None,
     leads_to: int | None = None,
     days_ahead: int = 10,
-    from_offset: int = -7,
-    to_offset: int = 30,
+    # [-180, +60] - crm_sync_contract.md section 6. Keep in step with run.py.
+    from_offset: int = -180,
+    to_offset: int = 60,
     opp_ids: tuple[str, ...] | None = None,
     call_budget: int = 300,
     pace: float = 0.6,
     hot_ttl_hours: float = 24.0,
     cold_ttl_hours: float = 336.0,
     refresh_stale_hours: float | None = None,
+    sweep_only: bool = False,
 ):
     cfg = INSTANCES[instance_id]
     # pace: proactive throttle (~1.6 calls/s) to stay under SmartMoving's
@@ -283,8 +285,9 @@ def smartmoving_source(
         #                     and immediate, but structurally blind to money and
         #                     leadStatus (see _opp_hash).
         #   2. staleness TTL - bounded blindness. Hot rows refresh daily, cold
-        #                     rows fortnightly. A flat 24h TTL over the whole
-        #                     window would cost ~42k calls/month on `local`.
+        #                     rows fortnightly. Tiered on purpose: a flat 24h TTL
+        #                     over the whole sweep window would cost more than the
+        #                     entire monthly budget (crm_sync_contract.md s7).
         #   3. report queue  - marts.mart_enrichment_candidates, fed by the daily
         #                     zero-quota reports, targets exactly the opportunities
         #                     whose money or status the sweep cannot see.
@@ -438,8 +441,26 @@ def smartmoving_source(
                 del opps[opp_id]
 
         yield enrich_sweep
-        yield opportunities_enriched
-        yield opportunity_deletions
+
+        # sweep_only stops here on purpose.
+        #
+        # /api/customers?IncludeOpportunityInfo=true returns the opportunity GUID AND
+        # the quote number for every opportunity it covers - 685/685 and 514/514 with
+        # a quote on the live data - at roughly ONE call per 200 customers. That makes
+        # the sweep, not the per-opportunity detail call, the cheapest way to build
+        # the GUID <-> quote crosswalk that lets a webhook-known opportunity be
+        # matched to a report row.
+        #
+        # Widening the window is therefore near-free, while the transformer below
+        # costs one call PER OPPORTUNITY. Separating them lets the crosswalk be
+        # refreshed over a year of history for the price of a few dozen calls, without
+        # dragging thousands of detail calls along with it.
+        #
+        # Deletions are also skipped: a sweep run purely to widen coverage says
+        # nothing about absence in the narrower window the scheduled runs use.
+        if not sweep_only:
+            yield opportunities_enriched
+            yield opportunity_deletions
 
     if "dims" in jobs:
         # factory closure: dlt injects config into resource-function *arguments*
