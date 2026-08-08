@@ -19,13 +19,19 @@ with latest as (
     select * from {{ ref('int_opportunity_latest_by_source') }}
 ),
 
--- One narrow CTE per source. Adding a Phase 5 report source means adding a CTE
--- here and extra branches to the pick_latest calls below - core's shape does not
--- otherwise change.
+-- One narrow CTE per source.
+--
+-- A new source is NOT free here, whatever int_opportunity_observations' header
+-- suggests: the union arm makes the data available, but a field only starts
+-- resolving against it once that source appears as a branch in the pick_latest
+-- call below. Add the arm and forget the branch and everything still builds,
+-- every test still passes, and the new source contributes precisely nothing -
+-- which is exactly what happened on the first attempt at the report arm.
 enr as (select * from latest where source = 'api_enrichment'),
 whk as (select * from latest where source = 'api_webhook'),
 swp as (select * from latest where source = 'api_sweep'),
 del as (select * from latest where source = 'api_deletion'),
+rpt as (select * from latest where source = 'report_lead_status'),
 
 base as (
     select distinct
@@ -45,7 +51,8 @@ resolved as (
 
         {{ pick_latest([
             ("enr.quote_number", "enr.observed_at"),
-            ("swp.quote_number", "swp.observed_at")
+            ("swp.quote_number", "swp.observed_at"),
+            ("rpt.quote_number", "rpt.observed_at")
         ]) }}                                               as quote_number,
 
         -- The authoritative outcome. All three API sources report the same coding
@@ -57,9 +64,19 @@ resolved as (
             ("swp.status_code", "swp.observed_at")
         ]) }}                                               as status_code,
 
-        {{ pick_latest([("enr.pipeline_status", "enr.observed_at")]) }}
-                                                            as pipeline_status,
-        {{ pick_latest([("enr.service_date", "enr.observed_at")]) }}
+        -- The report's Status string and the API's leadStatus share this column
+        -- because they are the same namespace: a human-facing pipeline label that
+        -- the platform int cannot express. The report additionally carries the
+        -- lost/cancelled SUBCATEGORY ("Lost price too high"), which is the whole
+        -- reason it is worth ranking above the API here when it is fresher.
+        {{ pick_latest([
+            ("enr.pipeline_status", "enr.observed_at"),
+            ("rpt.pipeline_status", "rpt.observed_at")
+        ]) }}                                               as pipeline_status,
+        {{ pick_latest([
+            ("enr.service_date", "enr.observed_at"),
+            ("rpt.service_date", "rpt.observed_at")
+        ]) }}
                                                             as service_date,
         {{ pick_latest([("enr.opportunity_type_code", "enr.observed_at")]) }}
                                                             as opportunity_type_code,
@@ -85,19 +102,49 @@ resolved as (
         {{ pick_latest([("swp.customer_address", "swp.observed_at")]) }}
                                                             as customer_address,
 
-        {{ pick_latest([("enr.branch_name", "enr.observed_at")]) }}         as branch_name,
+        {{ pick_latest([
+            ("enr.branch_name", "enr.observed_at"),
+            ("rpt.branch_name", "rpt.observed_at")
+        ]) }}                                                              as branch_name,
         {{ pick_latest([("enr.estimated_subtotal", "enr.observed_at")]) }}  as estimated_subtotal,
         {{ pick_latest([("enr.estimated_tax", "enr.observed_at")]) }}       as estimated_tax,
-        {{ pick_latest([("enr.estimated_final_total", "enr.observed_at")]) }} as estimated_final_total,
-        {{ pick_latest([("enr.referral_source", "enr.observed_at")]) }}     as referral_source,
+
+        -- The report contributes `Estimated Revenue` here, not to the subtotal.
+        -- Every opportunity in the warehouse currently has zero tax, so the two are
+        -- indistinguishable in the data and the mapping rests on the column name.
+        -- Revisit when a taxed opportunity appears: if this is wrong, every
+        -- report-sourced total is wrong by exactly the tax.
+        {{ pick_latest([
+            ("enr.estimated_final_total", "enr.observed_at"),
+            ("rpt.estimated_final_total", "rpt.observed_at")
+        ]) }}                                                              as estimated_final_total,
+        {{ pick_latest([
+            ("enr.referral_source", "enr.observed_at"),
+            ("rpt.referral_source", "rpt.observed_at")
+        ]) }}                                                              as referral_source,
         {{ pick_latest([("enr.affiliate_name", "enr.observed_at")]) }}      as affiliate_name,
         {{ pick_latest([("enr.tariff_name", "enr.observed_at")]) }}         as tariff_name,
         {{ pick_latest([("enr.move_size_name", "enr.observed_at")]) }}      as move_size_name,
-        {{ pick_latest([("enr.volume", "enr.observed_at")]) }}              as volume,
-        {{ pick_latest([("enr.weight", "enr.observed_at")]) }}              as weight,
-        {{ pick_latest([("enr.sales_assignee_name", "enr.observed_at")]) }} as sales_assignee_name,
-        {{ pick_latest([("enr.estimator_name", "enr.observed_at")]) }}      as estimator_name,
-        {{ pick_latest([("enr.move_coordinator_name", "enr.observed_at")]) }} as move_coordinator_name,
+        {{ pick_latest([
+            ("enr.volume", "enr.observed_at"),
+            ("rpt.volume", "rpt.observed_at")
+        ]) }}                                                              as volume,
+        {{ pick_latest([
+            ("enr.weight", "enr.observed_at"),
+            ("rpt.weight", "rpt.observed_at")
+        ]) }}                                                              as weight,
+        {{ pick_latest([
+            ("enr.sales_assignee_name", "enr.observed_at"),
+            ("rpt.sales_assignee_name", "rpt.observed_at")
+        ]) }}                                                              as sales_assignee_name,
+        {{ pick_latest([
+            ("enr.estimator_name", "enr.observed_at"),
+            ("rpt.estimator_name", "rpt.observed_at")
+        ]) }}                                                              as estimator_name,
+        {{ pick_latest([
+            ("enr.move_coordinator_name", "enr.observed_at"),
+            ("rpt.move_coordinator_name", "rpt.observed_at")
+        ]) }}                                                              as move_coordinator_name,
         {{ pick_latest([("enr.cancellation_reason", "enr.observed_at")]) }} as cancellation_reason,
         {{ pick_latest([("enr.created_at_utc", "enr.observed_at")]) }}      as created_at_utc,
 
@@ -114,13 +161,15 @@ resolved as (
             coalesce(enr.observed_at, '-infinity'::timestamptz),
             coalesce(whk.observed_at, '-infinity'::timestamptz),
             coalesce(swp.observed_at, '-infinity'::timestamptz),
-            coalesce(del.observed_at, '-infinity'::timestamptz)
+            coalesce(del.observed_at, '-infinity'::timestamptz),
+            coalesce(rpt.observed_at, '-infinity'::timestamptz)
         )                                                   as synced_at
     from base b
     left join enr on enr.opportunity_key = b.opportunity_key
     left join whk on whk.opportunity_key = b.opportunity_key
     left join swp on swp.opportunity_key = b.opportunity_key
     left join del on del.opportunity_key = b.opportunity_key
+    left join rpt on rpt.opportunity_key = b.opportunity_key
 )
 
 select

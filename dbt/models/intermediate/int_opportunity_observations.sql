@@ -125,6 +125,79 @@ sweep as (
     from {{ ref('stg_smartmoving__opportunities') }} o
     join {{ ref('stg_smartmoving__customers') }} c
       on c.customer_dlt_id = o.customer_dlt_id
+),
+
+-- The Lead Status scheduled report. Zero API quota, and the only source that keeps
+-- covering an opportunity after it leaves the sweep's [-7,+30] service-date window.
+--
+-- Resolves through the quote crosswalk because the report carries no GUID. Rows that
+-- do not resolve are NOT dropped silently - they surface in
+-- marts.mart_unmatched_report_rows, per the identity-resolution rule.
+--
+-- WHAT THIS ARM DELIBERATELY DOES NOT CONTRIBUTE:
+--
+--   status_code. The report's Status is a different namespace from the platform int,
+--   not a relabelling of it, and the live data proves it: 185 rows read `Closed` in
+--   the report while the API says status_code 4 (Booked), and `Cancelled service no
+--   longer needed` maps to BOTH 4 and 20 depending on the row. Deriving the int from
+--   the string would manufacture agreement that does not exist. The string goes to
+--   pipeline_status, which is where the lost/cancelled subcategory lives anyway - the
+--   one thing the int genuinely cannot express.
+--
+--   Customer identity. The Lead Status export has 16 columns and none of them is a
+--   customer name, email or phone.
+--
+--   is_deleted. A row's absence from a report means it fell outside the report's
+--   date range, never that it was deleted.
+report_lead_status as (
+    select
+        r.source_instance_id || ':' || x.external_opportunity_id as opportunity_key,
+        r.entity_id,
+        r.source_instance_id,
+        x.external_opportunity_id,
+        'report_lead_status'            as source,
+        5                               as source_priority,
+        r.report_generated_at           as observed_at,
+
+        null::bigint                    as status_code,
+        r.quote_number,
+        r.status_raw                    as pipeline_status,
+        r.service_date_local            as service_date,
+        null::bigint                    as opportunity_type_code,
+        null::bigint                    as service_type_id,
+        null::text                      as external_customer_id,
+        null::text                      as customer_name,
+        null::text                      as customer_email,
+        null::text                      as customer_phone,
+        null::text                      as customer_address,
+        r.branch_name,
+
+        -- `Estimated Revenue` maps to the final total, not the subtotal.
+        -- CAVEAT, and it is a real one: every opportunity in the warehouse today has
+        -- estimated_tax = 0, so subtotal and final_total are identical and the data
+        -- cannot distinguish them. The mapping rests on the column's name. Re-check
+        -- the moment a taxed opportunity appears - if this is wrong, it is wrong by
+        -- exactly the tax amount, on every report-sourced figure.
+        null::numeric                   as estimated_subtotal,
+        null::numeric                   as estimated_tax,
+        r.estimated_revenue::numeric    as estimated_final_total,
+
+        r.referral_source,
+        null::text                      as affiliate_name,
+        null::text                      as tariff_name,
+        null::text                      as move_size_name,
+        r.volume_cuft::numeric          as volume,
+        r.weight_lbs::numeric           as weight,
+        r.sales_person                  as sales_assignee_name,
+        r.estimator_name,
+        r.move_coordinator_name,
+        null::text                      as cancellation_reason,
+        null::timestamptz               as created_at_utc,
+        null::boolean                   as is_deleted
+    from {{ ref('stg_smartmoving__report_lead_status') }} r
+    join {{ ref('int_opportunity_quote_crosswalk') }} x
+      on  x.source_instance_id = r.source_instance_id
+      and x.quote_number       = r.quote_number
 )
 
 {% if deletions_rel %}
@@ -156,6 +229,7 @@ deletions as (
 select * from enrichment
 union all select * from webhooks
 union all select * from sweep
+union all select * from report_lead_status
 {% if deletions_rel %}
 union all select * from deletions
 {% endif %}

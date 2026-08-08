@@ -39,6 +39,16 @@ GRANT ALL ON SCHEMA raw_smartmoving, staging, core, marts, serving TO platform_r
 ALTER DEFAULT PRIVILEGES FOR ROLE platform_rw IN SCHEMA raw_smartmoving, staging, core, marts, serving
   GRANT ALL ON TABLES TO platform_rw;
 
+-- CREATE on the DATABASE, not just on the schemas above. dlt's merge write
+-- disposition loads into a transient staging dataset (`raw_smartmoving_staging`)
+-- which it creates and drops per run, so schema-level grants are not enough.
+--
+-- Without this, extraction fails at the LOAD step with "permission denied for
+-- database" - after the API calls have already been spent. Quota is consumed and
+-- nothing lands. Discovered 2026-08-08, having silently blocked every extraction
+-- run since 2026-07-22.
+GRANT CREATE ON DATABASE datawarehouse TO platform_rw;
+
 -- Consumers: usage on serving + core only, and SELECT (incl. future tables).
 REVOKE ALL ON SCHEMA raw_smartmoving, staging, marts FROM app_read;
 GRANT USAGE ON SCHEMA serving, core TO app_read;

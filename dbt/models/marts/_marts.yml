@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: mart_unmatched_report_rows
+    description: >
+      Report rows from the newest generation that could not be attached to an API
+      opportunity. Most are expected - the reports span far more history than the
+      API sweep window - so the reason column matters more than the count.
+    columns:
+      - name: unmatched_key
+        tests: [not_null, unique]
+      - name: unmatched_reason
+        tests:
+          - accepted_values:
+              values: ['no_quote_number', 'quote_not_in_api']
+      - name: source_instance_id
+        tests: [not_null]
+      - name: entity_id
+        tests: [not_null]

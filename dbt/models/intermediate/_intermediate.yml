@@ -36,7 +36,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['api_enrichment', 'api_webhook', 'api_sweep', 'api_deletion']
+              values: ['api_enrichment', 'api_webhook', 'api_sweep', 'api_deletion',
+                       'report_lead_status']
       - name: observed_at
         data_tests: [not_null]
       - name: source_priority

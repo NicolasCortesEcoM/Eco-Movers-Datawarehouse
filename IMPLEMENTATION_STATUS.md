@@ -65,26 +65,121 @@ droplet**, not from a local build.
 
 ---
 
+## Droplet structural audit - 2026-08-08
+
+Ran against the droplet, not local. Two blocking defects found, both fixed.
+
+### FIXED - extraction was silently dead for 17 days
+
+`platform_rw` had **no CREATE privilege on the database**. dlt's merge write disposition loads
+through a transient staging dataset (`raw_smartmoving_staging`) that it creates per run, so
+schema-level grants are not enough. Every extraction failed at the LOAD step with
+`permission denied for database datawarehouse` - **after the API calls had already been spent**.
+Quota burned, nothing landed.
+
+Evidence it had been failing since 2026-07-22: `opportunities_enriched`, `leads` and every `dim_*`
+table carried a 17-day-old `_sm_extracted_at`, while `webhook_events` (which n8n writes directly,
+bypassing dlt) was current to the minute.
+
+Fixed with `GRANT CREATE ON DATABASE datawarehouse TO platform_rw`, added to
+`sql/00_bootstrap.sql` so a rebuild does not reintroduce it. Verified by a full extract -> load
+cycle: `LOADED and contains no failed jobs`, dims now stamped 2026-08-08, and
+`raw_smartmoving_staging` exists.
+
+### The reason nobody noticed: the pipe-swallows-exit-code bug, again
+
+`run.py ... | tail -25` reported **exit 0 while dlt was raising `PipelineStepFailed`**. A pipeline
+returns its LAST stage's status. This is the same defect found in the dbt SSH command the same day,
+and **every existing n8n workflow that pipes `run.py` output has it**. Any workflow that pipes must
+use `out=$(cmd 2>&1); rc=$?; echo "$out" | tail -N; exit $rc`.
+
+> This is the failure mode worth internalising: the pipeline was broken for 17 days, the schedules
+> were green, and the only visible symptom was data that quietly stopped moving.
+
+### Verified sound
+
+| Check | Result |
+|---|---|
+| RLS from the consumer's side | Connected **as `app_read`**: reads `serving` + `core`, **denied** on `raw_smartmoving`, `staging`, `marts`, and denied on write |
+| RLS policies | `rls_entity` on all 8 `core` + `serving` tables, via `core.current_role_can_see(entity_id)` |
+| Rule 8 (UTC) | No naked `timestamp` anywhere except two `*_local` columns, which is the convention's sanctioned form |
+| Rule 5 (idempotent merges) | 0 duplicate business keys across `opportunities_enriched`, `leads`, `customers_service_window`, `dim_branches`, `dim_users` |
+| Report landing tables | Real composite PKs `(source_instance_id, report_generated_at, row_key)` |
+| Grain | `core.opportunities` 2,169/2,169 - `jobs` 835/835 - `charges` 1,579/1,579 |
+
+### Known, accepted, not defects
+
+- **dlt raw tables have a unique index on `_dlt_id` only**, not on the business key. Idempotency
+  comes from dlt's merge logic rather than a database constraint. Zero duplicates observed, but
+  there is no database-level guard if that logic ever regresses.
+- **`entity_id` is absent from dlt CHILD tables.** dlt stamps only the root row; children carry
+  `_dlt_root_id` and the staging models join back. Deliberate.
+- **`raw_smartmoving.report_ingest_errors` has no `entity_id`.** It is an operational log of emails
+  that could not be attributed to an instance - an `entity_id` there would be a guess.
+- **Money is `double precision` in raw/staging** on the API side, cast to `numeric` before `core`.
+  Correct under ELT (raw preserves the payload), but do not SUM money in `staging`.
+- **43,338 webhook events, all with `processed_at` null.** Not a backlog in the harmful sense: dbt
+  reads `webhook_events` directly, so the free status feed works and contributes 35,442
+  observations. `processed_at` is the *enrichment worker's* marker, and that worker has never run.
+
+---
+
 ## Next Immediate Step
 
-**Wire the report into the observation layer.** `staging.stg_smartmoving__report_lead_status` is
-live on the droplet and typing all 4,801 rows correctly, but `marts.int_opportunity_observations`
-still has only the three API arms (`api_enrichment` 657, `api_sweep` 708, `api_webhook` 33,240) and
-**zero report rows**. The report is landed, typed, and read by nothing. Adding the
-`report_lead_status` arm (priority 5) is what turns it into data other teams can see.
+**Restart extraction and let it catch up.** The `GRANT` above unblocked it, but the API-side data
+is still 17 days stale: `api_enrichment` and `api_sweep` last observed 2026-07-22. Until the
+schedules run, `core.opportunities` is carrying July numbers for every field the reports do not
+cover. Publish the extraction workflows (see the migration steps below), then run one manual
+`--job enrich` per instance to close the gap.
 
 Then, in order:
 
-1. **Import `deploy/n8n_dbt_build_reports.json`** and activate it (07:00 PT daily) - see "What you
-   need to do" at the end of this section.
+1. **Migrate the 6 draft n8n workflows** to the new host path and the exit-code-safe command shape -
+   see [deploy/n8n_workflow_migration.md](deploy/n8n_workflow_migration.md). Then publish them.
 2. **Schedule the reports in the SmartMoving UI** (H2). Lead Status first: it is the denominator.
+   Both per-instance aliases are live as of 2026-08-08.
 3. **Remove the temporary `reporting@ecomoversmoving.com` alias** from `Resolve Report Metadata`
-   once the two per-instance aliases are live, and clear the one stale row in
+   once a report has arrived on each per-instance alias, and clear the one stale row in
    `report_ingest_errors` before that table is wired to an alert.
-4. **Deploy the pipeline schedules**: confirm the n8n SSH credential (`SSH Password account`, id
-   `1wkrc8PhMPB14wEp`) points at the droplet host and publish the 6 draft workflows. Note their
-   paths must change from `/opt/datawarehouse` to `/home/datawarehouse_user/datawarehouse`.
-5. **The other three report staging models** + the Playwright bot for All Jobs.
+4. **The other three report staging models** + the Playwright bot for All Jobs.
+
+### Report arm wired into core - DONE 2026-08-08
+
+`report_lead_status` is now a real source, priority 5. On the droplet, **`PASS=204 WARN=0 ERROR=0`**.
+
+| | |
+|---|---|
+| Observations contributed | 489 |
+| Opportunities where the report is the freshest source | **472** |
+| Opportunities that gained a money value they did not have | **657 -> 691** (total `2,313,887.88` -> `2,387,834.19`) |
+| `pipeline_status` | now carries the lost/cancelled **subcategory** (`Lost price too high`, `Cancelled price was to high`) that the platform int cannot express |
+| Grain | 2,169 / 2,169 - unchanged |
+| `serving.jobs_upcoming_v1` | unchanged |
+
+**Resolution rate is 10.2% (489 of 4,801), and that is expected.** The Lead Status export spans
+three months of received dates; the API sweep only covers a `[-7,+30]` **service**-date window, so
+most report rows describe opportunities the API has never been asked about. That history at zero
+quota is the point. The unmatched rows are surfaced in `marts.mart_unmatched_report_rows` with a
+reason, never dropped. The number to watch is `no_quote_number` (currently 0) - a rise there means
+the export shape changed.
+
+> **A correction to how this layer was documented.** `int_opportunity_observations` said adding a
+> source was "a `union all` arm and nothing else". That is false: `core.opportunities` resolves
+> each field against an explicit list of source branches, so an arm added without a matching
+> `pick_latest` branch builds green, passes every test, and contributes **nothing**. That is
+> exactly what happened on the first attempt - the arm landed 489 observations and `core` did not
+> change by a single value. Both files now say so.
+
+### Two empirical findings that shaped the arm
+
+- **The report's `Status` cannot be mapped to the platform int.** On matched rows, 185 read
+  `Closed` while the API says `status_code = 4` (Booked), and `Cancelled service no longer needed`
+  maps to **both** 4 and 20. The arm therefore contributes the string to `pipeline_status` and
+  leaves `status_code` null - the API owns the int.
+- **`Estimated Revenue` -> `estimated_final_total`, on the strength of the column's name alone.**
+  Every opportunity in the warehouse has `estimated_tax = 0`, so subtotal and final total are
+  identical and the data cannot distinguish them. Re-check when a taxed opportunity first appears:
+  if the mapping is wrong, it is wrong by exactly the tax on every report-sourced figure.
 
 > Local read access when needed: SSH tunnel in **Windows PowerShell** (not WSL),
 > `ssh -L 5433:localhost:5432 <droplet_ssh_user>@<droplet_ssh_host>` (values in laptop `.env`);
