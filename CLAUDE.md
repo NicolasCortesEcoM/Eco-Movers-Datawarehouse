@@ -52,7 +52,7 @@ Should an analytical warehouse ever be needed, the move is deliberately cheap: d
 3. **API quota is finite and metered per instance.** Prefer reprocessing from raw over re-calling the API. Every call is logged to `scripts/api_call_log.jsonl`. The budget, the cost of each mechanism, and what may trigger an expensive call live in [`crm_sync_contract.md`](crm_sync_contract.md) - that file has precedence over every other document in this repo on those questions.
 4. **Single database, `entity_id` on every table, Row-Level Security.** Never separate schemas or databases per company.
 5. **Composite primary keys, merge write disposition, idempotent loads.** Every load must be safely re-runnable.
-6. **No consumer reads `raw_*` or `core`.** Other teams read `serving` only.
+6. **No consumer reads `raw_*` or `staging`.** Other teams read `serving` - plus read-only `core` under an explicit "unstable, may change without a version bump" label. That exception is deliberate and bounded; the reasoning, and what would reverse it, is in [`decisions/0003`](decisions/0003-hybrid-serving-plus-core-read.md). Nobody gets `raw_*`, `staging`, or a vendor API key.
 7. **Never store a naked source identifier.** Business keys are always `(entity_id, external_id)`.
 8. **Every timestamp is `timestamptz` in UTC.** No exceptions.
 
@@ -60,13 +60,15 @@ Should an analytical warehouse ever be needed, the move is deliberately cheap: d
 
 | Schema                                 | Contents                                                                                         | Who reads it              |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------- |
-| `raw_smartmoving`, `raw_quickbooks`, ... | Source payloads as received, dlt-loaded, merged on composite PK                                  | dbt only                  |
-| `staging`                              | dbt views: renamed, typed, lightly cleaned. One model per raw table.                             | dbt only                  |
-| `core`                                 | Canonical, cross-source-resolved entities: `employees`, `branches`, `jobs`, `customers`, `calls` | dbt only                  |
-| `marts`                                | Analytical models for BI. May change whenever an analyst needs it.                               | Metabase, analysts        |
+| `raw_smartmoving`, `raw_quickbooks`, ... | Source payloads as received, merged on composite PK. Two loaders - see below.                  | dbt only                  |
+| `staging`                              | dbt views: renamed, typed, lightly cleaned. One model per raw table. **Money is cast to `numeric` here**, at this boundary. | dbt only                  |
+| `core`                                 | Canonical, cross-source-resolved entities: `employees`, `branches`, `jobs`, `customers`, `calls` | dbt only + read-only apps (unstable, see rule 6) |
+| `marts`                                | Analytical models for BI. May change whenever an analyst needs it. Also holds the `int_*` observation layer (dbt folder `models/intermediate/`, schema `marts` - it is dbt-owned and free to change, same as marts). | Metabase, analysts        |
 | `serving`                              | Stable, versioned, documented views. The public contract.                                        | Other teams' applications |
 
 `marts` and `serving` differ in exactly one way that matters: `marts` changes freely, `serving` cannot change without a version bump and a deprecation window.
+
+**`raw_*` has two loaders, not one.** `dlt` (via `pipeline/run.py`) lands everything pulled from an API. **n8n writes directly by SQL** for the two paths dlt is the wrong tool for: the webhook receiver (`sql/20_webhook_events.sql` - it must record the event and answer 200 before any processing) and the scheduled-report landing (`sql/30`-`sql/33`). Both write raw payloads verbatim, append-only, and are governed by the same rules as the dlt tables. A model does not care which loader filled its source table.
 
 Where a source schema is volatile, preserve the full payload in a `JSONB` column alongside the normalized fields so reprocessing never requires an API call.
 
@@ -85,6 +87,10 @@ Where a source schema is volatile, preserve the full payload in a `JSONB` column
 - Business keys are `(entity_id, external_id)`, never `external_id` alone
 - Surrogate keys are generated in dbt, never in the pipeline
 
+### Money
+
+- **Every monetary column is `numeric`, cast at the `staging` boundary.** dlt lands money as `double precision` because that is the JSON shape; binary floats drift by fractions of a cent under `SUM`. Staging is where typing happens, so no downstream model re-casts and no one has to remember a "don't sum money here" rule.
+
 ### Time
 
 - Store every timestamp as `timestamptz` in UTC
@@ -102,14 +108,14 @@ Where a source schema is volatile, preserve the full payload in a `JSONB` column
 
 This is the deliverable other teams depend on. A `serving` view is not finished until all of the following exist:
 
-- An entry in `serving_catalog.md`: contents, source systems, grain, freshness target, owner
+- An entry in `serving_catalog.md`: contents, source systems, grain, owner, and the **entity whose freshness target applies** - named and linked, never restated as a number (the target itself lives only in `crm_sync_contract.md`)
 - `entity_id` and `synced_at` columns present
 - dbt tests: not-null on keys, uniqueness on the declared grain, referential integrity to `core`
 - A version suffix
 
 **Change policy.** Additive changes (adding a column) ship freely. Breaking changes (rename, type change, removal) require a new version, with the previous version kept live for 90 days.
 
-**Access policy.** Consumers connect with a read-only role scoped to `serving`, enforced by RLS on `entity_id`. No consumer receives credentials to `raw_*` or `core`. Any team that finds itself wanting to call a vendor API directly should be given a serving view instead - that request is a signal the catalog has a gap.
+**Access policy.** Consumers connect with a read-only role (`app_read`, or a per-team role inheriting it) scoped to `serving` **and `core`**, enforced by RLS on `entity_id` in both (rule 6 and [`decisions/0003`](decisions/0003-hybrid-serving-plus-core-read.md)). No consumer receives credentials to `raw_*` or `staging`, and none ever receives a vendor API key. A `core`-based query that becomes load-bearing for an app is the signal to promote it into a versioned `serving` view - and a team wanting to call a vendor API directly is the signal the catalog has a gap.
 
 ## Freshness targets
 
@@ -130,13 +136,13 @@ Note that **SmartMoving has no lead-created webhook**: leads are polling-only, a
 Follow this order. Skipping steps produces sources that each behave differently and cost more to maintain than they save.
 
 1. Document the API under `<source>_api_docs/` - endpoints, auth, rate limits, pagination
-2. Add a client under `pipeline/` with call logging and a budget, mirroring `sm_client.py`
+2. Add a client under `pipeline/` with call logging and a budget, mirroring `pipeline/sm_pipeline/client.py`
 3. Define the dlt extraction resource with composite PK and merge disposition
 4. Land into `raw_<source>` with no transformation
 5. Write `stg_<source>__*` models
 6. Extend `core` entities and crosswalk tables
 7. Publish `serving` views only when a consumer needs them
-8. Add the source to the freshness table above
+8. Add the source to [`crm_sync_contract.md`](crm_sync_contract.md) - which mechanism feeds each entity, at what cadence, at what quota cost, and what that mechanism *cannot* do. A source that is not in the contract has no published freshness obligation.
 
 ## Data quality
 
@@ -158,7 +164,8 @@ Follow this order. Skipping steps produces sources that each behave differently 
 - `smartmoving_*.md` (root) - condensed AI-context guides for the SmartMoving API, lead API, and webhooks; `smartmoving_api_complete_reference.md` is the exhaustive version; `smartmoving_api_findings.md` is ground truth from live API exploration (real enum values, volumes, PageSize cap of 200) - trust it over the scraped docs where they differ.
 - `pipeline/` - the dlt extraction pipeline: `run.py` CLI extracts leads/jobs-window/dims from both instances into DuckDB (dev) or Postgres (prod). Read `pipeline/README.md` before touching it - it records non-negotiable design rules (composite PKs, merge-everywhere, entity-local dates) and a dlt config-injection gotcha.
 - `scripts/sm_client.py` - back-compat shim re-exporting the SmartMoving API client from `pipeline/sm_pipeline/client.py` (reads `.env`, logs every call to `scripts/api_call_log.jsonl`, enforces a per-session call budget). Always use it for API calls; never ad-hoc curl. See the `smartmoving-api` project skill.
-- `SCRDLA - dim_*.csv` - hand-maintained seed dimension mappings (future dbt seeds): status -' boolean flags (`is_booked`, `is_lost`, etc.), line-of-business classification rules (rule/priority-based; service_type is reliable, branch_name is not), referral-source -' marketing-channel mapping, and sales-team assignments. Column notes inside these CSVs encode business rules - preserve them when editing.
+- `dbt/seeds/` - the **loaded** hand-maintained dimensions: status -> boolean flags (`dim_opportunity_status`, `dim_status_map`), instance -> entity (`dim_instance`), per-branch timezone overrides, line-of-business classification rules (rule/priority-based; service_type is reliable, branch_name is not), referral-source -> marketing-channel mapping, and sales-team assignments. `OLD_TABLES/SCRDLA - dim_*.csv` are the original Google-Sheet exports, kept as the editing surface. The column notes that encoded business rules live as `description` entries in `dbt/seeds/_seeds.yml` - preserve them when editing. Note `dim_lob_map`, `dim_sales_team` and `dim_referral_source` are loaded but not yet read by any model; they are Phase 2 material (LOB + marketing reporting), not an oversight.
+- `IMPLEMENTATION_STATUS.md` - the progress board and plan of record: where we are, what is done, what is next, and the dated audits. Architecture lives in this file, `crm_sync_contract.md` and `decisions/`; status lives there.
 - `smartmoving_scheduble_reports/` - sample xlsx/csv exports of SmartMoving's schedulable reports, useful as ground truth for field names and expected report shapes.
 
 ## Roadmap

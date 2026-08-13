@@ -62,6 +62,16 @@ SINGLE_SOURCE_FACTS = [
      "a superseded TTL cost estimate"),
     (r"4-5\s*(x|times)\s*(/|per\s+)day",
      "a superseded cadence; the contract defines the schedule"),
+    # Freshness targets are a published obligation, so a stale copy is a promise
+    # we are not keeping. serving_catalog.md carried "< 15 min" for jobs and leads
+    # long after the contract had moved both to < 4 h - nobody noticed, because
+    # nothing looked. Name the entity and link; never restate the number.
+    (r"<\s*15\s*min",
+     "a freshness target; section 8 of the contract holds the only copy"),
+    (r"<\s*4\s*h\b",
+     "a freshness target; section 8 of the contract holds the only copy"),
+    (r"\*\*Freshness target\*\*",
+     "a restated freshness target row; name the entity and link to the contract"),
 ]
 
 # Claims that are simply false and must never reappear anywhere.

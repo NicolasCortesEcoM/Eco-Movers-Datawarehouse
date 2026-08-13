@@ -34,7 +34,8 @@ select
          then to_date(j.job_date::text, 'YYYYMMDD') end as job_date,
     j.type                                  as service_type_id,
     j.confirmed                             as is_confirmed,
-    j.total_tips,
+    -- money: cast at the staging boundary like every other monetary column
+    j.total_tips::numeric                   as total_tips,
 
     nullif(j.arrival_window__id, '')            as arrival_window_id,
     nullif(j.arrival_window__description, '')   as arrival_window_description,

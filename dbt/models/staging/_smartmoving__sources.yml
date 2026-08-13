@@ -68,6 +68,19 @@ sources:
         description: Additional named contacts on the opportunity. Not available from any list endpoint.
       - name: opportunities_enriched__surveys
         description: Scheduled surveys/estimates with assignee and notes.
+      - name: opportunity_deletions
+        description: >
+          Soft-delete markers. Raw never physically deletes: an opportunity that a
+          COMPLETED sweep should have seen but did not, or that the detail endpoint
+          answers 404 for, gets a marker here, and dbt treats a later enriched
+          snapshot as "present again".
+
+          Created by dlt only when the first deletion is detected, so it is absent
+          on a fresh environment. int_opportunity_observations guards on the
+          relation existing - but the guard alone was not enough: the model reads it
+          through source(), which needs this declaration too. Missing it meant the
+          build broke the very first time a deletion was ever detected (2026-08-13),
+          having been green for weeks.
 
       # --- Scheduled reports, landed by n8n from email. Zero API quota.
       - name: report_lead_status

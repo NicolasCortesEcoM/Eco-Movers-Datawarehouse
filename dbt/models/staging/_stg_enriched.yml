@@ -51,7 +51,12 @@ models:
               to: ref('dim_opportunity_status')
               field: status_code
       - name: estimated_final_total
-        description: The money. 100% populated.
+        description: >
+          The money. 100% populated. Cast to `numeric` here at the staging
+          boundary - dlt lands it as double precision, and binary floats drift
+          under SUM. Every monetary column in this project is typed at this
+          boundary, so nothing downstream re-casts and money is safe to aggregate
+          from staging onward.
         data_tests: [not_null]
       - name: observed_at
         description: Snapshot time; the ordering key for the Phase 4 observation layer.
@@ -100,6 +105,7 @@ models:
         description: Int enum (observed 1,2,3,4,7,9,10). Unlabelled pending a verified seed.
         data_tests: [not_null]
       - name: total_cost
+        description: "`numeric`, cast at this boundary like every monetary column."
         data_tests: [not_null]
 
   - name: stg_smartmoving__opportunity_job_addresses

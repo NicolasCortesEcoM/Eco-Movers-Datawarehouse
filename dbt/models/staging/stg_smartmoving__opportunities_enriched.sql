@@ -20,6 +20,11 @@
 --
 -- pipeline_status arrives with inconsistent trailing whitespace - both 'Booked'
 -- and 'Booked ' occur - so it is trimmed once here at the boundary.
+--
+-- MONEY IS CAST TO numeric HERE. dlt lands estimated_total__* as double precision
+-- because that is the JSON shape, and binary floats drift by fractions of a cent
+-- under SUM. Typing is staging's job (CLAUDE.md: "renamed, typed, lightly
+-- cleaned"), so the cast lives here once instead of in every downstream model.
 
 select
     source_instance_id || ':' || id             as opportunity_key,
@@ -53,10 +58,10 @@ select
     nullif(tariff__id, '')                      as tariff_id,
     nullif(tariff__name, '')                    as tariff_name,
 
-    estimated_total__subtotal                   as estimated_subtotal,
-    estimated_total__taxable_amount             as estimated_taxable_amount,
-    estimated_total__tax                        as estimated_tax,
-    estimated_total__final_total                as estimated_final_total,
+    estimated_total__subtotal::numeric          as estimated_subtotal,
+    estimated_total__taxable_amount::numeric    as estimated_taxable_amount,
+    estimated_total__tax::numeric               as estimated_tax,
+    estimated_total__final_total::numeric       as estimated_final_total,
 
     nullif(move_size__name, '')                 as move_size_name,
     nullif(move_size__description, '')          as move_size_description,

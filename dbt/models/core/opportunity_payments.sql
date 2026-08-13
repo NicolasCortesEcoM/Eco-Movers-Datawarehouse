@@ -18,8 +18,9 @@ select
     p.payment_source_code,
     p.payment_type_code,
     p.payment_category_code,
-    p.amount::numeric           as amount,
-    p.amount_refunded::numeric  as amount_refunded,
+    -- already numeric: staging casts money at the boundary.
+    p.amount,
+    p.amount_refunded,
     p.is_outstanding,
     p.taken_by_user,
     o.synced_at

@@ -22,9 +22,11 @@ select
     c.charge_category_code,
     c.charge_description,
     c.sort_order,
-    c.subtotal::numeric         as subtotal,
-    c.discount_amount::numeric  as discount_amount,
-    c.total_cost::numeric       as total_cost,
+    -- already numeric: staging casts money at the boundary, so nothing here
+    -- re-types it. See stg_smartmoving__opportunity_job_charges.
+    c.subtotal,
+    c.discount_amount,
+    c.total_cost,
     o.synced_at
 from {{ ref('stg_smartmoving__opportunity_job_charges') }} c
 left join {{ ref('opportunities') }} o

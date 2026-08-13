@@ -9,6 +9,11 @@
 --
 -- source, payment_type and payment_category are int enums, left unlabelled
 -- pending a verified seed.
+--
+-- Money is cast to numeric here, at the staging boundary - see the note in
+-- stg_smartmoving__opportunity_job_charges. dlt lands it as double precision;
+-- typing it once here is what keeps "do not SUM money in staging" from being a
+-- rule anyone has to remember.
 
 with payments as (
     select * from {{ source('smartmoving', 'opportunities_enriched__payments') }}
@@ -29,8 +34,8 @@ select
     p.source                        as payment_source_code,
     p.payment_type                  as payment_type_code,
     p.payment_category              as payment_category_code,
-    p.amount,
-    p.amount_refunded,
+    p.amount::numeric               as amount,
+    p.amount_refunded::numeric      as amount_refunded,
     p.is_outstanding,
     nullif(p.taken_by_user, '')     as taken_by_user
 from payments p

@@ -98,6 +98,11 @@ def main() -> None:
     )
 
     instances = list(INSTANCES) if args.instance == "all" else [args.instance]
+    # One instance failing must not silently skip the others. The instances have
+    # separate API keys and separate quotas, so a problem with one says nothing
+    # about the other - but with a bare loop, `ld` blowing up meant `local` never
+    # ran and nobody could tell from the output that half the job was missing.
+    failures: list[str] = []
     for inst in instances:
         source = smartmoving_source(
             inst,
@@ -115,11 +120,29 @@ def main() -> None:
             refresh_stale_hours=args.refresh_stale_hours,
             sweep_only=args.sweep_only,
         )
-        info = pipeline.run(source)
-        print(f"[{inst}] {info}")
+        try:
+            info = pipeline.run(source)
+            print(f"[{inst}] {info}")
+        except Exception as exc:  # noqa: BLE001 - the next instance must still run
+            # Exhausting the call budget is a GUARDRAIL doing its job, not a
+            # failure: the run stops early, keeps what it fetched, and the next
+            # run resumes from the same watermark. Reporting it as a failure would
+            # make every scheduled run alert while a backlog is being absorbed -
+            # and an alert that always fires is an alert nobody reads.
+            if "budget" in str(exc).lower():
+                print(f"[{inst}] call budget reached - partial run, resuming next time")
+                continue
+            failures.append(inst)
+            print(f"[{inst}] FAILED: {type(exc).__name__}: {exc}")
 
     if args.dest == "duckdb":
         print(f"\nDuckDB file: {DUCKDB_PATH}")
+
+    # Exit non-zero so the caller can tell. The n8n SSH nodes wrap this in
+    # `out=$(...); rc=$?; ...; exit $rc` and assert on rc - without a non-zero exit
+    # here a failed instance would look like a clean run.
+    if failures:
+        raise SystemExit(f"extraction failed for: {', '.join(failures)}")
 
 
 if __name__ == "__main__":

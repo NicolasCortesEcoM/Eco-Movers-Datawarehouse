@@ -7,7 +7,9 @@
 
 **Current phase:** Phase 1 - SmartMoving -> Postgres.
 **Current workstream:** enriching **leads** and **opportunities** to the scheduled-report field set.
-**Last updated:** 2026-08-05.
+**Where that stands:** P0-P4 done; **P5 in progress** (Lead Status lands end-to-end; three reports and
+their observation arms remain); **P6-P8 not started**. Detail in "Pending - the current workstream".
+**Last updated:** 2026-08-13 (architecture audit - see below).
 **Repository:** `https://github.com/NicolasCortesEcoM/Eco-Movers-Datawarehouse`
 
 ---
@@ -116,8 +118,12 @@ use `out=$(cmd 2>&1); rc=$?; echo "$out" | tail -N; exit $rc`.
   `_dlt_root_id` and the staging models join back. Deliberate.
 - **`raw_smartmoving.report_ingest_errors` has no `entity_id`.** It is an operational log of emails
   that could not be attributed to an instance - an `entity_id` there would be a guess.
-- **Money is `double precision` in raw/staging** on the API side, cast to `numeric` before `core`.
-  Correct under ELT (raw preserves the payload), but do not SUM money in `staging`.
+- ~~**Money is `double precision` in raw/staging**, cast to `numeric` before `core`; do not SUM money
+  in `staging`.~~ **FIXED 2026-08-13** (architecture audit). Money is still `double precision` in
+  **raw** - correct under ELT, raw preserves the payload - but every monetary column is now cast to
+  `numeric` at the **staging** boundary, which is what staging is for. The redundant casts in
+  `core.opportunity_charges` / `core.opportunity_payments` were removed. Money is safe to aggregate
+  from staging onward, so the rule nobody could enforce is now a property of the schema.
 - **43,338 webhook events, all with `processed_at` null.** Not a backlog in the harmful sense: dbt
   reads `webhook_events` directly, so the free status feed works and contributes 35,442
   observations. `processed_at` is the *enrichment worker's* marker, and that worker has never run.
@@ -162,6 +168,50 @@ strongest argument for treating reports as the backbone rather than a supplement
 > explanation - service dates inside the swept span, non-lead statuses. Job-anchoring explains bad
 > leads and some lost opportunities, not all of it. One focused investigation is owed. Nothing is
 > blocked: those rows surface in `marts.mart_unmatched_report_rows`.
+
+---
+
+## Architecture audit - 2026-08-13
+
+A full read of the repository against the Phase 1 objective: one reliable source other teams consume
+without calling a vendor API, as fresh as each source allows, replacing the Google Sheets.
+
+**Verdict: no structural change is warranted.** The layering, the observation layer, the per-field
+resolution, the instance/entity split and the contract-with-a-checker pattern are the right shapes for
+this problem and should not be redesigned. What the audit found was documentation drift and one real
+typing weakness - fixed below - plus a short list of things that are missing rather than wrong.
+
+### Fixed in this pass
+
+| Finding | What was wrong | Fix |
+|---|---|---|
+| **Money typing** | Money reached `staging` as `double precision`; the `numeric` cast happened in `core`. Correct results today, but it made "do not SUM money in staging" a rule people had to remember rather than a property of the schema. | Cast moved to the staging boundary in all four models that carry money; redundant `core` casts removed; the rule is now written in `CLAUDE.md` under **Conventions -> Money**. |
+| **Stale freshness targets** | `serving_catalog.md` promised both published views a target several times tighter than the one the contract actually sets for jobs and leads (section 8 has the numbers; they are not repeated here). The catalog is what a consuming team would cite as our SLA, so it was publishing a commitment the pipeline does not meet. | Catalog now names the entity and links to `crm_sync_contract.md` section 8 instead of restating a number. |
+| **The checker could not see that class of drift** | `check_sync_contract.py` guarded sweep windows and quota estimates, but not freshness targets - which is why the drift above survived. | Three freshness patterns added to `SINGLE_SOURCE_FACTS`. Verified the guard fires on a planted violation, not just that it passes. |
+| **Rule 6 contradicted `decisions/0003`** | `CLAUDE.md` rule 6 said "no consumer reads `core`"; ADR 0003 deliberately relaxes exactly that, and the implementation follows the ADR. A non-negotiable rule was being negotiated elsewhere. | Rule 6 now states the bounded exception and links to the ADR. |
+| **`raw_*` looked single-loader** | The layer table implied dlt loads all of raw. n8n writes `webhook_events` and every `report_*` table directly, by design. | Documented in the layer table - both loaders, and why each is right for its path. |
+| **`intermediate/` was invisible** | The dbt folder is `models/intermediate/` but the schema is `marts`. Nothing said so, so the observation layer was hard to locate in Postgres. | Noted in the layer table. |
+| **Stale `status` column note** | The catalog still described status labels as `status_<int>` placeholders "pending a full enum mapping". That mapping shipped with `dim_opportunity_status`. | Catalog now lists the real labels, warns that `status_<int>` would be a bug, and points at `status_model.md` for the Completed/Closed trap. |
+
+### Open, unchanged by this pass
+
+- **`marts.mart_enrichment_candidates` (P6) does not exist.** `pipeline/README.md` and `source.py`
+  both describe it as the third change detector and "the real fix" for the sweep's blindness to money
+  and `leadStatus`. Until it lands, an opportunity that changes money outside the enrichment allowlist
+  and outside the hot window waits on the **cold TTL** to be re-read. That is a deliberate,
+  documented backstop - but it is the largest remaining freshness gap in the system.
+- **The exit-code sweep is not finished.** The 2026-08-08 audit established that *every* n8n workflow
+  piping `run.py` hides failures. The migration doc carries the correct shape; the sweep itself is
+  step 1 of Next Immediate Step and is what turns a 17-day silent outage into a visible one.
+- **Three seeds have no consumer.** `dim_lob_map`, `dim_sales_team` and `dim_referral_source` load and
+  are documented, but no model under `dbt/models/` references any of them. They are Phase 2 material
+  (LOB and marketing reporting), not an oversight - recorded here so the next audit does not
+  re-discover it as a gap.
+- **`raw_*` has no database-level uniqueness on the business key**, only on `_dlt_id`. Idempotency
+  rests entirely on dlt's merge logic. Zero duplicates observed across every table checked, but rule 5
+  ("composite primary keys, idempotent loads") is currently enforced by application behaviour rather
+  than by a constraint. Adding `UNIQUE (source_instance_id, id)` on the dlt root tables would make it
+  structural. Cheap; not yet done.
 
 ---
 

@@ -4,6 +4,8 @@ The published catalog of `serving` views - the contract other teams build on. **
 
 Change policy: additive changes ship freely; breaking changes (rename, type change, removal) require a new version suffix with the previous version kept live for 90 days.
 
+**Freshness targets are defined in [`crm_sync_contract.md`](crm_sync_contract.md) section 8 and are not restated here.** Each entry below names the entity whose target applies; read the number there. This file once carried its own copies and they drifted out of date - a target stated in two places is a contradiction waiting to happen. `synced_at` on every view is the per-row truth regardless of any target.
+
 ---
 
 ## `serving.jobs_upcoming_v1`
@@ -14,7 +16,7 @@ Change policy: additive changes ship freely; breaking changes (rename, type chan
 | **Contents** | Every job scheduled in the next 10 days, one row per job. |
 | **Grain** | `(source_instance_id, external_job_id)` - one row per job. |
 | **Source systems** | SmartMoving (windowed service-date sweep -' `core.jobs`). |
-| **Freshness target** | < 15 min. *Current mechanism:* hourly service-date sweep (Phase 1). Drops to minutes once webhook enrichment lands (Phase 2). Read `synced_at` for the actual per-row freshness. |
+| **Freshness** | Governed by the **Jobs** row of [`crm_sync_contract.md`](crm_sync_contract.md) section 8 (mechanism: service-date sweep plus the `job-closed` enrichment trigger). Read `synced_at` for the actual per-row freshness. |
 | **Owner** | Reporting Manager / data-platform team. |
 | **Version** | v1 (first published contract). |
 | **RLS** | Filtered by `entity_id`; consumers only see their own entity. |
@@ -29,7 +31,7 @@ Change policy: additive changes ship freely; breaking changes (rename, type chan
 | `external_job_id` | text | SmartMoving job id (unique within its instance). |
 | `job_number` | text | Human-facing job number (e.g. `12534-1`). |
 | `quote_number` | text | Human-facing opportunity/quote number. |
-| `status` | text | Opportunity status label. `Booked` is reliable; other values render as `status_<int>` pending a full enum mapping (see `smartmoving_api_findings.md`). |
+| `status` | text | Opportunity status label, resolved from the authoritative status integer through the `dim_opportunity_status` seed: `NewLead`, `LeadInProgress`, `Opportunity`, `Booked`, `Completed`, `Closed`, `Cancelled`, `Lost`, `BadLead`. A value ever rendering as `status_<int>` means an unmapped code appeared and is a bug, not a placeholder. **Do not derive "booked" by string-matching this column** - `Completed` and `Closed` also count as booked. See [`status_model.md`](status_model.md). |
 | `service_date` | date | Local business date of the job (never timezone-converted). |
 | `days_until_service` | int | `service_date -' today` (today in the entity's timezone). |
 | `service_type_name` | text | Resolved from the job's service-type id (e.g. Moving, Packing, Commercial). |
@@ -39,7 +41,7 @@ Change policy: additive changes ship freely; breaking changes (rename, type chan
 | `customer_address` | text | |
 | `synced_at` | timestamptz | When this row's source data was last extracted (data freshness). |
 
-**Not yet included** (arrive later via opportunity enrichment, as additive columns - no version bump): branch, origin/destination addresses, crew/dispatch, estimated total. The `status` label mapping will be completed as the sweep status enum is cross-referenced against the UI.
+**Not yet included** (arrive later as additive columns - no version bump, tracked as P7 in `IMPLEMENTATION_STATUS.md`): branch, structured origin/destination addresses, crew/dispatch, estimated total. Structured addresses come from the All Jobs scheduled report, not from any API source - the enriched payload carries flat address strings whose order does not identify origin vs destination.
 
 **dbt tests:** not-null on `job_key`/`entity_id`/`external_job_id`/`service_date`/`synced_at`; unique on `job_key` (grain); not-null + unique enforced on `core.jobs` upstream. RLS cross-entity isolation verified.
 
@@ -53,7 +55,7 @@ Change policy: additive changes ship freely; breaking changes (rename, type chan
 | **Contents** | Leads created today (entity-local date), one row per lead. |
 | **Grain** | `(source_instance_id, external_lead_id)` - one row per lead. |
 | **Source systems** | SmartMoving (`/api/leads` windowed poll -' `core.leads`). |
-| **Freshness target** | < 15 min. *Current mechanism:* poll every 15 - 30 min (no lead webhook exists). Read `synced_at` for per-row freshness. |
+| **Freshness** | Governed by the **Leads** row of [`crm_sync_contract.md`](crm_sync_contract.md) section 8. Leads are **polling-only** - SmartMoving has no lead-created webhook, so no mechanism change will make this faster than the poll. Read `synced_at` for per-row freshness. |
 | **Owner** | Reporting Manager / data-platform team. |
 | **Version** | v1. |
 | **RLS** | Filtered by `entity_id`. |

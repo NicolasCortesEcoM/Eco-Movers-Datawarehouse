@@ -10,6 +10,12 @@
 -- charge_category is an int enum (observed 1,2,3,4,7,9,10). Deliberately NOT
 -- labelled here - inventing names for unverified codes is how wrong business logic
 -- gets baked in. It needs a seed, mapped from the SmartMoving UI. See IMPLEMENTATION_STATUS.
+--
+-- MONEY IS CAST TO numeric HERE, at the staging boundary. dlt lands it as
+-- `double precision` because that is the JSON shape, and summing binary floats
+-- silently drifts by fractions of a cent. Typing is what staging is for
+-- (CLAUDE.md: "renamed, typed, lightly cleaned"), so the cast belongs here rather
+-- than in every model that later touches the column. Downstream may SUM freely.
 
 with jobs as (
     select job_dlt_id, source_instance_id, entity_id, external_job_id, external_opportunity_id
@@ -45,9 +51,9 @@ select
     nullif(u.description, '')           as charge_description,
     nullif(u.editable_description, '')  as charge_editable_description,
     u.sort_order,
-    u.subtotal,
-    u.discount_amount,
-    u.total_cost
+    u.subtotal::numeric                 as subtotal,
+    u.discount_amount::numeric          as discount_amount,
+    u.total_cost::numeric               as total_cost
 from unioned u
 join jobs j
   on j.job_dlt_id = u._dlt_parent_id

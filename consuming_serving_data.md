@@ -26,7 +26,9 @@ Every row carries an `entity_id`. RLS filters your role to the entities it's aut
 
 ## Reading freshness
 
-Every serving view carries **`synced_at`** - when that row's source data was last extracted. Show it in your UI ("as of 10:42"). Don't assume real-time; check `synced_at` and the freshness target in the catalog.
+Every serving view carries **`synced_at`** - when that row's source data was last extracted. Show it in your UI ("as of 10:42"). Don't assume real-time.
+
+`synced_at` is the truth for a given row. The *target* your view is held to lives in `crm_sync_contract.md` section 8, named per entity from `serving_catalog.md` - so a target is stated once and cannot go stale in two places. If `synced_at` is consistently further behind than the target, tell the platform team; that is a pipeline problem, not something to work around in your app.
 
 ## Versioning & change policy
 

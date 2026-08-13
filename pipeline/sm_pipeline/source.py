@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 import dlt
 
-from .client import SmartMoving
+from .client import BudgetExceeded, SmartMoving
 from .instances import INSTANCES
 
 # All 10 Include* flags of GET /api/opportunities/{id}. Per smartmoving_api_findings.md
@@ -302,25 +302,40 @@ def smartmoving_source(
         # second compare equal and a disappearance is silently missed.
         now_iso = now_dt.isoformat()
 
+        # Run-scoped, deliberately NOT source state: dlt persists source state to
+        # the destination, so a budget flag stored there would survive the run and
+        # disable enrichment on every future run.
+        budget_spent: set[bool] = set()
+
         @dlt.resource(
             name="customers_service_window",
             primary_key=("source_instance_id", "id"),
             write_disposition="merge",
         )
         def enrich_sweep():
-            for row in sm.paginate(
-                "/api/customers",
-                FromServiceDate=sweep_from,
-                ToServiceDate=sweep_to,
-                IncludeOpportunityInfo=True,
-            ):
-                row["_sweep_from"] = sweep_from
-                row["_sweep_to"] = sweep_to
-                yield stamp(row)
-            # Only a sweep that paginated to completion proves absence. If the
-            # budget trips or the API errors mid-walk this never runs, so the
-            # deletion pass keeps using the previous complete sweep instead of
-            # concluding that every unvisited opportunity vanished.
+            try:
+                for row in sm.paginate(
+                    "/api/customers",
+                    FromServiceDate=sweep_from,
+                    ToServiceDate=sweep_to,
+                    IncludeOpportunityInfo=True,
+                ):
+                    row["_sweep_from"] = sweep_from
+                    row["_sweep_to"] = sweep_to
+                    yield stamp(row)
+            except BudgetExceeded:
+                # dlt pulls this resource round-robin with the enrichment
+                # transformer, so once the transformer has spent the budget the
+                # sweep's NEXT page is what actually raises. Catching it only in
+                # the transformer left the exception escaping from here instead.
+                budget_spent.add(True)
+                print(f"[{instance_id}] call budget reached during the sweep - "
+                      f"landing what was fetched; the next run resumes from here")
+                return
+            # Only a sweep that paginated to completion proves absence. Returning
+            # early above deliberately skips this, so the deletion pass keeps using
+            # the previous COMPLETE sweep rather than concluding that every
+            # opportunity the truncated walk never reached has vanished.
             dlt.current.source_state()["sweep"] = {
                 "at": now_iso, "from": sweep_from, "to": sweep_to,
             }
@@ -334,6 +349,28 @@ def smartmoving_source(
         def opportunities_enriched(customer):
             st = dlt.current.source_state()
             opps = _migrate_opp_state(st, now_iso)
+
+            # The budget is a GUARDRAIL, not an error. Once it trips, stop calling
+            # and let the run finish cleanly - everything already fetched still
+            # lands, and the next scheduled run picks up where this one stopped
+            # (the watermark is banked per opportunity, so no work is repeated).
+            #
+            # Letting BudgetExceeded propagate instead aborts the whole dlt
+            # pipeline: the load package is discarded, and because run.py loops
+            # over instances, `local` never runs at all because `ld` exhausted its
+            # own separate budget. Observed 2026-08-13 - `ld` spent 298 detail
+            # calls, then the run died and `local` was skipped entirely.
+            #
+            # Hitting the budget is the NORMAL case while a backlog is being
+            # absorbed, so treating it as a crash would make every scheduled run
+            # fail and alert.
+            #
+            # The flag is RUN-SCOPED (a closure, not source state). dlt persists
+            # source state to the destination, so a flag stored there would
+            # survive the run and disable enrichment permanently.
+            if budget_spent:
+                return
+
             for opp in customer.get("opportunities") or []:
                 opp_id = opp.get("id")
                 if not opp_id:
@@ -372,7 +409,15 @@ def smartmoving_source(
                 if not (rec.get("h") != h or stale or forced or resurrected):
                     continue  # unchanged, fresh enough - no API call
 
-                row, missing = enrich_one(opp_id)
+                try:
+                    row, missing = enrich_one(opp_id)
+                except BudgetExceeded:
+                    # Flip the run-scoped flag so the remaining customers in this
+                    # run short-circuit at the top rather than each raising again.
+                    budget_spent.add(True)
+                    print(f"[{instance_id}] call budget reached - stopping enrichment, "
+                          f"landing what was fetched; the next run resumes from here")
+                    return
                 if missing:
                     # 404 = gone at source. Direct proof, independent of the sweep.
                     rec["gone"], rec["gp"], rec["g404"] = now_iso, True, True
