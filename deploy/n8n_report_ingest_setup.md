@@ -8,6 +8,37 @@ landed 4,801 rows against 4,801 expected. See `IMPLEMENTATION_STATUS.md` for the
 full post-run database audit. The paste-ready node JSON is in
 [`n8n_report_ingest_nodes.json`](n8n_report_ingest_nodes.json).
 
+## ⚠️ The IMAP filter is a safety device, not an optimisation
+
+```
+["UNSEEN", ["FROM", "no-reply@smartmoving.com"]]
+```
+
+**The mailbox this reads is a person's working inbox** - roughly 38,000 messages,
+14,500 of them unread - not a dedicated reports account. The design assumed a
+dedicated mailbox; the deployment does not have one.
+
+With a bare `["UNSEEN"]`, activating this workflow makes n8n try to parse *every
+unread email in that inbox* as a SmartMoving report. On 2026-08-13 that produced 39
+junk rows in `report_ingest_errors` and a Slack alert each - Google notifications,
+Asana, RingCentral, Paylocity - within minutes. It was caught and reverted quickly;
+unrestricted it had 14,500 messages still to work through.
+
+**Never widen this back to a bare `UNSEEN`.** If another report sender is added
+later, extend the FROM criteria; do not remove them.
+
+## Two things to know before activating
+
+- **The IMAP trigger will not re-fetch a message it has already fetched**, even if
+  that message is still marked unread. So a message that failed downstream (a
+  download timeout, say) is not retried by re-activating the workflow - the report
+  has to be re-sent from SmartMoving, or the row loaded by hand from the download
+  URL, which stays valid for 30 days.
+- **The download node needs the box to be responsive.** Its timeout is 120 s with 3
+  retries. On 2026-08-13 the droplet was saturated by an unrelated headless-Chrome
+  workload (load average 61 on 4 cores) and two report downloads timed out even
+  though the Azure blob answered a direct `curl` in 0.8 s.
+
 **Why the flow looks like this.** A real SmartMoving report email (2026-08-07) proved
 two assumptions wrong:
 

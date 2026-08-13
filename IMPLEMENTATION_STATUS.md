@@ -192,6 +192,18 @@ typing weakness - fixed below - plus a short list of things that are missing rat
 | **`raw_*` looked single-loader** | The layer table implied dlt loads all of raw. n8n writes `webhook_events` and every `report_*` table directly, by design. | Documented in the layer table - both loaders, and why each is right for its path. |
 | **`intermediate/` was invisible** | The dbt folder is `models/intermediate/` but the schema is `marts`. Nothing said so, so the observation layer was hard to locate in Postgres. | Noted in the layer table. |
 | **Stale `status` column note** | The catalog still described status labels as `status_<int>` placeholders "pending a full enum mapping". That mapping shipped with `dim_opportunity_status`. | Catalog now lists the real labels, warns that `status_<int>` would be a bug, and points at `status_model.md` for the Completed/Closed trap. |
+| **Stale repo-layout entries** | `CLAUDE.md` still called the dimension CSVs "future dbt seeds" (they have been loaded seeds since P2), pointed rule 2 at the back-compat shim rather than the real client, and told a new-source author to update a freshness table that no longer exists in that file. `IMPLEMENTATION_STATUS.md` itself was not listed. | All four corrected; step 8 of "Adding a new source" now points at the contract. |
+
+**Verification (local dev warehouse, 2026-08-13).** `dbt build` **PASS=204 WARN=0 ERROR=0** - the same
+figure as the droplet run on 2026-08-08, so the money retyping changed no test outcome. Money
+reconciles exactly across the change: charges `2,576,064.42` / 1,579 rows, payments `159,122.95` / 41
+rows, opportunities `2,313,887.88` / 708 rows - identical before and after, to the cent. All 10
+monetary columns in `staging` now report `numeric` in `information_schema`; none is left as
+`double precision`. `scripts/check_sync_contract.py` exits 0, and the three new freshness patterns were
+confirmed to fire against a planted violation rather than merely passing.
+
+> **Not yet on the droplet.** This pass was verified locally only. Per the working rule above, run
+> `python deploy/sync_droplet.py` and confirm `PASS=204` from the droplet before treating it as done.
 
 ### Open, unchanged by this pass
 
@@ -212,6 +224,54 @@ typing weakness - fixed below - plus a short list of things that are missing rat
   ("composite primary keys, idempotent loads") is currently enforced by application behaviour rather
   than by a constraint. Adding `UNIQUE (source_instance_id, id)` on the dlt root tables would make it
   structural. Cheap; not yet done.
+
+---
+
+## Activation test - 2026-08-13
+
+Activated `report_ingest` to run the ld-vs-local attribution test. Mixed result: the
+attribution question is **answered**, and two new problems surfaced.
+
+### PASSED - instance attribution works
+
+A Lost Leads report arriving at `ld.reporting@` landed **321 rows attributed to `ld`**,
+8 columns constant on every row. The independent confirmation is the quote-number
+range: 12276, 12288 - five digits, the `ld` range. `local` quote numbers are six
+(132156-136966). This was the last unverified silent-failure mode in the chain.
+
+`local` still needs the same confirmation from its own report.
+
+### FIXED - the IMAP trigger was reading the whole inbox
+
+The trigger filtered on `["UNSEEN"]` alone. **The mailbox is a working inbox** -
+~38,000 messages, ~14,500 unread - not the dedicated reports account the design
+assumed. Activating it made n8n parse Google, Asana, RingCentral and Paylocity mail
+as SmartMoving reports: 39 junk rows in `report_ingest_errors`, one Slack alert each,
+in minutes, with 14,500 messages still ahead of it.
+
+Filter is now `["UNSEEN", ["FROM", "no-reply@smartmoving.com"]]`. The 39 junk rows
+were deleted, along with a stale 2026-08-07 false positive, so the table is back to
+0 - which is what makes "any row here means a report was NOT ingested" a usable alert.
+
+### The droplet is saturated by an unrelated workload
+
+`load average 61.83 on 4 cores`, from eleven `chrome` / `chrome-headless` processes
+plus `uvicorn`. **None of it is ours** - no `run.py`, no `dbt` running. It took n8n
+(502) and SSH (timeout) down together, and it is why two report downloads timed out
+at 120 s while the same Azure blob answered a direct `curl` in 0.8 s.
+
+This is a production risk independent of the warehouse: the database, the
+orchestrator and the pipeline share four cores with a browser-automation service that
+can starve them. Worth separating or resizing before consumers depend on this.
+
+Disk improved on its own: 90% -> 49%.
+
+### Not retried, and why
+
+n8n's IMAP trigger does not re-fetch a message it has already fetched, even one still
+marked unread. The two Booked Opportunities emails (one per alias) were fetched during
+the unfiltered activation, failed on download while the box was saturated, and will
+not be picked up again. They need re-sending from SmartMoving.
 
 ---
 
