@@ -227,6 +227,62 @@ confirmed to fire against a planted violation rather than merely passing.
 
 ---
 
+## Full eight-report run - 2026-08-13
+
+All four reports scheduled on both instances. **Seven of eight landed with zero ingest
+errors**, including **All Jobs** - the report that carries the job GUID and was
+previously assumed to need a Playwright bot.
+
+| Report | `ld` | `local` |
+|---|---|---|
+| Lead Status | *missing* | 4,810 |
+| All Jobs | 925 | 5,972 |
+| Booked Opportunities | 171 | 1,972 |
+| Lost Leads | 321 | 2,121 |
+
+### FIXED - only the first report per execution was being verified
+
+The IMAP trigger does **not** deliver one email per execution: seven reports arrived
+across five runs, several sharing a run. The verification nodes read `.first()`, so
+exactly one report per execution was row-count checked.
+
+Landing was never affected - `Build Landing Rows` is pairing-aware - so the failure
+mode was silent by construction: a truncated report would land short, nothing would
+fail, and no alert would fire. `Collect Reports To Verify` now emits one item per
+distinct `(instance, target_table, report_generated_at)` and the check runs per report.
+
+### Sync quality after the full cascade
+
+| | Before today | Now |
+|---|---|---|
+| Report resolution | 41.0% | **69.5%** (6,681 of 9,611) |
+| `core.opportunities` | 14,014 | 14,329, **$11.66M** |
+| …with money | 2,971 | **3,398** |
+| `core.leads` | 2,708 | **2,866** |
+| `serving.jobs_upcoming_v1` | 28 | **241** |
+| `serving.leads_today_v1` | 0 | **13** |
+
+### Lead enrichment: the sparse city is the source, not the model
+
+`core.leads.origin_city` covers only 21% of leads, which looks like a modelling gap.
+It is not. SmartMoving's web-form capture frequently records **only a postcode**:
+1,614 leads have an `origin_address_full` that is a bare five-digit ZIP with no city.
+
+`origin_zip` covers **74%** and is already exposed in both `core.leads` and
+`serving.leads_today_v1`. The location data is there; the city name is what the source
+never had. A ZIP -> city/state seed would lift city coverage to match the ZIP's at zero
+API cost - worth doing, but it is an addition, not a repair.
+
+### Budgets cut
+
+`opps_sweep` 300 -> **100** per instance; `nightly_reconciliation` 500 -> **200**, its
+leads pass 200 -> **60**. The reasoning changed, not the arithmetic: with All Jobs
+landing, the reports now carry money, addresses and actuals, so buying the
+**11,032-opportunity** enrichment backlog through the detail call is no longer the
+right trade. It gets absorbed gradually instead.
+
+---
+
 ## API workflow tests - 2026-08-13
 
 Ran every extraction workflow manually from n8n, against the live API, to find

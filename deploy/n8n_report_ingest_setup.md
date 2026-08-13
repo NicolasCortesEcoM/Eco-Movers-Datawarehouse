@@ -186,11 +186,18 @@ return [{
 
 ## Known limitations
 
-- **One email per execution is assumed by the verification step.** `Build Landing
-  Rows` is pairing-aware and handles several emails correctly, but the two
-  verification nodes use `.first()`, so if the IMAP trigger delivers two reports in a
-  single execution only the first is verified. Reports are scheduled minutes apart,
-  so this is unlikely; revisit if it ever happens.
+- ~~One email per execution is assumed by the verification step.~~ **FIXED
+  2026-08-13, and it was not the unlikely edge case it was written up as.** When all
+  eight scheduled reports send together they arrive together: seven reports were
+  processed across five executions, several sharing a run. `Collect Reports To
+  Verify` now emits one item per distinct `(instance, target_table,
+  report_generated_at)` and the verify/assert pair runs per report rather than
+  `.first()`.
+
+  Worth noting how this would have failed: landing was always correct, because
+  `Build Landing Rows` is pairing-aware. Only the row-count *check* was skipped. So a
+  truncated report would have landed short with nothing failing and no alert - the
+  exact failure the check exists to catch.
 - **The test alias `reporting@ecomoversmoving.com` maps to `local`.** Remove it from
   `Resolve Report Metadata` once the per-instance aliases are live in SmartMoving.
 - **Email cleanup is deliberately not implemented.** `postProcessAction: read` plus
