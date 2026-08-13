@@ -227,6 +227,49 @@ confirmed to fire against a planted violation rather than merely passing.
 
 ---
 
+## API workflow tests - 2026-08-13
+
+Ran every extraction workflow manually from n8n, against the live API, to find
+failures before they run on a schedule. One was completely broken.
+
+| Workflow | Result |
+|---|---|
+| `weekly_dims` | ✅ both instances LOADED, 15 s |
+| `leads_poll` | ✅ both instances LOADED, 4 s |
+| `opps_sweep` | ✅ both instances LOADED (budget-capped, which is the designed behaviour) |
+| `Enrichment_worker` | ❌ **crashed on every invocation** → fixed → ✅ both instances LOADED |
+| `nightly_reconciliation` | running at time of writing |
+
+### FIXED - the webhook enrichment path was dead on arrival
+
+Every `--ids` invocation crashed before a single API call:
+
+```
+TypeError: issubclass() arg 1 must be a class
+  dlt/common/typing.py:444 in is_subclass
+```
+
+dlt inspects each parameter's type hint to decide what it may inject from config, and
+on **dlt 1.29.1** a *parameterised generic inside a Union* makes that inspection raise.
+`opp_ids: tuple[str, ...] | None` is such a hint. Confirmed by calling dlt's own
+`get_all_types_of_class_in_union` on the droplet:
+
+| Hint | Result |
+|---|---|
+| `tuple[str, ...] \| None` | **FAIL** - `TypeError` |
+| `float \| None` | OK (`float` is a real class) |
+| `bool` | OK |
+
+Annotated `Any` instead. This is why the enrichment worker had never processed an
+event: not the allowlist, not the credentials - the process died at import-time
+argument binding. It ran on an older dlt, which is why it was believed to work.
+
+**The worker now drains correctly:** 55,120 low-value events marked processed without
+spending a call, leaving exactly the 1,858 allowlist events (686 `job-closed`,
+353 `job-finalized`, 819 `payment-made`) to enrich at 150 per run.
+
+---
+
 ## Activation test - 2026-08-13
 
 Activated `report_ingest` to run the ld-vs-local attribution test. Mixed result: the

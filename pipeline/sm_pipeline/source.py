@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import dlt
@@ -146,7 +147,17 @@ def smartmoving_source(
     # [-180, +60] - crm_sync_contract.md section 6. Keep in step with run.py.
     from_offset: int = -180,
     to_offset: int = 60,
-    opp_ids: tuple[str, ...] | None = None,
+    # NOT annotated `tuple[str, ...] | None`. dlt inspects every parameter hint to
+    # decide what it can inject from config, and on dlt 1.29.1 a PARAMETERISED
+    # GENERIC inside a Union makes that inspection raise
+    # `TypeError: issubclass() arg 1 must be a class` before the source is even
+    # built. `float | None` on the neighbouring parameters is fine - `float` is a
+    # real class; `tuple[str, ...]` is a generic alias and is not.
+    #
+    # The whole --ids path (the webhook enrichment worker) was dead because of this:
+    # it crashed on every invocation, on an older dlt it did not. Verified on the
+    # droplet by calling dlt's own get_all_types_of_class_in_union with each hint.
+    opp_ids: Any = None,
     call_budget: int = 300,
     pace: float = 0.6,
     hot_ttl_hours: float = 24.0,
