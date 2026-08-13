@@ -1,0 +1,13 @@
+agent_name,line_of_business,valid_from,valid_to,notes
+Graydon Foxx,local,2024-01-01,9999-12-31,Works both lines.
+Graydon Foxx,long_distance,2024-01-01,9999-12-31,Works both lines.
+Kirk Bussell,local,2024-01-01,9999-12-31,Works both lines.
+Kirk Bussell,long_distance,2024-01-01,9999-12-31,Works both lines.
+Ana Vasquez,local,2024-01-01,9999-12-31,Works both lines.
+Ana Vasquez,long_distance,2024-01-01,9999-12-31,Works both lines.
+Ricardo Salvador Arellano,local,2024-01-01,9999-12-31,Works both lines.
+Ricardo Salvador Arellano,long_distance,2024-01-01,9999-12-31,Works both lines.
+Dean Savage,local,2024-01-01,9999-12-31,Works both lines.
+Dean Savage,long_distance,2024-01-01,9999-12-31,Works both lines.
+Devin Thompson,local,2024-01-01,9999-12-31,Works both lines.
+Devin Thompson,long_distance,2024-01-01,9999-12-31,Works both lines.

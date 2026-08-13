@@ -162,3 +162,42 @@ seeds:
     columns:
       - name: referral_source_raw
         data_tests: [not_null, unique]
+
+  - name: dim_agent_assignment
+    description: >
+      Which line(s) of business each sales agent is responsible for, and WHEN.
+      A slowly-changing dimension kept as a hand-edited CSV: metrics join on the
+      opportunity's received date against [valid_from, valid_to], so re-assigning an
+      agent tomorrow never rewrites yesterday's numbers. An agent working both lines
+      in the same period has two rows.
+      Editing this file is the whole interface - no SQL change is needed to move an
+      agent between lines or to close a period.
+    columns:
+      - name: agent_name
+        description: Matches core.opportunities.sales_assignee_name after norm_text.
+        tests: [not_null]
+      - name: line_of_business
+        tests:
+          - not_null
+          - accepted_values: {values: ['local', 'long_distance', 'commercial']}
+      - name: valid_from
+        tests: [not_null]
+      - name: valid_to
+        description: 9999-12-31 means the assignment is open-ended.
+        tests: [not_null]
+
+  - name: dim_lob_branch
+    description: >
+      Branch -> line of business. A SEED rather than logic in SQL because another
+      company on this platform will draw the local/long-distance line differently.
+      Outranked by the service type: if the service says commercial, the job is
+      commercial regardless of which branch booked it.
+    columns:
+      - name: source_instance_id
+        tests: [not_null]
+      - name: branch_name
+        tests: [not_null]
+      - name: line_of_business
+        tests:
+          - not_null
+          - accepted_values: {values: ['local', 'long_distance', 'commercial']}

@@ -119,7 +119,11 @@ select
     o.customer_phone,
     o.customer_email,
     o.customer_address,
-    o.branch_name,
+    -- Prefer the JOB's own branch over the opportunity's. All Jobs reports it on
+    -- 100% of its rows; the opportunity carries it on far fewer, and the branch is
+    -- a property of where the job was booked. This is what feeds
+    -- core.lines_of_business, so a null here silently becomes a `local` fallback.
+    coalesce(aj.branch_name, o.branch_name) as branch_name,
     o.estimated_final_total,
     coalesce(o.is_deleted, false)       as is_deleted,
 

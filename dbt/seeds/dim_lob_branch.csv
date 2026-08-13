@@ -1,0 +1,9 @@
+source_instance_id,branch_name,line_of_business,notes
+ld,South Sound LD,long_distance,
+ld,Main Office,long_distance,
+local,Seattle,local,
+local,South Sound,local,
+local,Kirkland,local,
+local,Lynnwood,local,
+local,Bremerton,local,
+local,Long Distance Team,long_distance,Local instance but the branch handles long-distance work.

@@ -34,6 +34,36 @@ del as (select * from latest where source = 'api_deletion'),
 rpt as (select * from latest where source = 'report_lead_status'),
 bkd as (select * from latest where source = 'report_booked_opps'),
 
+-- SALES ATTRIBUTION RECOVERED FROM THE JOB SIDE.
+--
+-- 9,530 opportunities reach core through the customers sweep alone, and the sweep
+-- does not return a sales person. The reports do - Lead Status 98%, All Jobs 100% -
+-- but both attach by Quote #, and these opportunities do not resolve in the quote
+-- crosswalk. So the field was 25% populated in core while being ~100% populated at
+-- every source. That is a plumbing gap, not missing data.
+--
+-- All Jobs identifies its rows by job GUID, and the API arms already know which
+-- opportunity each job belongs to. Going job -> opportunity closes it without a
+-- single API call.
+--
+-- Note this is a LAST RESORT in the pick_latest ordering below: a value that came
+-- straight from the opportunity always beats one inferred through its jobs.
+agent_from_jobs as (
+    select distinct on (j.source_instance_id, j.external_opportunity_id)
+        j.source_instance_id || ':' || j.external_opportunity_id as opportunity_key,
+        aj.sales_person,
+        aj.estimator_name,
+        aj.move_coordinator_name,
+        aj.branch_name,
+        aj.referral_source,
+        aj.observed_at
+    from {{ ref('int_job_latest_by_source') }} j
+    join {{ ref('int_report_all_jobs_latest') }} aj
+      on aj.job_key = j.job_key
+    where j.external_opportunity_id is not null
+    order by j.source_instance_id, j.external_opportunity_id, aj.observed_at desc
+),
+
 -- Booked-report fields that no other source has, so they need no resolution -
 -- newest generation per opportunity and done. Kept out of the observation layer
 -- for the same reason as int_report_all_jobs_latest: pick_latest earns its
@@ -125,7 +155,8 @@ resolved as (
 
         {{ pick_latest([
             ("enr.branch_name", "enr.observed_at"),
-            ("rpt.branch_name", "rpt.observed_at")
+            ("rpt.branch_name", "rpt.observed_at"),
+            ("ajo.branch_name",  "ajo.observed_at")
         ]) }}                                                              as branch_name,
         {{ pick_latest([("enr.estimated_subtotal", "enr.observed_at")]) }}  as estimated_subtotal,
         {{ pick_latest([("enr.estimated_tax", "enr.observed_at")]) }}       as estimated_tax,
@@ -142,7 +173,8 @@ resolved as (
         ]) }}                                                              as estimated_final_total,
         {{ pick_latest([
             ("enr.referral_source", "enr.observed_at"),
-            ("rpt.referral_source", "rpt.observed_at")
+            ("rpt.referral_source", "rpt.observed_at"),
+            ("ajo.referral_source",  "ajo.observed_at")
         ]) }}                                                              as referral_source,
         {{ pick_latest([("enr.affiliate_name", "enr.observed_at")]) }}      as affiliate_name,
         {{ pick_latest([("enr.tariff_name", "enr.observed_at")]) }}         as tariff_name,
@@ -157,13 +189,16 @@ resolved as (
         ]) }}                                                              as weight,
         {{ pick_latest([
             ("enr.sales_assignee_name", "enr.observed_at"),
-            ("rpt.sales_assignee_name", "rpt.observed_at")
+            ("rpt.sales_assignee_name", "rpt.observed_at"),
+            ("ajo.sales_person",        "ajo.observed_at")
         ]) }}                                                              as sales_assignee_name,
         {{ pick_latest([
+            ("ajo.estimator_name", "ajo.observed_at"),
             ("enr.estimator_name", "enr.observed_at"),
             ("rpt.estimator_name", "rpt.observed_at")
         ]) }}                                                              as estimator_name,
         {{ pick_latest([
+            ("ajo.move_coordinator_name", "ajo.observed_at"),
             ("enr.move_coordinator_name", "enr.observed_at"),
             ("rpt.move_coordinator_name", "rpt.observed_at")
         ]) }}                                                              as move_coordinator_name,
@@ -203,6 +238,7 @@ resolved as (
     left join rpt on rpt.opportunity_key = b.opportunity_key
     left join bkd on bkd.opportunity_key = b.opportunity_key
     left join bkd_extra on bkd_extra.opportunity_key = b.opportunity_key
+    left join agent_from_jobs ajo on ajo.opportunity_key = b.opportunity_key
 )
 
 select
