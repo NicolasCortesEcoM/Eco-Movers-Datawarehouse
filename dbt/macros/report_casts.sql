@@ -81,3 +81,31 @@
 {% macro rpt_lbs(col) -%}
     nullif((regexp_match(coalesce({{ col }}, ''), '/ ([0-9.]+) lbs'))[1], '')::numeric
 {%- endmacro %}
+
+{#
+  Report timestamps that carry an EXPLICIT UTC OFFSET, e.g.
+  "6/20/2026 8:45:00 AM -07:00" (All Jobs' Start/End Time Utc).
+
+  These are NOT the same as the other `*at Utc` columns. Those render as bare wall
+  clocks in the instance's crm_timezone and need rpt_ts. These already state their
+  offset, so they are unambiguous instants and the crm_timezone must NOT be applied -
+  doing so would shift them twice.
+
+  Why the arithmetic rather than `AT TIME ZONE <offset>`: PostgreSQL reads a bare
+  offset string in AT TIME ZONE with POSIX sign convention, which is INVERTED.
+  Measured: '8:45 AM -07:00' AT TIME ZONE '-07:00' yields 01:45 UTC, not 15:45.
+  Subtracting the offset from the naive wall clock is unambiguous in both directions;
+  verified against -07:00, +02:00 and a -08:00 case that crosses midnight into the
+  next year.
+#}
+{% macro rpt_ts_offset(col) -%}
+    (
+      (
+        to_timestamp(
+          regexp_replace(nullif(trim(coalesce({{ col }}, '')), ''), '\s*[-+]\d{2}:\d{2}$', ''),
+          'MM/DD/YYYY HH12:MI:SS AM'
+        )::timestamp
+        - regexp_replace(nullif(trim(coalesce({{ col }}, '')), ''), '^.*\s([-+]\d{2}:\d{2})$', '\1')::interval
+      ) at time zone 'UTC'
+    )
+{%- endmacro %}

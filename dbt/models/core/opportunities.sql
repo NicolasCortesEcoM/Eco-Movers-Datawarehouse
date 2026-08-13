@@ -32,6 +32,23 @@ whk as (select * from latest where source = 'api_webhook'),
 swp as (select * from latest where source = 'api_sweep'),
 del as (select * from latest where source = 'api_deletion'),
 rpt as (select * from latest where source = 'report_lead_status'),
+bkd as (select * from latest where source = 'report_booked_opps'),
+
+-- Booked-report fields that no other source has, so they need no resolution -
+-- newest generation per opportunity and done. Kept out of the observation layer
+-- for the same reason as int_report_all_jobs_latest: pick_latest earns its
+-- complexity only where sources can disagree.
+bkd_extra as (
+    select distinct on (x.external_opportunity_id, r.source_instance_id)
+        r.source_instance_id || ':' || x.external_opportunity_id as opportunity_key,
+        r.invoiced_amount,
+        r.booked_date_local
+    from {{ ref('stg_smartmoving__report_booked_opportunities') }} r
+    join {{ ref('int_opportunity_quote_crosswalk') }} x
+      on  x.source_instance_id = r.source_instance_id
+      and x.quote_number       = r.quote_number
+    order by x.external_opportunity_id, r.source_instance_id, r.report_generated_at desc
+),
 
 base as (
     select distinct
@@ -71,7 +88,8 @@ resolved as (
         -- reason it is worth ranking above the API here when it is fresher.
         {{ pick_latest([
             ("enr.pipeline_status", "enr.observed_at"),
-            ("rpt.pipeline_status", "rpt.observed_at")
+            ("rpt.pipeline_status", "rpt.observed_at"),
+            ("bkd.pipeline_status", "bkd.observed_at")
         ]) }}                                               as pipeline_status,
         {{ pick_latest([
             ("enr.service_date", "enr.observed_at"),
@@ -88,14 +106,17 @@ resolved as (
             ("swp.external_customer_id", "swp.observed_at")
         ]) }}                                               as external_customer_id,
         {{ pick_latest([
+            ("bkd.customer_name", "bkd.observed_at"),
             ("enr.customer_name", "enr.observed_at"),
             ("swp.customer_name", "swp.observed_at")
         ]) }}                                               as customer_name,
         {{ pick_latest([
+            ("bkd.customer_email", "bkd.observed_at"),
             ("enr.customer_email", "enr.observed_at"),
             ("swp.customer_email", "swp.observed_at")
         ]) }}                                               as customer_email,
         {{ pick_latest([
+            ("bkd.customer_phone", "bkd.observed_at"),
             ("enr.customer_phone", "enr.observed_at"),
             ("swp.customer_phone", "swp.observed_at")
         ]) }}                                               as customer_phone,
@@ -116,7 +137,8 @@ resolved as (
         -- report-sourced total is wrong by exactly the tax.
         {{ pick_latest([
             ("enr.estimated_final_total", "enr.observed_at"),
-            ("rpt.estimated_final_total", "rpt.observed_at")
+            ("rpt.estimated_final_total", "rpt.observed_at"),
+            ("bkd.estimated_final_total", "bkd.observed_at")
         ]) }}                                                              as estimated_final_total,
         {{ pick_latest([
             ("enr.referral_source", "enr.observed_at"),
@@ -148,6 +170,14 @@ resolved as (
         {{ pick_latest([("enr.cancellation_reason", "enr.observed_at")]) }} as cancellation_reason,
         {{ pick_latest([("enr.created_at_utc", "enr.observed_at")]) }}      as created_at_utc,
 
+        -- REALISED revenue, and the only column in the warehouse that carries it.
+        -- Read straight off the Booked Opportunities report rather than through
+        -- pick_latest, because there is exactly one source: `estimated_final_total`
+        -- is a quote, and All Jobs' `total_actual_cost` is cost, not revenue.
+        -- Conflating any of the three would misstate the business.
+        bkd_extra.invoiced_amount                           as invoiced_amount,
+        bkd_extra.booked_date_local                         as booked_date_local,
+
         -- A deletion marker only counts if nothing newer has been observed; a
         -- reappearance therefore un-deletes the opportunity on its own.
         coalesce({{ pick_latest([
@@ -162,7 +192,8 @@ resolved as (
             coalesce(whk.observed_at, '-infinity'::timestamptz),
             coalesce(swp.observed_at, '-infinity'::timestamptz),
             coalesce(del.observed_at, '-infinity'::timestamptz),
-            coalesce(rpt.observed_at, '-infinity'::timestamptz)
+            coalesce(rpt.observed_at, '-infinity'::timestamptz),
+            coalesce(bkd.observed_at, '-infinity'::timestamptz)
         )                                                   as synced_at
     from base b
     left join enr on enr.opportunity_key = b.opportunity_key
@@ -170,6 +201,8 @@ resolved as (
     left join swp on swp.opportunity_key = b.opportunity_key
     left join del on del.opportunity_key = b.opportunity_key
     left join rpt on rpt.opportunity_key = b.opportunity_key
+    left join bkd on bkd.opportunity_key = b.opportunity_key
+    left join bkd_extra on bkd_extra.opportunity_key = b.opportunity_key
 )
 
 select

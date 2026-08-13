@@ -200,6 +200,57 @@ report_lead_status as (
     join {{ ref('int_opportunity_quote_crosswalk') }} x
       on  x.source_instance_id = r.source_instance_id
       and x.quote_number       = r.quote_number
+),
+
+-- The Booked Opportunities report. Contributes the customer contact and, uniquely,
+-- what the customer was actually BILLED - see the staging model for why the other
+-- 17 columns are deliberately not promoted.
+--
+-- Note it contributes `estimated_final_total` from `Estimated Amount`, same as Lead
+-- Status does from `Estimated Revenue`. Both are quotes for the same opportunity, so
+-- they genuinely can disagree, and pick_latest resolving them by recency is the
+-- right answer rather than a problem.
+report_booked as (
+    select
+        r.source_instance_id || ':' || x.external_opportunity_id as opportunity_key,
+        r.entity_id,
+        r.source_instance_id,
+        x.external_opportunity_id,
+        'report_booked_opps'            as source,
+        4                               as source_priority,
+        r.report_generated_at           as observed_at,
+
+        null::bigint                    as status_code,
+        r.quote_number,
+        r.status_raw                    as pipeline_status,
+        r.service_date_local            as service_date,
+        null::bigint                    as opportunity_type_code,
+        null::bigint                    as service_type_id,
+        null::text                      as external_customer_id,
+        r.customer_name,
+        r.customer_email,
+        r.customer_phone,
+        null::text                      as customer_address,
+        null::text                      as branch_name,
+        null::numeric                   as estimated_subtotal,
+        null::numeric                   as estimated_tax,
+        r.estimated_amount::numeric     as estimated_final_total,
+        null::text                      as referral_source,
+        null::text                      as affiliate_name,
+        null::text                      as tariff_name,
+        null::text                      as move_size_name,
+        null::numeric                   as volume,
+        null::numeric                   as weight,
+        null::text                      as sales_assignee_name,
+        null::text                      as estimator_name,
+        null::text                      as move_coordinator_name,
+        null::text                      as cancellation_reason,
+        null::timestamptz               as created_at_utc,
+        null::boolean                   as is_deleted
+    from {{ ref('stg_smartmoving__report_booked_opportunities') }} r
+    join {{ ref('int_opportunity_quote_crosswalk') }} x
+      on  x.source_instance_id = r.source_instance_id
+      and x.quote_number       = r.quote_number
 )
 
 {% if deletions_rel %}
@@ -232,6 +283,7 @@ select * from enrichment
 union all select * from webhooks
 union all select * from sweep
 union all select * from report_lead_status
+union all select * from report_booked
 {% if deletions_rel %}
 union all select * from deletions
 {% endif %}

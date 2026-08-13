@@ -227,6 +227,67 @@ confirmed to fire against a planted violation rather than merely passing.
 
 ---
 
+## Reports connected to dbt - 2026-08-13
+
+All four reports now land. **Three are modelled; one is deliberately not.**
+
+| Report | Grain | Connected? | Why |
+|---|---|---|---|
+| **Lead Status** | opportunity | ✅ | The denominator. Every lead and opportunity received in a period, with the authoritative status and its lost/cancelled subcategory. |
+| **All Jobs** | job | ✅ | The richest source in the warehouse - job GUID, structured addresses, the full ACTUAL cost breakdown, lifecycle dates. Nothing else has any of it. |
+| **Booked Opportunities** | opportunity | ✅ thin | Three columns only. `Invoiced Amount` is the **sole record of realised revenue** anywhere. |
+| **Lost Leads** | opportunity | ❌ **skipped** | Of its 8 columns only `Lost Date` is not already in Lead Status, which reports every lost opportunity with the full reason. A whole staging model, observation arm and test suite for one date column is complexity that buys nothing. |
+
+### The design decision worth understanding
+
+The observation layer exists to resolve **disagreement between sources**. That
+machinery earns its complexity only where sources overlap.
+
+All Jobs contributes ~60 fields that **no other source has**. Routing those through
+`int_job_observations` would mean adding ~60 nullable columns to every other arm, so
+each could contribute NULL to all of them, to resolve a conflict that cannot occur.
+So the split is by whether a conflict is *possible*, not by which table a field is in:
+
+- `job_number`, `service_date` overlap with the API → observation arm, `pick_latest`
+- everything else is All Jobs alone → `int_report_all_jobs_latest`, joined directly
+
+Same reasoning for `invoiced_amount` on the opportunity side.
+
+### The `at Utc` suffix means THREE different things in All Jobs
+
+Measured, not assumed, and the first version got it wrong silently:
+
+| Column | Actual format | Handling |
+|---|---|---|
+| `Start/End Time Utc` | `6/20/2026 8:45:00 AM -07:00` - **explicit offset** | Unambiguous instant. crm_timezone must NOT be applied. |
+| `Completed/Closed at Utc` | `6/20/2026` - **bare date** | Local business date, renamed `*_date_local`. |
+| `Created/Booked at Utc`, `Job Date` | bare date | Local business date. |
+
+Treating the first two as crm_timezone wall clocks parsed **0 of 6,897 rows** and
+raised no error at all. Offsets also *vary* between rows (`-06:00` and `-07:00`
+both occur), so a fixed instance timezone would have been wrong even where it parsed.
+
+⚠️ `AT TIME ZONE '<offset>'` is **not** the fix: PostgreSQL reads a bare offset string
+with POSIX sign convention, inverted. Measured: `8:45 AM -07:00 AT TIME ZONE '-07:00'`
+yields `01:45` UTC, not `15:45`. The `rpt_ts_offset` macro subtracts the offset
+arithmetically instead; verified against `-07:00`, `+02:00` and a `-08:00` case that
+crosses midnight into the next year.
+
+### What landed in core
+
+| | Before | After |
+|---|---|---|
+| `core.jobs` | 835 | **17,636** |
+| …with structured origin city | 0 | **6,869** |
+| …with actual costs | 0 | **2,903** ($5,504,267.64) |
+| …with start/completed dates | 0 | **2,821 / 2,874** |
+| `core.opportunities.invoiced_amount` | did not exist | **1,153 rows, $2,263,449.86 realised revenue** |
+
+Grain intact: 14,337 / 14,337 opportunities, 17,636 / 17,636 jobs. Droplet
+**PASS=207 ERROR=0**.
+
+---
+
 ## Full eight-report run - 2026-08-13
 
 All four reports scheduled on both instances. **Seven of eight landed with zero ingest

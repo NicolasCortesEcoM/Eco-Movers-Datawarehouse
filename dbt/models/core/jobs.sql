@@ -19,6 +19,7 @@ with job as (
 
 enr as (select * from job where source = 'api_enrichment'),
 swp as (select * from job where source = 'api_sweep'),
+aj  as (select * from job where source = 'report_all_jobs'),
 
 base as (
     select distinct job_key, entity_id, source_instance_id, external_job_id
@@ -46,11 +47,13 @@ resolved as (
         ]) }}                                       as external_opportunity_id,
         {{ pick_latest([
             ("enr.job_number", "enr.observed_at"),
-            ("swp.job_number", "swp.observed_at")
+            ("swp.job_number", "swp.observed_at"),
+            ("aj.job_number",  "aj.observed_at")
         ]) }}                                       as job_number,
         {{ pick_latest([
             ("enr.service_date", "enr.observed_at"),
-            ("swp.service_date", "swp.observed_at")
+            ("swp.service_date", "swp.observed_at"),
+            ("aj.service_date",  "aj.observed_at")
         ]) }}                                       as service_date,
         {{ pick_latest([
             ("enr.service_type_id", "enr.observed_at"),
@@ -70,11 +73,13 @@ resolved as (
 
         greatest(
             coalesce(enr.observed_at, '-infinity'::timestamptz),
-            coalesce(swp.observed_at, '-infinity'::timestamptz)
+            coalesce(swp.observed_at, '-infinity'::timestamptz),
+            coalesce(aj.observed_at,  '-infinity'::timestamptz)
         )                                           as job_synced_at
     from base b
     left join enr on enr.job_key = b.job_key
     left join swp on swp.job_key = b.job_key
+    left join aj  on aj.job_key  = b.job_key
 )
 
 select
@@ -118,12 +123,59 @@ select
     o.estimated_final_total,
     coalesce(o.is_deleted, false)       as is_deleted,
 
+    -- Everything below comes from the All Jobs report and from nowhere else. It is
+    -- joined directly rather than resolved through pick_latest because there is no
+    -- second source to disagree with - see int_report_all_jobs_latest for the full
+    -- reasoning. The API alternative is the Premium per-job endpoint, the most
+    -- expensive call SmartMoving sells; this costs zero quota.
+    aj.origin_street, aj.origin_city, aj.origin_state, aj.origin_zip,
+    aj.origin_unit, aj.origin_type, aj.origin_address_full,
+    aj.destination_street, aj.destination_city, aj.destination_state,
+    aj.destination_zip, aj.destination_unit, aj.destination_type,
+    aj.destination_address_full,
+
+    aj.job_type_name,
+    aj.opportunity_type_name,
+    aj.pricing_method,
+    aj.crew_member_names,
+    aj.truck_names,
+    aj.job_rating,
+    aj.move_date_is_tbd,
+
+    aj.created_date_local               as job_created_date_local,
+    aj.booked_date_local                as job_booked_date_local,
+    aj.end_date_local,
+    aj.start_at_utc,
+    aj.end_at_utc,
+    aj.completed_date_local,
+    aj.closed_date_local,
+
+    aj.total_estimated_cost,
+    aj.total_actual_cost,
+    aj.actual_labor_cost, aj.actual_materials_cost, aj.actual_fuel_cost,
+    aj.actual_insurance_cost, aj.actual_valuation_cost,
+    aj.actual_additional_services_cost, aj.actual_other_fees_cost,
+    aj.actual_trip_fees_cost, aj.actual_storage_in_transit_cost,
+    aj.actual_prepaid_storage_cost, aj.actual_warehouse_handling_cost,
+    aj.actual_truck_fees_cost, aj.actual_travel_time_fees_cost,
+    aj.actual_credit_card_fees_cost, aj.actual_tax_amount, aj.actual_discount,
+    aj.tip_amount, aj.wages,
+
+    aj.est_crew_count, aj.actual_crew_count,
+    aj.est_truck_count, aj.actual_truck_count,
+    aj.est_time_hours, aj.actual_time_hours, aj.time_deductions_minutes,
+    aj.origin_to_destination_mileage, aj.round_trip_mileage,
+    aj.hourly_rate_quoted, aj.hourly_rate_billed,
+    aj.volume_cuft, aj.weight_lbs,
+
     coalesce(o.timezone, i.timezone)    as timezone,
     greatest(r.job_synced_at, coalesce(o.synced_at, '-infinity'::timestamptz)) as synced_at
 from resolved r
 left join opportunities o
        on o.source_instance_id = r.source_instance_id
       and o.external_opportunity_id = r.external_opportunity_id
+left join {{ ref('int_report_all_jobs_latest') }} aj
+       on aj.job_key = r.job_key
 left join service_types st
        on st.source_instance_id = r.source_instance_id
       and st.service_type_id = r.service_type_id

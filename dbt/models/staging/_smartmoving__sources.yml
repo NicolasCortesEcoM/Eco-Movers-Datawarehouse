@@ -83,6 +83,28 @@ sources:
           having been green for weeks.
 
       # --- Scheduled reports, landed by n8n from email. Zero API quota.
+      - name: report_all_jobs
+        description: >
+          The All Jobs report, JOB grain, 89 columns. The richest source in the
+          warehouse and the only one carrying the job GUID, structured
+          origin/destination, the full ACTUAL cost breakdown and lifecycle
+          timestamps. The API equivalent is the Premium per-job endpoint, the most
+          expensive call SmartMoving sells; this costs zero quota.
+          `Job Number` is `<quote>-<seq>`, a second independent path to the
+          opportunity. See sql/30_report_landing.sql.
+      - name: report_booked_opportunities
+        description: >
+          Booked Opportunities by Date Booked, OPPORTUNITY grain, 20 columns. Only
+          three are promoted - invoiced amount, booked date and the customer contact.
+          `Invoiced Amount` is the sole record of REALISED revenue anywhere in the
+          warehouse: estimated_final_total is a quote and All Jobs' total_actual_cost
+          is cost. See sql/31_report_booked_lost.sql.
+      - name: report_lost_leads
+        description: >
+          Lost Leads report. Landed but DELIBERATELY NOT MODELLED - see
+          IMPLEMENTATION_STATUS.md. Of its 8 columns only `Lost Date` is not already
+          carried by report_lead_status, which reports every lost opportunity with
+          the full subcategory reason. Wire it up when something needs lost_date.
       - name: report_lead_status
         description: >
           THE MOST IMPORTANT REPORT. Keyed on lead RECEIVED date, so one export

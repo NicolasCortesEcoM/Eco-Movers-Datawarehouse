@@ -61,7 +61,40 @@ sweep as (
       on o.opportunity_dlt_id = j.opportunity_dlt_id
     join {{ ref('stg_smartmoving__customers') }} c
       on c.customer_dlt_id = j.customer_dlt_id
+),
+
+-- The All Jobs report, contributing ONLY the fields it shares with an API source.
+--
+-- Its ~60 exclusive fields - structured addresses, actual costs, lifecycle
+-- timestamps - are NOT here on purpose. No other source reports them, so there is no
+-- disagreement for pick_latest to resolve, and carrying them through this union
+-- would mean ~60 nullable columns in every other arm to resolve a conflict that
+-- cannot occur. They join into core.jobs directly from int_report_all_jobs_latest.
+--
+-- external_opportunity_id is null here: the report identifies the opportunity by
+-- quote number, not GUID, and inventing a join to fill it in would put a guess into
+-- the observation layer. core.jobs already gets that link from the API arms.
+report_all_jobs as (
+    select
+        job_key,
+        entity_id,
+        source_instance_id,
+        external_job_id,
+        null::text                  as external_opportunity_id,
+        'report_all_jobs'           as source,
+        4                           as source_priority,
+        observed_at,
+
+        job_number,
+        service_date_local          as service_date,
+        null::bigint                as service_type_id,
+        null::boolean               as is_confirmed,
+        null::numeric               as total_tips,
+        null::text                  as arrival_window_description,
+        null::bigint, null::bigint, null::bigint, null::bigint, null::bigint
+    from {{ ref('int_report_all_jobs_latest') }}
 )
 
 select * from enrichment
 union all select * from sweep
+union all select * from report_all_jobs
