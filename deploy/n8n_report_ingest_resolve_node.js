@@ -22,15 +22,17 @@
 // that the number of rows landed matches what SmartMoving says it sent - a silent
 // truncation is otherwise invisible.
 
-const INSTANCE_BY_ALIAS = {
-  'ld.reporting@ecomoversmoving.com':    { source_instance_id: 'ld',    entity_id: 'ecomovers' },
-  'local.reporting@ecomoversmoving.com': { source_instance_id: 'local', entity_id: 'ecomovers' },
+// THE COMPANY USES TWO DOMAINS. On 2026-08-25 a report arrived at
+// local.reporting@ecomovers.com while the map only knew ecomoversmoving.com, which
+// would have rejected a perfectly valid report. The instance is decided by the LOCAL
+// PART, and the domain only has to be one of ours.
+const COMPANY_DOMAINS = ['ecomoversmoving.com', 'ecomovers.com'];
 
-  // TEMPORARY - test alias only.
-  // A generic mailbox cannot identify a SmartMoving instance. Remove this entry
-  // once the two per-instance aliases are configured in the SmartMoving UI, or a
-  // later report sent here is silently attributed to `local`.
-  'reporting@ecomoversmoving.com':       { source_instance_id: 'local', entity_id: 'ecomovers' },
+const INSTANCE_BY_MAILBOX = {
+  'ld.reporting':    { source_instance_id: 'ld',    entity_id: 'ecomovers' },
+  'local.reporting': { source_instance_id: 'local', entity_id: 'ecomovers' },
+  // TEMPORARY - remove once every report goes to a per-instance alias.
+  'reporting':       { source_instance_id: 'local', entity_id: 'ecomovers' },
 };
 
 // Matched against the download URL's filename, NOT the subject.
