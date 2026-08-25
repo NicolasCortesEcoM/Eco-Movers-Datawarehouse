@@ -108,28 +108,6 @@ models:
         description: "`numeric`, cast at this boundary like every monetary column."
         data_tests: [not_null]
 
-  - name: stg_smartmoving__opportunity_job_addresses
-    description: >
-      Flat address strings per job. Grain: (source_instance_id, external_job_id,
-      address_seq). Origin/destination is NOT inferable from the ordinal.
-    columns:
-      - name: address_key
-        data_tests: [not_null, unique]
-      - name: address_full
-        data_tests: [not_null]
-      - name: external_job_id
-        data_tests:
-          - not_null
-          - relationships:
-              to: ref('stg_smartmoving__opportunity_jobs')
-              field: external_job_id
-
-  - name: stg_smartmoving__opportunity_job_crew
-    description: "Crew names per job. Grain: (source_instance_id, external_job_id, crew_seq)."
-    columns:
-      - name: crew_key
-        data_tests: [not_null, unique]
-
   - name: stg_smartmoving__opportunity_payments
     description: >
       Payments per opportunity. Grain: (source_instance_id, external_opportunity_id,
@@ -145,22 +123,6 @@ models:
           - relationships:
               to: ref('stg_smartmoving__opportunities_enriched')
               field: external_opportunity_id
-
-  - name: stg_smartmoving__opportunity_contacts
-    description: >
-      Extra named contacts per opportunity. Grain: (source_instance_id,
-      external_opportunity_id, contact_seq). No list endpoint exposes these.
-    columns:
-      - name: contact_key
-        data_tests: [not_null, unique]
-
-  - name: stg_smartmoving__opportunity_surveys
-    description: >
-      Surveys/estimates per opportunity. Grain: (source_instance_id,
-      external_opportunity_id, survey_seq). start_at_utc is a genuine UTC instant.
-    columns:
-      - name: survey_key
-        data_tests: [not_null, unique]
 
   - name: stg_smartmoving__branches
     description: Branch reference list, renamed and typed. Feeds core.branches.

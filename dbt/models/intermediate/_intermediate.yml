@@ -86,3 +86,21 @@ models:
         data_tests: [not_null]
       - name: resolved_at
         data_tests: [not_null]
+
+  - name: int_report_lost_leads_latest
+    description: >
+      Newest Lost Leads report row per opportunity. Carries WHY a deal was lost, WHEN,
+      and how long the customer waited for a first reply - three fields with exactly
+      one source in the warehouse, so they join straight into core.opportunities
+      rather than through the observation layer. Same rule as
+      int_report_all_jobs_latest: pick_latest earns its complexity only where two
+      sources can disagree. `Move Date` is the exception and is resolved in
+      core.opportunities, because service_date genuinely does have competing sources.
+    columns:
+      - name: opportunity_key
+        data_tests: [not_null, unique]
+      - name: external_opportunity_id
+        data_tests: [not_null]
+      - name: observed_at
+        data_tests: [not_null]
+

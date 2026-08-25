@@ -5,7 +5,7 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "cronExpression", "expression": "0 7 * * *" }
+            { "field": "cronExpression", "expression": "30 3 * * *" }
           ]
         }
       },
@@ -13,7 +13,7 @@
       "typeVersion": 1.2,
       "position": [0, 0],
       "id": "b1000000-0000-4000-8000-000000000001",
-      "name": "Daily 07:00 PT"
+      "name": "Daily 03:30 PT (30 3 * * *)"
     },
     {
       "parameters": {
@@ -85,7 +85,7 @@
     }
   ],
   "connections": {
-    "Daily 07:00 PT": { "main": [[{ "node": "Run dbt seed + build", "type": "main", "index": 0 }]] },
+    "Daily 03:30 PT (30 3 * * *)": { "main": [[{ "node": "Run dbt seed + build", "type": "main", "index": 0 }]] },
     "Run dbt seed + build": { "main": [[{ "node": "Assert dbt Succeeded", "type": "main", "index": 0 }]] },
     "Assert dbt Succeeded": { "main": [[{ "node": "Serving Freshness Check", "type": "main", "index": 0 }]] },
     "Serving Freshness Check": { "main": [[{ "node": "Assert Serving Is Fresh", "type": "main", "index": 0 }]] }

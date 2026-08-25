@@ -155,10 +155,14 @@ resolved as (
         --
         -- coalesce, not pick_latest, because a newer source must NOT overrule the
         -- CRM's own answer just by being newer.
+        --   4. The Lost Leads report's `Move Date`, LAST on purpose: for a lost
+        --      lead that is the date the customer was planning on, not a booked
+        --      commitment. It is better than nothing and worse than anything above.
         coalesce(
             rpt.service_date,
             enr.service_date,
-            jsd.service_date
+            jsd.service_date,
+            lost.service_date
         )                                                   as service_date,
 
         -- Where the date above actually came from. Without this the fallback is
@@ -168,7 +172,17 @@ resolved as (
             when rpt.service_date is not null then 'lead_status_report'
             when enr.service_date is not null then 'api_opportunity'
             when jsd.service_date is not null then 'inherited_from_job'
+            when lost.service_date is not null then 'lost_leads_report'
         end                                                 as service_date_source,
+
+        -- WHY a deal was lost, and when. Single-source fields, so they are joined
+        -- straight in rather than routed through the observation layer - see
+        -- int_report_lost_leads_latest for the reasoning.
+        lost.lost_reason                                    as lost_reason,
+        lost.lost_date                                      as lost_date,
+        -- Minutes between the lead arriving and a first reply. Only populated for
+        -- lost records: this report is the only source that carries it.
+        lost.time_to_first_contact_minutes                  as time_to_first_contact_minutes,
         {{ pick_latest([("enr.opportunity_type_code", "enr.observed_at")]) }}
                                                             as opportunity_type_code,
         {{ pick_latest([("enr.service_type_id", "enr.observed_at")]) }}
@@ -283,6 +297,8 @@ resolved as (
     left join bkd_extra on bkd_extra.opportunity_key = b.opportunity_key
     left join agent_from_jobs ajo on ajo.opportunity_key = b.opportunity_key
     left join job_service_date jsd on jsd.opportunity_key = b.opportunity_key
+    left join {{ ref('int_report_lost_leads_latest') }} lost
+      on lost.opportunity_key = b.opportunity_key
 )
 
 select

@@ -154,6 +154,10 @@ Follow this order. Skipping steps produces sources that each behave differently 
 ## Repository layout
 
 - **`crm_sync_contract.md` - THE AUTHORITY on how CRM data is refreshed.** Which mechanism feeds each entity, the schedule, the quota model, the enrichment-trigger allowlist, and - the section that prevents wrong answers - what each mechanism *cannot* do. It has precedence over every other file here, including this one. Read it before any ingestion work, and never copy its numbers into another document.
+- **[`ARCHITECTURE.md`](ARCHITECTURE.md) - how data actually moves, end to end.** The
+  four mechanisms, the five stages, what a webhook and a report each set in motion, and
+  how the seeds work. Links to a visual map. Start here to understand the system;
+  `crm_sync_contract.md` still owns every cadence and quota number.
 - `smartmoving_sync_strategy.md` - CDC design rationale: webhook replay/ordering, reconciliation-by-diff, phased rollout. The *why* behind the contract; the contract holds the current *what*.
 - `decisions/` - ADR log: settled architecture decisions (Postgres as the store, instance- entity, hybrid serving+core access, n8n-not-Dagster) so they are not re-litigated.
 - `serving_catalog.md` - the published catalog of `serving` views. The contract other teams read. Keep current; a view that is not catalogued does not exist.

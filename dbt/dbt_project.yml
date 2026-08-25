@@ -18,6 +18,24 @@ on-run-end:
 seeds:
   datawarehouse:
     +schema: staging      # hand-maintained dimensions live alongside staging views
+
+    # EVERY SEED TABLE CARRIES A WARNING, IN THE DATABASE ITSELF.
+    #
+    # `dbt seed` DROPS AND RECREATES these tables on every build. A row typed
+    # straight into Postgres is destroyed on the next run, silently, and dbt still
+    # reports success - verified by inserting a row and watching it disappear.
+    #
+    # The warning lives as a Postgres COMMENT because that is the one place someone
+    # about to edit the table will actually be looking: psql `\d+`, DBeaver, pgAdmin
+    # and Metabase all surface it next to the table name. A note in a README is not
+    # in front of the person holding the UPDATE statement.
+    +post-hook: >
+      comment on table {{ this }} is
+      'HAND-MAINTAINED DIMENSION - DO NOT EDIT IN THE DATABASE.
+      This table is dropped and recreated from dbt/seeds/{{ this.identifier }}.csv
+      on every dbt build, so any change made here is destroyed silently at the next
+      run. Edit the CSV in the repository instead; the change reaches every model
+      that depends on it on the next build.'
     dim_instance:
       +column_types:
         instance_id: text

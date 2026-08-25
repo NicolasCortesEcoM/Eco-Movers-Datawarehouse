@@ -182,14 +182,39 @@ which is the best possible time to pay for it.
 
 | Workflow | When | What it does |
 |---|---|---|
-| `report_ingest` | IMAP trigger | Lands whatever report email arrives |
-| SmartMoving report sends | **07:00, 11:00, 13:00, 15:00, 18:00, 21:00** | Configured in the SmartMoving UI, not in n8n |
+| `report_ingest` | IMAP trigger | Lands whatever report email arrives, then rebuilds dbt immediately |
+| SmartMoving report sends | **~03:04 daily, once** | Configured in the SmartMoving UI, not in n8n. See the gap below. |
 | `opps_sweep` | 06:30, 10:30, 13:30, 16:30, 20:30 | Sweep `[-180, +60]`, both instances |
 | `leads_poll` | aligned with the sweep | Leads have no webhook; polling is their only path |
-| `dbt_build_reports` | 07:00 daily | `dbt seed` + `dbt build`, under `flock` |
+| `dbt_build_reports` | **03:30 daily** (`30 3 * * *`) | `dbt seed` + `dbt build` + retention prune, under `flock` |
 | `Enrichment_worker` | every 5 min | Drains the trigger allowlist only |
 | `nightly_reconciliation` | 02:00 | `--refresh-stale-hours 336` |
 | `weekly_dims` | weekly | Dimensions |
+
+### What the SmartMoving UI is actually configured to send
+
+Measured 2026-08-25 from `report_generated_at` across 2026-08-21..24, i.e. days with
+no manual re-sends. **This is a description of reality, not of the intent** - the
+table above used to claim six sends a day at times nothing has ever sent at.
+
+| Report | `ld` | `local` |
+|---|---|---|
+| Lead Status | daily ~03:04 | **not scheduled** |
+| Booked Opportunities | daily ~03:04 | **not scheduled** |
+| Lost Leads | daily ~03:04 | **not scheduled** |
+| All Jobs | **not scheduled** | **not scheduled** |
+
+⚠️ **`local` sends exactly one report a day and it was rejected for twelve days.**
+It goes to `local.reporting@ecomovers.com` - the `ecomovers.com` domain, which the
+ingest alias map did not allow until 2026-08-25. Twelve consecutive rows in
+`report_ingest_errors` record it. The domain is now accepted, so it lands from
+2026-08-26 onward.
+
+⚠️ **`local` is 84% of the business** (12,570 of 15,024 opportunities) and **All Jobs
+is scheduled nowhere.** Every `local` report row and every All Jobs row in the
+warehouse today arrived because someone forwarded it by hand. Until the missing
+schedules are created in the SmartMoving UI, the free report mechanism covers the
+smaller instance only, and the API is carrying the rest.
 
 **Sweep window is `[-180, +60]` everywhere.** One window for every run, deliberately.
 Earlier the codebase used two different narrow windows for `opps_sweep` and the
