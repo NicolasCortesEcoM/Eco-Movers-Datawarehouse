@@ -152,6 +152,34 @@ seeds:
       - name: referral_source_raw
         data_tests: [not_null, unique]
 
+  - name: dim_agent
+    description: >
+      The sales roster: one row per name the CRM actually writes. Holds what does
+      NOT vary by line of business - identity, aliases, role, active flag.
+      Split from dim_agent_assignment deliberately: role is a property of the
+      PERSON, and repeating it on every line row means a role change has to be
+      applied in several places at once, which is how one gets missed.
+      Editing one cell here changes the role everywhere it is used.
+    columns:
+      - name: source_agent_name
+        description: >
+          The exact string SmartMoving writes into sales_assignee_name. This is the
+          join key. A person with two spellings gets two rows here, both pointing at
+          the same agent_name - that is how aliases are fixed without touching SQL.
+        tests: [not_null, unique]
+      - name: agent_name
+        description: Canonical name. Every downstream model groups by this, never by source_agent_name.
+        tests: [not_null]
+      - name: is_sales_agent
+        description: >
+          false for shared or system accounts such as `Admin team`. Agent metrics
+          exclude these rather than showing a phantom top performer.
+        tests: [not_null]
+      - name: role
+        description: Job title. Free text on purpose - it is descriptive, nothing branches on it.
+      - name: is_active
+        tests: [not_null]
+
   - name: dim_agent_assignment
     description: >
       Which line(s) of business each sales agent is responsible for, and WHEN.
@@ -163,8 +191,14 @@ seeds:
       agent between lines or to close a period.
     columns:
       - name: agent_name
-        description: Matches core.opportunities.sales_assignee_name after norm_text.
-        tests: [not_null]
+        description: >
+          The CANONICAL name, i.e. dim_agent.agent_name - not the raw CRM string.
+          Assignments are per person, so an alias never needs its own row here.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_agent')
+              field: agent_name
       - name: line_of_business
         tests:
           - not_null

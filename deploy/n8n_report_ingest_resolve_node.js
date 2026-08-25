@@ -31,7 +31,8 @@ const COMPANY_DOMAINS = ['ecomoversmoving.com', 'ecomovers.com'];
 const INSTANCE_BY_MAILBOX = {
   'ld.reporting':    { source_instance_id: 'ld',    entity_id: 'ecomovers' },
   'local.reporting': { source_instance_id: 'local', entity_id: 'ecomovers' },
-  // TEMPORARY - remove once every report goes to a per-instance alias.
+  // Confirmed by Nicolas 2026-08-25: `local` reports are sent to reporting@, and
+  // `ld` reports to ld.reporting@. This is the live production mapping, not a test.
   'reporting':       { source_instance_id: 'local', entity_id: 'ecomovers' },
 };
 
@@ -73,6 +74,28 @@ const recipients = [...new Set([
 const alias = recipients.find(a => INSTANCE_BY_ALIAS[a]) || null;
 const instance = alias ? INSTANCE_BY_ALIAS[alias] : null;
 
+// NOISE vs ERROR. Both reach here because both pass the IMAP `FROM smartmoving`
+// filter, but they are not the same thing and must not share an alert path:
+//
+//   NOISE - a report someone pulled by hand from the SmartMoving UI, delivered to
+//   their own mailbox (nicolas@...). Nothing is wrong and nothing is missing; it
+//   was simply never meant for the warehouse. Logging these produced ~5 rows a day
+//   in report_ingest_errors and a Slack alert each, which is how a REAL missed
+//   report gets lost in the scroll.
+//
+//   ERROR - an email that DOES look like scheduled ingestion (its mailbox is a
+//   reporting alias) but could not be resolved. That is a genuine gap: a report
+//   was sent and did not land, and someone has to see it.
+//
+// The test is the mailbox name, not the domain: any future `<x>.reporting@` alias
+// is treated as ingestion automatically and fails loudly if unmapped, which is the
+// safe direction to be wrong in.
+const looksLikeIngestion = recipients.some((addr) => {
+  const at = addr.lastIndexOf('@');
+  return at > 0 && addr.slice(0, at).includes('reporting');
+});
+const isNoise = !instance && !looksLikeIngestion;
+
 const body = String(j.text || '') + ' ' + String(j.html || '');
 
 // The report-exports path segment is what distinguishes the download link from
@@ -103,6 +126,7 @@ if (!generatedAt) problems.push('missing or unparseable Date header');
 return {
   json: {
     is_valid: problems.length === 0,
+    is_noise: isNoise,
     error: problems.join(' | ') || null,
     matched_alias: alias,
     source_instance_id: instance ? instance.source_instance_id : null,

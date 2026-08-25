@@ -145,3 +145,24 @@ models:
         data_tests: [not_null]
       - name: synced_at
         data_tests: [not_null]
+
+  - name: agents
+    description: >
+      The canonical sales roster: every salesperson name the CRM has written,
+      resolved to one canonical person with a role and an active flag.
+      Built from two seeds that are edited independently - dim_agent (who someone
+      is) and dim_agent_assignment (which lines they cover, and when). A name seen
+      in the CRM but missing from the seed is surfaced with is_known = false, never
+      dropped.
+    columns:
+      - name: source_agent_name
+        description: The raw CRM string. Join key from core.opportunities.sales_assignee_name.
+        data_tests: [not_null, unique]
+      - name: agent_name
+        description: Canonical name. Group by this, never by source_agent_name.
+        data_tests: [not_null]
+      - name: is_sales_agent
+        data_tests: [not_null]
+      - name: is_known
+        description: false means the name needs adding to dbt/seeds/dim_agent.csv.
+        data_tests: [not_null]

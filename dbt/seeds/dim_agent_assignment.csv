@@ -1,13 +1,35 @@
 agent_name,line_of_business,valid_from,valid_to,notes
-Graydon Foxx,local,2024-01-01,9999-12-31,Works both lines.
-Graydon Foxx,long_distance,2024-01-01,9999-12-31,Works both lines.
-Kirk Bussell,local,2024-01-01,9999-12-31,Works both lines.
-Kirk Bussell,long_distance,2024-01-01,9999-12-31,Works both lines.
-Ana Vasquez,local,2024-01-01,9999-12-31,Works both lines.
-Ana Vasquez,long_distance,2024-01-01,9999-12-31,Works both lines.
-Ricardo Salvador Arellano,local,2024-01-01,9999-12-31,Works both lines.
-Ricardo Salvador Arellano,long_distance,2024-01-01,9999-12-31,Works both lines.
-Dean Savage,local,2024-01-01,9999-12-31,Works both lines.
-Dean Savage,long_distance,2024-01-01,9999-12-31,Works both lines.
-Devin Thompson,local,2024-01-01,9999-12-31,Works both lines.
-Devin Thompson,long_distance,2024-01-01,9999-12-31,Works both lines.
+Graydon Foxx,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Graydon Foxx,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Kirk Bussell,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Kirk Bussell,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Ana Vasquez,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Ana Vasquez,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Ricardo Salvador Arellano,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Ricardo Salvador Arellano,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Dean Savage,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Dean Savage,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Devin Thompson,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Devin Thompson,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Jesus Carranza,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM. 160 ld opportunities.
+Jesus Carranza,long_distance,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM. 160 ld opportunities.
+Brett Morrow,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM. 132 ld opportunities.
+Brett Morrow,long_distance,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM. 132 ld opportunities.
+Jonathan Baldelomar,local,2024-01-01,9999-12-31,
+Jose Garcia,local,2024-01-01,9999-12-31,
+Kim Kate Rabara,local,2024-01-01,9999-12-31,
+Eduardo Velez Arteaga,local,2024-01-01,9999-12-31,
+Maximo Lopez,local,2024-01-01,9999-12-31,
+Daniela Vasquez,local,2024-01-01,9999-12-31,
+Victor Gorostiaga,local,2024-01-01,9999-12-31,
+Steven Mullen,local,2024-01-01,9999-12-31,
+Junior Aikman,local,2024-01-01,9999-12-31,
+Gonzalo Cortez,local,2024-01-01,9999-12-31,
+Michelle Morales,local,2024-01-01,9999-12-31,
+Grant Korzetz,local,2024-01-01,9999-12-31,
+Alejandro Machado,local,2024-01-01,9999-12-31,
+Ana Hall,local,2024-01-01,9999-12-31,
+Paulina Trubko,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
+Julio Fernandez,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
+Celina Meynard,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
+Maria Naranjo,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.

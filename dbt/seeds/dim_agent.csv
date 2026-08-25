@@ -1,0 +1,32 @@
+source_agent_name,agent_name,is_sales_agent,role,is_active,notes
+Devin Thompson,Devin Thompson,true,Sales Agent,true,
+Ricardo Salvador Arellano,Ricardo Salvador Arellano,true,Sales Agent,true,
+Jonathan Baldelomar,Jonathan Baldelomar,true,Sales Agent,true,
+Ana Vasquez,Ana Vasquez,true,Sales Agent,true,
+Jose Garcia,Jose Garcia,true,Sales Agent,true,
+Kim Kate Rabara,Kim Kate Rabara,true,Sales Agent,true,
+Eduardo Velez Arteaga,Eduardo Velez Arteaga,true,Sales Agent,true,
+Maximo Lopez,Maximo Lopez,true,Sales Agent,true,
+Kirk Bussell,Kirk Bussell,true,Sales Agent,true,
+Dean Savage,Dean Savage,true,Sales Agent,true,
+Daniela Vasquez,Daniela Vasquez,true,Sales Agent,true,
+Brett Morrow,Brett Morrow,true,Sales Agent,true,
+Jesus Carranza,Jesus Carranza,true,Sales Agent,true,CRM role is Admin but sells; see decisions note.
+Victor Gorostiaga,Victor Gorostiaga,true,Sales Agent,true,
+Steven Mullen,Steven Mullen,true,Sales Agent,true,
+Junior Aikman,Junior Aikman,true,Sales Agent,true,
+Graydon Foxx,Graydon Foxx,true,Sales Agent,true,
+Gonzalo Cortez,Gonzalo Cortez,true,Sales Agent,true,
+Michelle Morales,Michelle Morales,true,Sales Agent,true,
+Grant Korzetz,Grant Korzetz,true,Sales Agent,true,
+Grant K,Grant Korzetz,true,Sales Agent,true,Alias of Grant Korzetz - CRM writes the short form on some records.
+Alejandro Machado,Alejandro Machado,true,Sales Agent,true,
+Ana Hall,Ana Hall,true,Sales Agent,true,
+Admin team,Admin team,false,Shared CRM account,true,Not a person. Excluded from agent metrics.
+Paulina Trubko,Paulina Trubko,true,Sales Agent,true,
+Julio Fernandez,Julio Fernandez,true,Sales Agent,true,
+Celina Meynard,Celina Meynard,true,Sales Agent,true,
+Maria Naranjo,Maria Naranjo,true,Sales Agent,true,
+Woodinville / Lynnwood Operations Team,Woodinville / Lynnwood Operations Team,false,Operations team account,true,Not a person. Excluded from agent metrics.
+Seattle Operations Team,Seattle Operations Team,false,Operations team account,true,Not a person. Excluded from agent metrics.
+Accounting,Accounting,false,Department account,true,Not a person. Excluded from agent metrics.
