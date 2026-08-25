@@ -5,8 +5,8 @@ affected by both.
 
 ## Change 1 - the host path moved
 
-| Old | New |
-|---|---|
+| Old                  | New                                      |
+| -------------------- | ---------------------------------------- |
 | `/opt/datawarehouse` | `/home/datawarehouse_user/datawarehouse` |
 
 `/opt` on this droplet is mode 700 owned by another application's service user.
@@ -50,14 +50,14 @@ Apply Change 1 and Change 2 to every SSH node below. `<ARGS>` is all that differ
 **Cron times are defined in [`crm_sync_contract.md`](../crm_sync_contract.md) section 6 and nowhere
 else.** Read them from there; this table gives only the arguments.
 
-| Workflow | `<ARGS>` |
-|---|---|
-| `Enrichment_worker` | `--ids <ids> --instance <inst> --dest postgres --budget 200 --pace 0.6` |
-| `leads_poll` | `--job leads --instance <inst> --dest postgres --budget 60` |
-| `opps_sweep` | `--job enrich --instance <inst> --dest postgres --budget 300` |
-| `nightly_reconciliation` | `--job enrich --instance <inst> --dest postgres --budget 400 --refresh-stale-hours 336` |
-| `weekly_dims` | `--job dims --instance <inst> --dest postgres --budget 60` |
-| `Reporting_datawarehouse` | no SSH node - webhook only |
+| Workflow                  | `<ARGS>`                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `Enrichment_worker`       | `--ids <ids> --instance <inst> --dest postgres --budget 200 --pace 0.6`                 |
+| `leads_poll`              | `--job leads --instance <inst> --dest postgres --budget 60`                             |
+| `opps_sweep`              | `--job enrich --instance <inst> --dest postgres --budget 300`                           |
+| `nightly_reconciliation`  | `--job enrich --instance <inst> --dest postgres --budget 400 --refresh-stale-hours 336` |
+| `weekly_dims`             | `--job dims --instance <inst> --dest postgres --budget 60`                              |
+| `Reporting_datawarehouse` | no SSH node - webhook only                                                              |
 
 **Do not pass `--from-offset` / `--to-offset`.** The defaults in `run.py` are the contract's window,
 and `scripts/check_sync_contract.py` fails the build if they drift. Overriding them per workflow is
@@ -101,20 +101,22 @@ sends a day is ~10M rows a year from Lead Status alone and the droplet is at 90%
 ```javascript
 const r = $input.first().json;
 const code = Number(r.code ?? r.exitCode ?? 0);
-const out = String(r.stdout || '') + '\n' + String(r.stderr || '');
+const out = String(r.stdout || "") + "\n" + String(r.stderr || "");
 
 // The SSH node surfaces the remote exit status but treats any completed command as
 // a success. Throwing here is what routes a failed extraction to the error workflow
 // instead of letting the schedule stay green over a pipeline that stopped running.
 if (code !== 0) {
-  throw new Error('Extraction FAILED (exit ' + code + ').\n\n' + out.slice(-3000));
+  throw new Error(
+    "Extraction FAILED (exit " + code + ").\n\n" + out.slice(-3000),
+  );
 }
 
-// dlt reports a failed load as a normal log line, not a non-zero exit, whenever the
+// dlt reports a failed load as a normal log line, not a non-zero exit, whenever the +
 // failure happens inside a load package. API quota is spent before this point, so a
 // silent partial load is expensive as well as wrong.
 if (/PipelineStepFailed|contains failed jobs|LoadClientJobFailed/i.test(out)) {
-  throw new Error('dlt reported a failed load package.\n\n' + out.slice(-3000));
+  throw new Error("dlt reported a failed load package.\n\n" + out.slice(-3000));
 }
 
 return [{ json: { ok: true, tail: out.slice(-1500) } }];

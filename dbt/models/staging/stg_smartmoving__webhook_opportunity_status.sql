@@ -3,7 +3,7 @@
 -- payload for every opportunity-* event (confirmed in the live log:
 -- opportunity-created / opportunity-status-changed / opportunity-changed all
 -- carry 'opportunity-id' + 'opportunity-status'). received_at is the observed
--- instant; int_opportunity_status_latest picks the newest per opportunity.
+-- instant; int_opportunity_observations picks the newest per opportunity.
 --
 -- The status int is the SAME enum everywhere. The earlier note here (and in
 -- smartmoving_api_findings.md) claimed the webhook/sweep coding differed from the

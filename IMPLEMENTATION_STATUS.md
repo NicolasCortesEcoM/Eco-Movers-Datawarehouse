@@ -9,8 +9,150 @@
 **Current workstream:** enriching **leads** and **opportunities** to the scheduled-report field set.
 **Where that stands:** P0-P4 done; **P5 in progress** (Lead Status lands end-to-end; three reports and
 their observation arms remain); **P6-P8 not started**. Detail in "Pending - the current workstream".
-**Last updated:** 2026-08-13 (architecture audit - see below).
+**Last updated:** 2026-08-25.
 **Repository:** `https://github.com/NicolasCortesEcoM/Eco-Movers-Datawarehouse`
+
+---
+
+## DONDE ESTAMOS - 2026-08-25
+
+**Fase 1: SmartMoving -> Postgres.** La ingesta funciona de punta a punta y sin intervencion
+manual. Lo que falta es publicar el resultado para que otros equipos lo consuman.
+
+### Que hay en el almacen ahora mismo
+
+| Tabla | Filas | Que es |
+|---|---|---|
+| `core.opportunities` | 14.998 | Una fila por oportunidad de venta |
+| `core.jobs` | 20.968 | Una fila por trabajo (mudanza) |
+| `core.leads` | 2.866 | Una fila por lead recibido |
+| `core.lines_of_business` | 20.968 | Linea de negocio de cada trabajo |
+| `core.branches` | 8 | Sucursales, con su zona horaria |
+
+Cobertura de los campos que mas importan, sobre 14.998 oportunidades:
+
+| Campo | Cuantas lo tienen |
+|---|---|
+| Fecha de servicio | 13.163 (88%) |
+| Nombre del cliente | 13.163 (88%) |
+| Vendedor asignado | 6.122 (41%) |
+| Importe cotizado | 3.637 (24%) |
+| Importe facturado | 1.434 (10%) |
+
+Las tres ultimas suben conforme llegan mas generaciones de los reportes: el reporte cubre un
+periodo, no toda la historia.
+
+### De donde sale cada dato
+
+Cuatro fuentes, y cada una hace algo que las otras no pueden:
+
+| Fuente | Coste | Que aporta |
+|---|---|---|
+| **Webhooks** | Gratis | El estado, en segundos |
+| **Reportes programados** | Gratis | Cobertura masiva: dinero, direcciones, vendedor |
+| **Barrido del API** | ~1 llamada / 200 clientes | Identidad: el puente entre GUID y numero de cotizacion |
+| **Detalle del API** | 1 llamada por oportunidad | Profundidad, solo cuando un webhook lo justifica |
+
+El detalle esta en [`crm_sync_contract.md`](crm_sync_contract.md), que manda sobre cualquier otro
+documento en estas cuestiones.
+
+### Como se actualiza (sin tocar nada a mano)
+
+```
+Llega el correo con el reporte
+        v
+report_ingest lo detecta, descarga y aterriza
+        v
+Verifica que el numero de filas cuadre
+        v
+Reconstruye dbt inmediatamente  <-- anadido 2026-08-25
+        v
+core y serving quedan al dia
+```
+
+Ademas, `dbt_build_reports` corre cada noche a las 03:05 como red de seguridad: recarga las
+semillas, reconstruye todo y poda los reportes viejos.
+
+---
+
+## LO ULTIMO QUE SE HIZO - 2026-08-25
+
+### La fecha de servicio estaba mal, y se arreglo
+
+`Closed` tenia fecha de servicio solo en el **22%** de los casos. Un trabajo cerrado ya ocurrio,
+asi que ese numero no podia ser correcto.
+
+**La causa:** en SmartMoving la fecha no vive en la oportunidad, vive en el TRABAJO. El barrido
+del API alcanza 13.157 oportunidades y no devuelve fecha para ninguna, mientras que las 13.157
+tienen un trabajo que si la tiene. El dato estaba en el almacen; la oportunidad nunca miraba sus
+propios trabajos.
+
+Ahora la fecha se resuelve por autoridad, no por novedad:
+
+1. El reporte Lead Status - el CRM la calcula el mismo y elige el trabajo relevante
+2. La fecha del API a nivel de oportunidad
+3. La mas temprana de sus trabajos
+
+| Estado | Antes | Ahora |
+|---|---|---|
+| Closed | 22,4% | **94,0%** |
+| Cancelled | 22,6% | **94,3%** |
+| Lost | 26,6% | **88,5%** |
+| BadLead | 22,6% | 54,4% |
+| LeadInProgress | 0% | 0% |
+
+Los dos ultimos siguen bajos **a proposito**: un bad lead a menudo nunca tuvo fecha, y un lead en
+progreso todavia no la tiene acordada con el cliente.
+
+De donde sale cada fecha, ahora visible en la columna `service_date_source`:
+
+| Fuente | Cuantas | % |
+|---|---|---|
+| Heredada del trabajo | 9.549 | 63,7% |
+| Reporte Lead Status | 3.141 | 20,9% |
+| API | 473 | 3,2% |
+| Sin fecha | 1.835 | 12,2% |
+
+Validacion util: donde el reporte Y el trabajo tienen fecha, coinciden en **2.943 de 3.141
+(93,7%)**. Las 198 que difieren son justo los casos donde el CRM elige un trabajo distinto - por
+eso el reporte manda cuando existe.
+
+### Se elimino lo redundante
+
+Habia 11 modelos que nadie leia. Se borraron tres:
+
+- **`dim_lob_map`** - duplicado. Se creo `dim_lob_branch` sin advertir que ya existia otra tabla
+  para lo mismo. Dos tablas para la misma decision es la peor forma de redundancia: tarde o
+  temprano alguien edita la que no es.
+- **`int_opportunity_status_latest`** - la capa de observacion hace lo mismo desde que existe.
+- **`int_opportunity_attachment_counts`** - construido y nunca usado.
+
+Se conservan `dim_sales_team` y `dim_referral_source` (Fase 2, marketing) y las vistas de staging
+de contactos/encuestas/cuadrillas/direcciones: son vistas, no ocupan espacio, y son el acceso
+tipado a datos reales que ya estan cargados.
+
+### La cascada ya es automatica
+
+Antes: los reportes llegaban 6 veces al dia y dbt corria una sola vez, a las 03:05. Todo lo que
+entraba durante el dia esperaba hasta 20 horas.
+
+Ahora `report_ingest` reconstruye dbt en cuanto verifica que las filas cuadran. Una reconstruccion
+completa tarda unos 25 segundos.
+
+---
+
+## LO QUE SIGUE ABIERTO
+
+1. **Publicar `serving.opportunities_v1` y `serving.jobs_v1`.** Todo el dato vive en `core`, que
+   por contrato solo leen dbt y analistas. Hasta que exista una vista `serving`, ningun equipo
+   puede construir sobre el - y esa es la prioridad numero uno declarada del proyecto.
+2. **La tabla de vendedores.** Decidido que la mantiene Nicolas, no el CRM: hay admins que venden
+   (Jesus Carranza, 140 oportunidades) y "vendedores" que no son personas ("Admin team"). Faltan
+   12 vendedores por asignar. Pendiente decidir si se edita como archivo o con un formulario.
+3. **`Booked` con fecha de servicio en solo 30,8%.** Anomalia sin explicar: una oportunidad
+   reservada deberia tener fecha. Merece una revision propia.
+4. **Activar los 6 flujos restantes.** Estan configurados y probados uno a uno, pero inactivos:
+   activarlos empieza a gastar cuota de API de forma automatica.
 
 ---
 

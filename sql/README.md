@@ -20,3 +20,13 @@ Plain SQL run against the central Postgres store. No ORM, no migrations tool yet
 - `platform_rw` owns everything and bypasses RLS by design (dlt + dbt use it).
 - `app_read` (or a per-team role that inherits it) may `SELECT` on `serving` + `core` only - never `raw_*`/`staging`, never a vendor API key. RLS filters it to the entities listed for its role name in `core.entity_access`.
 - To onboard a consumer for an entity: `INSERT INTO core.entity_access(role_name, entity_id) VALUES ('their_role', 'their_entity');`
+
+## `34_report_retention.sql`
+
+Prunes the report landing tables: every generation is kept for 10 days, then one per
+day. Six report sends a day is roughly 10 million rows a year from Lead Status alone,
+and 69% of those rows are byte-identical copies of the generation before.
+
+Safe because dbt already collapses report rows to the newest observation, so an older
+intra-day generation contributes nothing once a newer one exists. Idempotent: running
+it twice is a no-op. Wired into `dbt_build_reports` (03:05 PT).

@@ -40,7 +40,7 @@ seeds:
       - name: lob_hint
         description: >
           Senal primaria de LOB cuando la instancia separa lineas de negocio (prevalece
-          sobre dim_lob_map).
+          sobre las reglas de linea de negocio).
       - name: api_key_env
         description: Variable de entorno con el API key.
 
@@ -110,17 +110,6 @@ seeds:
           - not_null
           - accepted_values:
               values: ['open', 'booked', 'completed', 'closed', 'cancelled', 'lost', 'bad_lead']
-
-  - name: dim_lob_map
-    description: >
-      Rule-based line-of-business classification, evaluated by priority (lowest first).
-      service_type is the reliable signal; branch_name is NOT - the `local` instance has
-      a branch literally named "Long Distance Team" (decisions/0002).
-    columns:
-      - name: rule_id
-        data_tests: [not_null, unique]
-      - name: priority
-        data_tests: [not_null]
 
   - name: dim_referral_source
     description: >

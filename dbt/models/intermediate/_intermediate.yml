@@ -1,26 +1,6 @@
 version: 2
 
 models:
-  - name: int_opportunity_status_latest
-    description: >
-      Last-observation-wins opportunity status derived only from the webhook log
-      (zero API cost). Grain: one row per (source_instance_id, external_opportunity_id).
-      Real-time count-by-status feed between the hourly /customers sweeps.
-    columns:
-      - name: opportunity_key
-        description: Surrogate key source_instance_id:external_opportunity_id.
-        tests: [not_null, unique]
-      - name: external_opportunity_id
-        tests: [not_null]
-      - name: source_instance_id
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['ld', 'local']
-      - name: opportunity_status_code
-        tests: [not_null]
-
   - name: int_opportunity_observations
     description: >
       Every observation any source has made about an opportunity. One row =
@@ -28,7 +8,6 @@ models:
       purpose: a source contributes NULL for fields it does not know, and
       pick_latest skips nulls, which is what lets a report add invoiced_amount
       without erasing the API's estimated_total. Nothing is resolved here.
-      Adding a source is a `union all` arm and nothing else.
     columns:
       - name: opportunity_key
         data_tests: [not_null]
@@ -57,8 +36,10 @@ models:
   - name: int_job_observations
     description: >
       Every observation any source has made about a job. Same shape and rules as
-      int_opportunity_observations. The Phase 5 report_all_jobs arm lands here and
-      brings structured origin/destination, actual costs and lifecycle timestamps.
+      int_opportunity_observations. The report_all_jobs arm contributes only the
+      fields that OVERLAP with an API source; its ~60 exclusive fields go through
+      int_report_all_jobs_latest, because pick_latest earns its complexity only
+      where two sources can disagree.
     columns:
       - name: job_key
         data_tests: [not_null]
@@ -73,6 +54,17 @@ models:
     description: Newest observation per (job, source). Fan-in point for core.jobs.
     columns:
       - name: job_key
+        data_tests: [not_null]
+
+  - name: int_report_all_jobs_latest
+    description: >
+      Newest All Jobs report row per job. Carries the ~60 fields no other source
+      has - structured addresses, the actual cost breakdown, lifecycle dates - and
+      joins straight into core.jobs rather than through the observation layer.
+    columns:
+      - name: job_key
+        data_tests: [not_null, unique]
+      - name: external_job_id
         data_tests: [not_null]
 
   - name: int_opportunity_quote_crosswalk
@@ -93,17 +85,4 @@ models:
       - name: external_opportunity_id
         data_tests: [not_null]
       - name: resolved_at
-        data_tests: [not_null]
-
-  - name: int_opportunity_attachment_counts
-    description: >
-      Documents, files and photos per opportunity as COUNTS. job_documents alone is
-      ~12 rows per job and carries no URL or id, so the rows themselves are not worth
-      modeling; URLs need a Premium call that is out of scope.
-    columns:
-      - name: external_opportunity_id
-        data_tests: [not_null, unique]
-      - name: document_count
-        data_tests: [not_null]
-      - name: job_document_count
         data_tests: [not_null]

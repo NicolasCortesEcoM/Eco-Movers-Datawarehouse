@@ -34,6 +34,27 @@ del as (select * from latest where source = 'api_deletion'),
 rpt as (select * from latest where source = 'report_lead_status'),
 bkd as (select * from latest where source = 'report_booked_opps'),
 
+-- SERVICE DATE INHERITED FROM THE OPPORTUNITY'S OWN JOBS - fallback only.
+--
+-- In SmartMoving the service date does not live on the opportunity, it lives on the
+-- JOB. The customers sweep reaches 13,157 opportunities and reports a service date
+-- for none of them, while 13,157 of those same 13,157 have a job that does carry
+-- one. The date was in the warehouse the whole time; the opportunity simply never
+-- looked at its own jobs, which is why `Closed` sat at 22% instead of ~100%.
+--
+-- MIN, not max: when several jobs exist this is the date work STARTED. It is only
+-- ever used when the Lead Status report has nothing to say, so it never competes
+-- with the CRM's own calculation.
+job_service_date as (
+    select
+        j.source_instance_id || ':' || j.external_opportunity_id as opportunity_key,
+        min(j.service_date) as service_date
+    from {{ ref('int_job_latest_by_source') }} j
+    where j.external_opportunity_id is not null
+      and j.service_date is not null
+    group by 1
+),
+
 -- SALES ATTRIBUTION RECOVERED FROM THE JOB SIDE.
 --
 -- 9,530 opportunities reach core through the customers sweep alone, and the sweep
@@ -121,11 +142,33 @@ resolved as (
             ("rpt.pipeline_status", "rpt.observed_at"),
             ("bkd.pipeline_status", "bkd.observed_at")
         ]) }}                                               as pipeline_status,
-        {{ pick_latest([
-            ("enr.service_date", "enr.observed_at"),
-            ("rpt.service_date", "rpt.observed_at")
-        ]) }}
-                                                            as service_date,
+        -- THE ONE FIELD THAT IS NOT A FRESHNESS RACE, deliberately.
+        --
+        -- Everything else here asks "who spoke most recently?". Service date asks
+        -- "who is most authoritative?", in a fixed order:
+        --
+        --   1. The Lead Status report. The CRM computes this itself - when an
+        --      opportunity has several jobs it picks the one it considers the real
+        --      move date, by logic we do not have and should not reinvent.
+        --   2. The API's opportunity-level date.
+        --   3. The earliest date among the opportunity's own jobs.
+        --
+        -- coalesce, not pick_latest, because a newer source must NOT overrule the
+        -- CRM's own answer just by being newer.
+        coalesce(
+            rpt.service_date,
+            enr.service_date,
+            jsd.service_date
+        )                                                   as service_date,
+
+        -- Where the date above actually came from. Without this the fallback is
+        -- invisible: a job-inherited date and a CRM-calculated one look identical
+        -- in the column, and only one of them is authoritative.
+        case
+            when rpt.service_date is not null then 'lead_status_report'
+            when enr.service_date is not null then 'api_opportunity'
+            when jsd.service_date is not null then 'inherited_from_job'
+        end                                                 as service_date_source,
         {{ pick_latest([("enr.opportunity_type_code", "enr.observed_at")]) }}
                                                             as opportunity_type_code,
         {{ pick_latest([("enr.service_type_id", "enr.observed_at")]) }}
@@ -239,6 +282,7 @@ resolved as (
     left join bkd on bkd.opportunity_key = b.opportunity_key
     left join bkd_extra on bkd_extra.opportunity_key = b.opportunity_key
     left join agent_from_jobs ajo on ajo.opportunity_key = b.opportunity_key
+    left join job_service_date jsd on jsd.opportunity_key = b.opportunity_key
 )
 
 select
