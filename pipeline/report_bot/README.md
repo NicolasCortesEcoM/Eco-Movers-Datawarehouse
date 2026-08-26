@@ -176,17 +176,31 @@ Left alone, the report is emailed to a person and the warehouse never sees it. T
 is why `request_email_delivery` clears the field, types the configured recipient, and
 reads it back before clicking Run Report.
 
-### Still to do
+### Running on the droplet: no deep link, ever
 
-1. **Create the n8n workflow.** Schedule -> SSH -> `python -m pipeline.report_bot.run
-   --window <year|recent> --instance all`, plus the `Assert Exit Code` node and
-   `errorWorkflow`. See "How it is scheduled" above.
-2. **Install Playwright's browser on the droplet**: `venv/bin/playwright install
-   chromium` (and `install-deps` if the system libraries are missing).
-The reference scripts `login.py` and `runreport.py` this module was built from were
-deleted in the same commit that verified it, once both instances had been driven end
-to end and the rows had landed. They are in the git history if the original ever
-needs to be compared against.
+The report has **no working deep link**, and this cost a debugging session to
+establish. Loading `https://app.smartmoving.com/reports/all-jobs` directly always
+lands on `/home`. Measured: three attempts, `wait_until="networkidle"`, seconds of
+settle time between them, every one bounced. It is a router guard rejecting a cold
+load, not a race a longer wait can win.
+
+It appeared to work on a laptop only by accident: **SmartMoving restores the user's
+last visited route on sign-in**, and that account happened to be parked on the
+report. The first droplet run, whose session was parked elsewhere, failed instantly.
+
+So the bot navigates the way the running app does - push the route onto history and
+let Angular's router pick it up from `popstate`. No page load, no guard, no bounce.
+
+### Scheduling
+
+n8n workflow **`report_bot_all_jobs`** (`0fsombzQ1psDwh75`), in the Datawarehouse
+folder. Two schedule triggers, each SSHing into the droplet with its window stated
+explicitly, both feeding one `Assert Exit Code` node. `errorWorkflow` is
+`datawarehouse_error_handler`, so a failure reaches Slack.
+
+`crm_sync_contract.md` section 6 owns the times.
+
+Verified 2026-08-26: manual execution succeeded, `requests_sent: 2`.
 
 ### The one selector most likely to break
 

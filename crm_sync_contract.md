@@ -190,7 +190,7 @@ which is the best possible time to pay for it.
 | `Enrichment_worker` | every 5 min | Drains the trigger allowlist only |
 | `nightly_reconciliation` | 02:00 | `--refresh-stale-hours 336` |
 | `weekly_dims` | weekly | Dimensions |
-| `report_bot` (All Jobs) | before each report send | Drives the SmartMoving UI so All Jobs is emailed. Zero API quota - it is a browser, not a client. |
+| `report_bot_all_jobs` | **02:50** (full year) and **10:00, 13:00, 16:00, 20:00** (last 90 days) | Drives the SmartMoving UI so All Jobs is emailed - SmartMoving cannot schedule that report itself. Zero API quota: it is a browser, not a client, and it loads nothing. |
 
 ### What the SmartMoving UI is actually configured to send
 

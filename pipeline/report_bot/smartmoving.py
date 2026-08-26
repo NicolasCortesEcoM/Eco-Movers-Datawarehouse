@@ -155,25 +155,87 @@ def login(page, instance: Instance) -> None:
             f"variable - the password itself is deliberately not shown here."
         ) from exc
 
-    page.wait_for_timeout(2_000)
+    # Let the app finish bootstrapping before anything navigates away. A deep link
+    # issued while Angular is still starting is the thing that lands on the
+    # Dashboard instead of the requested report.
+    page.wait_for_timeout(4_000)
     log.info("[%s] signed in", instance.id)
 
 
 def open_report(page, instance: Instance, report: Report) -> None:
-    """Navigate straight to the report's own screen.
+    """Navigate to the report's screen WITHOUT reloading the app.
 
-    Going to the URL rather than clicking through the navigation menu: fewer
-    selectors to break, and the menu structure differs between SmartMoving plans.
+    THE REPORT HAS NO WORKING DEEP LINK, and this cost a debugging session to
+    establish. Loading https://app.smartmoving.com/reports/all-jobs directly - which
+    is what `page.goto` does - always lands on /home instead. Measured on the
+    droplet: three attempts, `wait_until="networkidle"`, several seconds of settle
+    time between them, every one bounced. It is a router guard rejecting a cold
+    load, not a race that a longer wait can win.
+
+    It appeared to work on a laptop only by accident: SmartMoving restores the
+    user's LAST VISITED route on sign-in, and that account happened to be parked on
+    the report. That is luck, not a mechanism - the first droplet run, whose session
+    was parked elsewhere, failed immediately.
+
+    So navigate the way the running app does: push the route onto history and let
+    Angular's router pick it up from the popstate event. No page load, no guard, no
+    bounce. Verified: the URL changes and the date inputs render.
     """
-    url = instance.base_url + report.path
-    log.info("[%s] opening %s at %s", instance.id, report.label, url)
+    target = report.path
+    log.info("[%s] opening %s (%s)", instance.id, report.label, target)
 
-    page.goto(url, wait_until="domcontentloaded")
-    page.wait_for_selector(START_SEL, timeout=30_000)
-    # Angular hydrates the default date values a moment after the inputs exist.
-    # Reading them before that returns empty strings and the ordering logic below
-    # then picks the wrong branch.
-    page.wait_for_timeout(1_500)
+    for attempt in range(1, 4):
+        # Fast path. Sign-in restores the last route, so the report is often already
+        # on screen - and re-navigating to where you already are is how you lose it.
+        if target in page.url and _report_form_ready(page, 8_000):
+            log.info("[%s] report form ready", instance.id)
+            return
+
+        # Make sure a booted app is what we are routing inside of.
+        if "/home" not in page.url and target not in page.url:
+            page.goto(instance.base_url + "/home", wait_until="networkidle")
+            page.wait_for_timeout(2_000)
+
+        page.evaluate(
+            """(path) => {
+                window.history.pushState({}, '', path);
+                window.dispatchEvent(new PopStateEvent('popstate', { state: {} }));
+            }""",
+            target,
+        )
+        page.wait_for_timeout(2_500)
+
+        if target in page.url and _report_form_ready(page, 20_000):
+            # Angular hydrates the default date values a moment after the inputs
+            # exist. Reading them before that returns empty strings, and the
+            # assignment-order logic in set_date_range then picks the wrong branch.
+            page.wait_for_timeout(1_500)
+            log.info("[%s] report form ready", instance.id)
+            return
+
+        log.warning(
+            "[%s] report form not ready, landed on %s - retrying (%d/3)",
+            instance.id, page.url, attempt,
+        )
+        page.goto(instance.base_url + "/home", wait_until="networkidle")
+        page.wait_for_timeout(3_000)
+
+    raise BrowserStepFailed(
+        f"[{instance.id}] {report.label}: the report form never appeared. Last URL "
+        f"{page.url!r}. If that is /home the router refused the route; if it is a "
+        f"sign-in URL the session was lost."
+    )
+
+
+def _report_form_ready(page, timeout_ms: int) -> bool:
+    """Whether the report's date inputs have rendered."""
+    from playwright.sync_api import TimeoutError as PWTimeout
+
+    try:
+        page.wait_for_selector(START_SEL, timeout=timeout_ms)
+        return True
+    except PWTimeout:
+        return False
 
 
 def _pick_date(page, selector: str, target, label: str) -> None:

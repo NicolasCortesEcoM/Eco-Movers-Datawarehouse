@@ -39,7 +39,7 @@ windows:
 # Scheduled jobs should always pass --window explicitly, so that reading the n8n
 # workflow tells you what it does without reasoning about what time it fires.
 auto_window:
-  full_scan_hours: [3]      # local hour(s) that get the full-year pull
+  full_scan_hours: [3] # local hour(s) that get the full-year pull
   default: recent
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ instances:
   - id: ld
     entity_id: ecomovers
     label: Eco Movers - Long Distance
-    base_url: https://app.smartmoving.com
+    base_url: https://app.smartmoving.com/reports/all-jobs
     username_env: SMARTMOVING_LD_ACCOUNT
     password_env: SMARTMOVING_LD_PASSWORD
     deliver_to: ld.reporting@ecomoversmoving.com
@@ -66,7 +66,7 @@ instances:
   - id: local
     entity_id: ecomovers
     label: Eco Movers - Local & Commercial
-    base_url: https://app.smartmoving.com
+    base_url: https://app.smartmoving.com/reports/all-jobs
     username_env: SMARTMOVING_LOCAL_ACCOUNT
     password_env: SMARTMOVING_LOCAL_PASSWORD
     deliver_to: reporting@ecomoversmoving.com
