@@ -183,9 +183,10 @@ reads it back before clicking Run Report.
    `errorWorkflow`. See "How it is scheduled" above.
 2. **Install Playwright's browser on the droplet**: `venv/bin/playwright install
    chromium` (and `install-deps` if the system libraries are missing).
-3. **Delete `login.py` and `runreport.py`.** They are the reference scripts this
-   module was built from and are no longer imported by anything. They are kept only
-   until the scheduled runs have been green for a few days.
+The reference scripts `login.py` and `runreport.py` this module was built from were
+deleted in the same commit that verified it, once both instances had been driven end
+to end and the rows had landed. They are in the git history if the original ever
+needs to be compared against.
 
 ### The one selector most likely to break
 
