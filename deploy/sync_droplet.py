@@ -142,6 +142,13 @@ def main() -> int:
         f"app_read_password={env['droplet_app_read_password']}",
         f"SMARTMOVING_API_KEY_LD={env['SMARTMOVING_API_KEY_LD']}",
         f"SMARTMOVING_API_KEY_LOCAL={env['SMARTMOVING_API_KEY_LOCAL']}",
+        # UI logins, used ONLY by pipeline/report_bot to drive the browser. They are
+        # a different credential from the API keys above and grant far more - a real
+        # user session - which is why they live in a 0600 file and never in the repo.
+        f"SMARTMOVING_LD_ACCOUNT={env['SMARTMOVING_LD_ACCOUNT']}",
+        f"SMARTMOVING_LD_PASSWORD={env['SMARTMOVING_LD_PASSWORD']}",
+        f"SMARTMOVING_LOCAL_ACCOUNT={env['SMARTMOVING_LOCAL_ACCOUNT']}",
+        f"SMARTMOVING_LOCAL_PASSWORD={env['SMARTMOVING_LOCAL_PASSWORD']}",
         "",
     ])
     with sftp.open(posixpath.join(APP_DIR, ".env"), "w") as fh:

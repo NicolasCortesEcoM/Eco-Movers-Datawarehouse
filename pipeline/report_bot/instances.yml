@@ -24,10 +24,10 @@ version: 1
 # ---------------------------------------------------------------------------
 windows:
   year:
-    # The full current year. Run once a day: it corrects anything that changed in
-    # the past and back-fills a day that was missed entirely.
+    # The whole current year, 1 Jan to 31 Dec. Run once a day: it corrects anything
+    # that changed in the past and back-fills a day that was missed entirely.
     from: year_start
-    to_days_ahead: 60
+    to: year_end
 
   recent:
     # Freshness only. Nothing older than 90 days changes often enough to justify
@@ -57,7 +57,7 @@ instances:
   - id: ld
     entity_id: ecomovers
     label: Eco Movers - Long Distance
-    login_url: https://app.smartmoving.com
+    base_url: https://app.smartmoving.com
     username_env: SMARTMOVING_LD_ACCOUNT
     password_env: SMARTMOVING_LD_PASSWORD
     deliver_to: ld.reporting@ecomoversmoving.com
@@ -66,7 +66,7 @@ instances:
   - id: local
     entity_id: ecomovers
     label: Eco Movers - Local & Commercial
-    login_url: https://app.smartmoving.com
+    base_url: https://app.smartmoving.com
     username_env: SMARTMOVING_LOCAL_ACCOUNT
     password_env: SMARTMOVING_LOCAL_PASSWORD
     deliver_to: reporting@ecomoversmoving.com
@@ -83,6 +83,9 @@ instances:
 reports:
   - id: all_jobs
     label: All Jobs
+    # Appended to the instance's base_url. The bot navigates straight here once
+    # logged in rather than clicking through the menu - fewer selectors to break.
+    path: /reports/all-jobs
     # The filename report_ingest matches on to identify the report. It comes from
     # the download URL, not the subject line, because every SmartMoving report
     # arrives as "Your SmartMoving Report is Ready!".

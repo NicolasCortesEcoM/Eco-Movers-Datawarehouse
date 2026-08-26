@@ -100,11 +100,13 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = _run_dir()
     failures: list[str] = []
 
-    with browser_session(headless=not args.headful) as context:
+    # One browser, one context per instance - the context is created inside
+    # run_report_for_instance so that no session can survive into the next one.
+    with browser_session(headless=not args.headful) as browser:
         for inst in instances:
             for rep in reports:
                 try:
-                    run_report_for_instance(context, inst, rep, window, run_dir)
+                    run_report_for_instance(browser, inst, rep, window, run_dir)
                 except Exception as exc:
                     # One instance failing must not cost the others their run. Every
                     # instance that CAN succeed does, and the non-zero exit at the end

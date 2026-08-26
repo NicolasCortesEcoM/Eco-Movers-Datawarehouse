@@ -148,10 +148,49 @@ what it does without having to reason about what time it will run.
 
 ## Status
 
-**Scaffold.** The configuration, the instance loop, the window logic, the secret
-handling and the failure behaviour are complete and testable. The four steps that
-touch SmartMoving's actual interface — log in, open the report, set the dates, send —
-are marked `NotImplementedError` and need one walkthrough of the UI to fill in.
+**Working, and verified end to end against production on 2026-08-25.**
 
-Run `python -m pipeline.report_bot.run --dry-run --window year` to see exactly what it
-would do for every configured instance without opening a browser.
+```
+[ld]    logging in as i***@interstate.ecomovers.com
+[ld]    signed in
+[ld]    opening All Jobs at https://app.smartmoving.com/reports/all-jobs
+        start date: 1/1/2026      <- read back from the field, not assumed
+        end date:   12/31/2026
+        recipient:  info@interstate.ecomovers.com -> ld.reporting@ecomoversmoving.com
+[ld]    All Jobs queued for delivery
+[ld]    signed out
+[local] logging in as p***@sales.ecomovers.com
+        ... same, delivered to reporting@ecomoversmoving.com
+all 2 request(s) sent.
+```
+
+The first request landed through the normal path minutes later: 852 rows in
+`raw_smartmoving.report_all_jobs`, zero rows in `report_ingest_errors`. Nothing in
+the ingestion side needed changing, which is the whole point of the split.
+
+### The trap this caught immediately
+
+**Every instance's report form defaults to a mailbox `report_ingest` does not read** -
+`info@interstate.ecomovers.com` for `ld`, `pedro@sales.ecomovers.com` for `local`.
+Left alone, the report is emailed to a person and the warehouse never sees it. That
+is why `request_email_delivery` clears the field, types the configured recipient, and
+reads it back before clicking Run Report.
+
+### Still to do
+
+1. **Create the n8n workflow.** Schedule -> SSH -> `python -m pipeline.report_bot.run
+   --window <year|recent> --instance all`, plus the `Assert Exit Code` node and
+   `errorWorkflow`. See "How it is scheduled" above.
+2. **Install Playwright's browser on the droplet**: `venv/bin/playwright install
+   chromium` (and `install-deps` if the system libraries are missing).
+3. **Delete `login.py` and `runreport.py`.** They are the reference scripts this
+   module was built from and are no longer imported by anything. They are kept only
+   until the scheduled runs have been green for a few days.
+
+### The one selector most likely to break
+
+`RUN_SEL = 'button[data-test-id="x4y9tu7gjb"]'` is a generated id, not a readable
+one, so a SmartMoving release can change it without anything looking suspicious. The
+failure is loud rather than silent - `request_email_delivery` waits for the button to
+become enabled and raises when it does not - but that is the line to check first when
+a run starts failing for no apparent reason.

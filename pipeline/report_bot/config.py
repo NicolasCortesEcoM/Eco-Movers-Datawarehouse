@@ -32,7 +32,7 @@ class Instance:
     id: str
     entity_id: str
     label: str
-    login_url: str
+    base_url: str
     deliver_to: str
     username: str
 
@@ -64,6 +64,7 @@ class Instance:
 class Report:
     id: str
     label: str
+    path: str
     expected_filename_contains: str
 
 
@@ -131,7 +132,7 @@ def load_instances(cfg: dict, only: str | None = None) -> list[Instance]:
                 id=iid,
                 entity_id=_require(entry, "entity_id", f"instance {iid}"),
                 label=entry.get("label", iid),
-                login_url=_require(entry, "login_url", f"instance {iid}"),
+                base_url=_require(entry, "base_url", f"instance {iid}").rstrip("/"),
                 deliver_to=_require(entry, "deliver_to", f"instance {iid}"),
                 username=username,
                 _password_env=pass_env,
@@ -161,6 +162,7 @@ def load_reports(cfg: dict) -> list[Report]:
             Report(
                 id=_require(entry, "id", "reports[]"),
                 label=entry.get("label", entry["id"]),
+                path=_require(entry, "path", f"report {entry.get('id')}"),
                 expected_filename_contains=entry.get("expected_filename_contains", ""),
             )
         )
@@ -193,7 +195,6 @@ def resolve_window(cfg: dict, name: str, today: date | None = None) -> Window:
         )
 
     spec = windows[name]
-    ahead = int(spec.get("to_days_ahead", 0))
 
     if spec.get("from") == "year_start":
         start = date(today.year, 1, 1)
@@ -204,4 +205,16 @@ def resolve_window(cfg: dict, name: str, today: date | None = None) -> Window:
             f"window {name!r}: needs either `from: year_start` or `from_days_back`"
         )
 
-    return Window(name=name, date_from=start, date_to=today + timedelta(days=ahead))
+    if spec.get("to") == "year_end":
+        end = date(today.year, 12, 31)
+    elif "to_days_ahead" in spec:
+        end = today + timedelta(days=int(spec["to_days_ahead"]))
+    else:
+        raise ConfigError(
+            f"window {name!r}: needs either `to: year_end` or `to_days_ahead`"
+        )
+
+    if end < start:
+        raise ConfigError(f"window {name!r}: end {end} is before start {start}")
+
+    return Window(name=name, date_from=start, date_to=end)

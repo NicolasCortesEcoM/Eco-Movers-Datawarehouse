@@ -36,3 +36,10 @@ dbt/.user.yml
 
 # Python bytecode caches
 **/__pycache__/
+
+# report_bot - a saved browser session is a live credential, and screenshots are
+# debugging output. Neither belongs in a repository that syncs through OneDrive.
+auth.json
+report-*.png
+error.png
+.playwright-mcp/
