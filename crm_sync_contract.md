@@ -190,6 +190,7 @@ which is the best possible time to pay for it.
 | `Enrichment_worker` | every 5 min | Drains the trigger allowlist only |
 | `nightly_reconciliation` | 02:00 | `--refresh-stale-hours 336` |
 | `weekly_dims` | weekly | Dimensions |
+| `report_bot` (All Jobs) | before each report send | Drives the SmartMoving UI so All Jobs is emailed. Zero API quota - it is a browser, not a client. |
 
 ### What the SmartMoving UI is actually configured to send
 
@@ -211,7 +212,8 @@ ingest alias map did not allow until 2026-08-25. Twelve consecutive rows in
 2026-08-26 onward.
 
 ⚠️ **`local` is 84% of the business** (12,570 of 15,024 opportunities) and **All Jobs
-is scheduled nowhere.** Every `local` report row and every All Jobs row in the
+is scheduled nowhere** - SmartMoving cannot schedule it, which is exactly why
+`pipeline/report_bot/` exists.** Every `local` report row and every All Jobs row in the
 warehouse today arrived because someone forwarded it by hand. Until the missing
 schedules are created in the SmartMoving UI, the free report mechanism covers the
 smaller instance only, and the API is carrying the rest.

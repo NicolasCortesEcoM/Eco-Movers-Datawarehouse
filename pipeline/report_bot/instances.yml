@@ -1,0 +1,90 @@
+# Which SmartMoving instances the report bot drives, and where each one's report
+# should be emailed.
+#
+# THIS FILE IS SAFE TO COMMIT. It holds no secret - only the NAMES of the environment
+# variables that hold them. `username_env: SMARTMOVING_LD_ACCOUNT` says "the password
+# for this instance lives in that variable", never what the password is.
+#
+# Adding a company or an instance is a block here plus two variables in the droplet's
+# .env. No code change. A company with one instance and a company with six work the
+# same way.
+#
+# The bot REFUSES TO START if a named variable is missing, rather than skipping that
+# instance - a skipped instance is indistinguishable from a successful run.
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# Date windows. Defined here rather than in code so changing them is a config
+# edit and shows up in a diff.
+#
+# `to_days_ahead` is not padding. All Jobs carries UPCOMING moves, and those are
+# the rows an operations view needs most; a window that stops at today would
+# publish a schedule with nothing in it.
+# ---------------------------------------------------------------------------
+windows:
+  year:
+    # The full current year. Run once a day: it corrects anything that changed in
+    # the past and back-fills a day that was missed entirely.
+    from: year_start
+    to_days_ahead: 60
+
+  recent:
+    # Freshness only. Nothing older than 90 days changes often enough to justify
+    # re-pulling it six times a day.
+    from_days_back: 90
+    to_days_ahead: 60
+
+# Used only by `--window auto`, which exists for convenience at a terminal.
+# Scheduled jobs should always pass --window explicitly, so that reading the n8n
+# workflow tells you what it does without reasoning about what time it fires.
+auto_window:
+  full_scan_hours: [3]      # local hour(s) that get the full-year pull
+  default: recent
+
+# ---------------------------------------------------------------------------
+# Instances.
+#
+#   id            matches source_instance_id everywhere in the warehouse. It is
+#                 what report_ingest resolves from the mailbox, so the two must
+#                 agree or the rows land under the wrong instance - silently,
+#                 because quote numbers are unique only WITHIN an instance.
+#   entity_id     the company. Several instances can share one.
+#   deliver_to    the mailbox report_ingest reads. This is what tells the
+#                 ingestion which instance the file belongs to.
+# ---------------------------------------------------------------------------
+instances:
+  - id: ld
+    entity_id: ecomovers
+    label: Eco Movers - Long Distance
+    login_url: https://app.smartmoving.com
+    username_env: SMARTMOVING_LD_ACCOUNT
+    password_env: SMARTMOVING_LD_PASSWORD
+    deliver_to: ld.reporting@ecomoversmoving.com
+    enabled: true
+
+  - id: local
+    entity_id: ecomovers
+    label: Eco Movers - Local & Commercial
+    login_url: https://app.smartmoving.com
+    username_env: SMARTMOVING_LOCAL_ACCOUNT
+    password_env: SMARTMOVING_LOCAL_PASSWORD
+    deliver_to: reporting@ecomoversmoving.com
+    enabled: true
+
+# ---------------------------------------------------------------------------
+# Reports the bot can drive.
+#
+# Only All Jobs is here, and that is deliberate: every other report IS schedulable
+# in the SmartMoving UI, and a scheduled report is strictly better than a bot -
+# nothing to break, no browser, no credentials in play. Add a report here only
+# once it is confirmed that SmartMoving cannot schedule it itself.
+# ---------------------------------------------------------------------------
+reports:
+  - id: all_jobs
+    label: All Jobs
+    # The filename report_ingest matches on to identify the report. It comes from
+    # the download URL, not the subject line, because every SmartMoving report
+    # arrives as "Your SmartMoving Report is Ready!".
+    expected_filename_contains: all-jobs
+    enabled: true
