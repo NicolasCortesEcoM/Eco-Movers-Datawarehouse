@@ -260,7 +260,12 @@ resolved as (
             ("rpt.move_coordinator_name", "rpt.observed_at")
         ]) }}                                                              as move_coordinator_name,
         {{ pick_latest([("enr.cancellation_reason", "enr.observed_at")]) }} as cancellation_reason,
-        {{ pick_latest([("enr.created_at_utc", "enr.observed_at")]) }}      as created_at_utc,
+        -- coalesce, not pick_latest, and the API first. A creation instant is an
+        -- immutable fact, so "newest observation wins" is the wrong rule for it - a
+        -- report that arrives daily would outrank the API's own answer every day
+        -- purely by being newer. The two agree to the minute anyway; the ordering is
+        -- about which source is authoritative, not which is fresher.
+        coalesce(enr.created_at_utc, rpt.created_at_utc)    as created_at_utc,
 
         -- REALISED revenue, and the only column in the warehouse that carries it.
         -- Read straight off the Booked Opportunities report rather than through

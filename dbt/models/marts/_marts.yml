@@ -17,3 +17,70 @@ models:
         tests: [not_null]
       - name: entity_id
         tests: [not_null]
+
+  - name: fct_agent_leads_daily
+    description: >
+      Sales performance per agent, per line of business, per day the lead ARRIVED.
+      A cohort grain: every number on a row describes what became of the leads that
+      reached that agent on that day, whenever the outcome happened. That is what
+      makes conversion answerable - the leads and the bookings on any given calendar
+      day belong to different populations, so an "activity" grain cannot produce a
+      rate at all.
+
+      Roll up by summing: overall conversion across lines is
+      sum(booked_leads)/sum(valid_leads), which weights by volume rather than
+      averaging the lines - an agent with 400 local leads and 2 commercial ones
+      should not have those two count equally.
+
+      CAUTION - recent cohorts read high. A lead received last week has not had time
+      to be lost, so its cohort looks better than it will settle at. Read open_leads
+      alongside any conversion figure, or exclude the most recent ~60 days.
+
+      Lives in marts, not serving, deliberately: marts may change whenever an analyst
+      needs it. It is promoted to a versioned serving view once an application
+      actually depends on its shape.
+    columns:
+      - name: agent_day_key
+        description: entity:agent:line:YYYYMMDD. Readable on purpose.
+        tests: [not_null, unique]
+      - name: entity_id
+        tests: [not_null]
+      - name: agent_name
+        description: Canonical name from core.agents, never the raw CRM string.
+        tests: [not_null]
+      - name: line_of_business
+        description: >
+          `unassigned` where the opportunity has no job and therefore no line. Those
+          rows are kept so an agent's total still reconciles against
+          core.opportunities.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['local', 'long_distance', 'commercial', 'unassigned']
+      - name: lead_received_date
+        tests: [not_null]
+      - name: valid_leads
+        description: The conversion denominator. Excludes bad leads, which were never winnable.
+        tests: [not_null]
+      - name: booked_leads
+        tests: [not_null]
+      - name: open_leads
+        description: The maturity signal. A cohort with open leads has not finished settling.
+        tests: [not_null]
+      - name: conversion_pct
+        description: >
+          booked_leads / valid_leads. NULL rather than 0 when there is no denominator,
+          so an empty day cannot average into a report as a real 0% performance.
+      - name: is_sales_agent
+        description: false for shared CRM accounts. Filter on it; they are flagged, not dropped.
+        tests: [not_null]
+      - name: is_within_assignment
+        description: >
+          Whether the lead landed in a line dim_agent_assignment says the agent covers
+          on that date. A signal, never a filter: a run of false means the roster is
+          stale or work is being routed somewhere unexpected.
+        tests: [not_null]
+      - name: synced_at
+        description: Inherited from the underlying opportunities, not the build time.
+        tests: [not_null]
+
