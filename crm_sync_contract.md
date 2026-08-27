@@ -183,7 +183,7 @@ which is the best possible time to pay for it.
 | Workflow | When | What it does |
 |---|---|---|
 | `report_ingest` | IMAP trigger | Lands whatever report email arrives, then rebuilds dbt immediately |
-| SmartMoving report sends | **~03:04 daily, once** | Configured in the SmartMoving UI, not in n8n. See the gap below. |
+| SmartMoving report sends | **03:00, 11:00, 13:00, 15:00, 18:00, 21:00** | Configured in the SmartMoving UI, not in n8n. Six reports per send: Lead Status, Booked, Lost Leads, All Jobs, Cancellations, Payments. |
 | `opps_sweep` | 06:30, 10:30, 13:30, 16:30, 20:30 | Sweep `[-180, +60]`, both instances |
 | `leads_poll` | aligned with the sweep | Leads have no webhook; polling is their only path |
 | `dbt_build_reports` | **03:30 daily** (`30 3 * * *`) | `dbt seed` + `dbt build` + retention prune, under `flock` |
@@ -192,31 +192,29 @@ which is the best possible time to pay for it.
 | `weekly_dims` | weekly | Dimensions |
 | `report_bot_all_jobs` | **02:50** (full year) and **10:00, 13:00, 16:00, 20:00** (last 90 days) | Drives the SmartMoving UI so All Jobs is emailed - SmartMoving cannot schedule that report itself. Zero API quota: it is a browser, not a client, and it loads nothing. |
 
-### What the SmartMoving UI is actually configured to send
+### The six reports, and what each one uniquely carries
 
-Measured 2026-08-25 from `report_generated_at` across 2026-08-21..24, i.e. days with
-no manual re-sends. **This is a description of reality, not of the intent** - the
-table above used to claim six sends a day at times nothing has ever sent at.
+All six land through `report_ingest` at **zero API quota**. Nothing else in the
+warehouse carries the columns in the right-hand column.
 
-| Report | `ld` | `local` |
+| Report | Key | Uniquely provides |
 |---|---|---|
-| Lead Status | daily ~03:04 | **not scheduled** |
-| Booked Opportunities | daily ~03:04 | **not scheduled** |
-| Lost Leads | daily ~03:04 | **not scheduled** |
-| All Jobs | **not scheduled** | **not scheduled** |
+| Lead Status | `Quote #` | The denominator - every lead regardless of outcome. `Received at` (the lead date, on 100% of rows). |
+| Booked Opportunities | `Quote #` | `Invoiced Amount` - **the only realised-revenue column in the warehouse**. |
+| Lost Leads | `Quote #` | `Lost Date`, `Reason`, `Time to First Contact`. |
+| All Jobs | `Job Id` | The full actual cost breakdown, crew and truck counts, hourly rates, pricing method. Driven by `report_bot` because SmartMoving cannot schedule it. |
+| **Cancellations** | `Quote #` | **`Cancelled Date`** - the warehouse had no cancellation date at all before this. Plus `Amount` (revenue lost) and `Reason`. |
+| **Payments** | hash of the row | `Date`, `Amount`, `Payment Category`, and links to **Quote, Job OR Storage Account**. |
 
-⚠️ **`local` sends exactly one report a day and it was rejected for twelve days.**
-It goes to `local.reporting@ecomovers.com` - the `ecomovers.com` domain, which the
-ingest alias map did not allow until 2026-08-25. Twelve consecutive rows in
-`report_ingest_errors` record it. The domain is now accepted, so it lands from
-2026-08-26 onward.
+⚠️ **A payment can attach to a storage account that has no quote number.** Storage
+accounts are a third top-level entity alongside opportunities and jobs. When the
+payments model is written it needs a nullable link to each of the three plus a target
+discriminator - forcing every payment under an opportunity id would silently drop
+every storage payment.
 
-⚠️ **`local` is 84% of the business** (12,570 of 15,024 opportunities) and **All Jobs
-is scheduled nowhere** - SmartMoving cannot schedule it, which is exactly why
-`pipeline/report_bot/` exists.** Every `local` report row and every All Jobs row in the
-warehouse today arrived because someone forwarded it by hand. Until the missing
-schedules are created in the SmartMoving UI, the free report mechanism covers the
-smaller instance only, and the API is carrying the rest.
+⚠️ **`local` reports were rejected for twelve days** (2026-08-14 to 08-25) because they
+arrive at `local.reporting@ecomovers.com` and the `ecomovers.com` domain was not in
+the alias map. Fixed 2026-08-25.
 
 **Sweep window is `[-180, +60]` everywhere.** One window for every run, deliberately.
 Earlier the codebase used two different narrow windows for `opps_sweep` and the

@@ -37,11 +37,22 @@ const INSTANCE_BY_MAILBOX = {
 };
 
 // Matched against the download URL's filename, NOT the subject.
+// `exclude` exists because substring matching is not enough once the report list
+// grows: SmartMoving also offers `unapplied-storage-payments` and
+// `payment-ratio-report`, and a bare 'payment' match would route either of them into
+// the payments table. A misrouted report lands successfully and is wrong.
+//
+// `row_key_field: null` means HASH THE WHOLE ROW. Deliberate for payments: one
+// customer can pay twice against the same quote on the same day, so `Quote` alone
+// would collide on the primary key and ON CONFLICT DO NOTHING would silently drop
+// the second payment. Two byte-identical rows genuinely ARE one observation.
 const REPORTS = [
-  { match: 'lead-status',           report_type: 'lead_status',          target_table: 'report_lead_status',          sheet_name: 'data', row_key_field: 'Quote #' },
-  { match: 'all-jobs',              report_type: 'all_jobs',             target_table: 'report_all_jobs',             sheet_name: 'jobs', row_key_field: 'Job Id' },
-  { match: 'booked-opportunities',  report_type: 'booked_opportunities', target_table: 'report_booked_opportunities', sheet_name: 'data', row_key_field: 'Quote #' },
-  { match: 'lost-leads',            report_type: 'lost_leads',           target_table: 'report_lost_leads',           sheet_name: 'data', row_key_field: 'Quote #' },
+  { match: 'lead-status',           exclude: [], report_type: 'lead_status',          target_table: 'report_lead_status',          sheet_name: 'data', row_key_field: 'Quote #' },
+  { match: 'all-jobs',              exclude: [], report_type: 'all_jobs',             target_table: 'report_all_jobs',             sheet_name: 'jobs', row_key_field: 'Job Id' },
+  { match: 'booked-opportunities',  exclude: [], report_type: 'booked_opportunities', target_table: 'report_booked_opportunities', sheet_name: 'data', row_key_field: 'Quote #' },
+  { match: 'lost-leads',            exclude: [], report_type: 'lost_leads',           target_table: 'report_lost_leads',           sheet_name: 'data', row_key_field: 'Quote #' },
+  { match: 'cancellation',          exclude: [], report_type: 'cancellations',        target_table: 'report_cancellations',        sheet_name: 'data', row_key_field: 'Quote #' },
+  { match: 'payment',               exclude: ['storage', 'unapplied', 'ratio', 'refund'], report_type: 'payments', target_table: 'report_payments', sheet_name: 'data', row_key_field: null },
 ];
 
 const item = $input.item;
@@ -104,7 +115,12 @@ const urlMatch = body.match(/https:\/\/[^\s'"<>]*\/report-exports\/[^\s'"<>]+\.(
 const downloadUrl = urlMatch ? urlMatch[0] : null;
 const fileName = downloadUrl ? String(downloadUrl.split('/').pop()).toLowerCase() : null;
 
-const report = fileName ? (REPORTS.find(r => fileName.includes(r.match)) || null) : null;
+const report = fileName
+  ? (REPORTS.find(r =>
+      fileName.includes(r.match) &&
+      !(r.exclude || []).some(x => fileName.includes(x))
+    ) || null)
+  : null;
 
 // "Your Lead Status report, containing 4801 records, is ready to download."
 const countMatch = body.match(/containing\s+([\d,]+)\s+records/i);
@@ -116,6 +132,9 @@ if (rawDate) {
   const parsed = new Date(String(rawDate).replace(/^Date:\s*/i, ''));
   if (!isNaN(parsed.getTime())) generatedAt = parsed.toISOString();
 }
+
+const rawMsgId = j.messageId || headers['message-id'] || null;
+const rfc822 = rawMsgId ? String(rawMsgId).replace(/[<>]/g, '').trim() : null;
 
 const problems = [];
 if (!instance)    problems.push('unrecognised recipient alias; saw [' + recipients.join(', ') + ']');
@@ -139,7 +158,10 @@ return {
     download_url: downloadUrl,
     file_name: fileName,
     expected_records: expectedRecords,
-    message_id: j.messageId || headers['message-id'] || null,
+    message_id: rawMsgId,
+    // Brackets stripped, so the cleanup step can find this exact message in Gmail
+    // with `rfc822msgid:` and move it to Trash once it has landed.
+    rfc822_msgid: rfc822,
     message_uid: j.attributes ? j.attributes.uid : null,
     from_address: (addresses(j.from)[0] || null),
     to_address: recipients.join(', ') || null,

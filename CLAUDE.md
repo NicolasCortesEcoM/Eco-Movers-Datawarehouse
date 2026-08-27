@@ -154,6 +154,11 @@ Follow this order. Skipping steps produces sources that each behave differently 
 ## Repository layout
 
 - **`crm_sync_contract.md` - THE AUTHORITY on how CRM data is refreshed.** Which mechanism feeds each entity, the schedule, the quota model, the enrichment-trigger allowlist, and - the section that prevents wrong answers - what each mechanism *cannot* do. It has precedence over every other file here, including this one. Read it before any ingestion work, and never copy its numbers into another document.
+- **[`DATABASE.md`](DATABASE.md) - what the warehouse IS.** Every schema and what it
+  holds, the grain of each `core` entity, where crew/rate/money columns actually live,
+  how tenancy and RLS are enforced, and which keys are tested versus merely assumed.
+  **Read it before changing anything in the database, and update it in the same commit
+  when a schema, a core object, a seed or a key relationship changes.**
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md) - how data actually moves, end to end.** The
   four mechanisms, the five stages, what a webhook and a report each set in motion, and
   how the seeds work. Links to a visual map. Start here to understand the system;
