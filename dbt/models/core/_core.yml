@@ -146,6 +146,41 @@ models:
       - name: synced_at
         data_tests: [not_null]
 
+  - name: opportunity_charges
+    description: >
+      Charge lines per JOB, estimated and actual in one table separated by
+      charge_kind. Despite the name this is job grain, not opportunity grain.
+
+      THESE ARE REVENUE LINES, NOT COSTS. SmartMoving names them "cost" and the
+      warehouse repeated that mistake until 2026-09-01. `charge_kind = 'actual'`
+      sums to the same realised figure the All Jobs report calls
+      `total_actual_cost`, which in turn equals `core.opportunities.invoiced_amount`
+      - 2,552 of 2,554 single-job opportunities agree to the cent. The only true
+      cost column in the warehouse is `core.jobs.wages`.
+
+      Coverage is partial by design: charges only exist for opportunities that were
+      enriched through the detail call, which is a deliberate minority. Where the
+      API and the report disagree the REPORT is newer - the API rows are a snapshot
+      from the moment the job closed.
+    columns:
+      - name: charge_key
+        data_tests: [not_null, unique]
+      - name: charge_kind
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['estimated', 'actual']}
+      - name: charge_category_code
+        description: >
+          Derived from live data 2026-09-01 by correlating each category total against
+          the All Jobs report columns:
+          1 = moving labor (local hourly), 2 = transportation / line-haul (long
+          distance), 3 = materials and packing, 4 = additional services,
+          7 = valuation / replacement cost coverage, 9 = storage, 10 = shuttle.
+          Codes 1 and 2 both land in the report's `actual_labor_cost`, because the
+          main charge differs by job type.
+      - name: entity_id
+        data_tests: [not_null]
+
   - name: agents
     description: >
       The canonical sales roster: every salesperson name the CRM has written,

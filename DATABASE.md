@@ -63,10 +63,94 @@ across its jobs is inventing an allocation.
 | `invoiced_amount` — the **only** realised-revenue column in the warehouse               | **opportunity**                    |
 | Status, cancellation reason                                                             | **opportunity** (copied onto jobs) |
 
-⚠️ **`total_actual_cost` is cost, not revenue.** Three money columns are routinely
-confused: `estimated_final_total` is a quote, `total_actual_cost` is what the job cost
-to run, and `invoiced_amount` is what the customer was billed. Conflating any two
-misstates the business.
+## Money: what is revenue, what is cost
+
+**This section was wrong until 2026-09-01 and the correction matters more than
+almost anything else in this file.**
+
+SmartMoving names the All Jobs breakdown columns `Actual Labor Cost`, `Actual
+Materials Cost`, `Actual Additional Services Cost` and so on. **They are not costs.
+They are REVENUE CHARGED to the customer, by line item.** The vendor's naming is
+simply misleading.
+
+Measured, not assumed — `core.jobs.total_actual_cost` against
+`core.opportunities.invoiced_amount` on the 2,554 opportunities that have exactly one
+job:
+
+```
+2,552 of 2,554 agree to the cent        correlation 1.0000
+avg total_actual_cost 1,867             avg invoiced_amount 1,868
+```
+
+They are the same number. `invoiced_amount` is not "the only realised-revenue column
+in the warehouse" — it is the only one **at opportunity grain**.
+
+### The three money families
+
+| Family | Columns | Grain | Means |
+|---|---|---|---|
+| **Quote** | `estimated_final_total`, and every `est_*_cost` | opportunity / job | What was priced |
+| **Realised revenue** | `invoiced_amount` | opportunity | Total billed |
+| **Realised revenue, itemised** | `total_actual_cost` and every `actual_*_cost` | **job** | Same money, broken out by line |
+| **Actual cost to the company** | **`wages`** | job | What the crew was paid |
+
+**`wages` is the only true cost column anywhere in the warehouse**, and it is what
+makes gross margin computable at job grain:
+
+```
+avg actual_labor_cost (charged)   1,675
+avg wages (paid)                    479     = 34.8% of labor revenue
+jobs where wages exceed the charge    8  of 5,578
+```
+
+### The breakdown reconciles, once tips are included
+
+Summing the fourteen `actual_*` components plus `actual_tax_amount`, minus
+`actual_discount`:
+
+| Sum | Jobs matching `total_actual_cost` within $1 |
+|---|---:|
+| components only | 3,532 of 5,752 (61%) |
+| **components + `tip_amount`** | **5,066 of 5,752 (88%)** |
+
+So `tip_amount` is part of the realised total, not an extra. The residual 12% is
+rounding and edge cases; check the gap before trusting a line-item figure to the
+cent.
+
+### The API agrees with the report
+
+`core.opportunity_charges` (`charge_kind = 'actual'`) carries the same breakdown from
+the enrichment call, and it matches: **1,205 jobs with both, correlation 0.9928**,
+average 3,111 (API) vs 3,086 (report). Not identical, because the API detail is a
+snapshot from the moment the job closed while the report reflects the current state —
+so where they differ, **the report is newer**.
+
+### `charge_category_code`, decoded
+
+Previously documented as "left unlabelled until the mapping is read off the
+SmartMoving UI". Derived instead by correlating each category's total against the
+report columns, on live data:
+
+| Code | Category | Evidence |
+|---|---|---|
+| 1 | Moving labor (local, hourly) | corr 0.852 vs `actual_labor_cost` |
+| 2 | Transportation / line-haul (long distance) | corr **0.999** vs `actual_labor_cost` |
+| 3 | Materials and packing | corr **0.992** vs `actual_materials_cost` |
+| 4 | Additional services | corr **0.996** vs `actual_additional_services_cost` |
+| 7 | Valuation / replacement cost coverage | corr **1.000** vs `actual_valuation_cost` |
+| 9 | Storage | few rows; names are storage charges |
+| 10 | Shuttle | few rows; names are shuttle fees |
+
+Codes 1 and 2 both land in `actual_labor_cost` on the report: for a local job the
+hourly labor is the main charge, for a long-distance job the transportation charge is.
+
+### What this unlocks
+
+Revenue is now available **at job grain, itemised**, which removes the allocation
+problem that blocked per-job revenue analysis: `invoiced_amount` sits at opportunity
+grain and 1,221 opportunities have several jobs, so splitting it would have been a
+fabricated allocation. `total_actual_cost` needs no splitting — and with `wages`
+beside it, so does margin.
 
 ---
 

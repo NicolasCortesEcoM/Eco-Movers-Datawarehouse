@@ -270,8 +270,11 @@ resolved as (
         -- REALISED revenue, and the only column in the warehouse that carries it.
         -- Read straight off the Booked Opportunities report rather than through
         -- pick_latest, because there is exactly one source: `estimated_final_total`
-        -- is a quote, and All Jobs' `total_actual_cost` is cost, not revenue.
-        -- Conflating any of the three would misstate the business.
+        -- is a quote. `total_actual_cost` on All Jobs is the SAME realised figure,
+        -- at job grain - measured 2026-09-01, 2,552 of 2,554 single-job
+        -- opportunities agree to the cent, correlation 1.0000. Both are kept
+        -- because they differ in grain, not in meaning: this one is the only
+        -- opportunity-level realised total, All Jobs is the only per-job breakdown.
         bkd_extra.invoiced_amount                           as invoiced_amount,
         bkd_extra.booked_date_local                         as booked_date_local,
 

@@ -12,9 +12,18 @@
 -- What is genuinely unique:
 --
 --   * `Invoiced Amount` - what the customer was actually BILLED. No other source
---     has it. All Jobs carries `Total Actual Cost`, which is cost, not revenue;
---     Lead Status carries `Estimated Revenue`, which is a quote. This is the only
---     column in the warehouse that states realised revenue.
+--     has it AT OPPORTUNITY GRAIN. Lead Status carries `Estimated Revenue`, which
+--     is a quote.
+--
+--     CORRECTION (2026-09-01): this file used to claim All Jobs' `Total Actual Cost`
+--     was "cost, not revenue". It is not. It is the same realised figure at JOB
+--     grain - 2,552 of 2,554 single-job opportunities agree to the cent, correlation
+--     1.0000. Everything named `Actual * Cost` on that report is REVENUE CHARGED by
+--     line item, not what the work cost the company. The only true cost column
+--     anywhere is All Jobs' `Wages`.
+--
+--     Both are kept because they differ in grain: this one is the only
+--     opportunity-level total, All Jobs is the only per-line breakdown.
 --   * `Booked Date` at opportunity grain, for opportunities with no job row yet.
 --   * The customer contact, for the same reason.
 --
