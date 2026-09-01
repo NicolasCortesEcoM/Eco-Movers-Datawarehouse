@@ -10,7 +10,8 @@ schemas exist, what lives in each, how they relate, and which rules are enforced
 Last verified against the live database: **2026-08-26**.
 
 Related documents, each owning something this one does not:
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — how data *moves*: the four mechanisms, the flow.
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — how data _moves_: the four mechanisms, the flow.
 - [`crm_sync_contract.md`](crm_sync_contract.md) — **the authority** on refresh cadence and API quota.
 - [`serving_catalog.md`](serving_catalog.md) — the published contract for consumers.
 
@@ -18,14 +19,14 @@ Related documents, each owning something this one does not:
 
 ## The five schemas
 
-| Schema | Industry term | Objects | What it holds | Who may read it |
-|---|---|---|---|---|
-| `raw_smartmoving` | Bronze | 45 tables | Source payloads exactly as received. No transformation. | dbt only |
-| `staging` | Silver | 9 seed tables + 15 views | Renamed, typed, lightly cleaned. **Money becomes `numeric` here.** | dbt only |
-| `marts` (the `int_*` half) | Silver | 6 views | The observation layer — "source S said this about O at time T". | dbt only |
-| `core` | Silver (conformed) | 8 tables | The canonical business entities, reconciled across sources. | dbt + read-only apps |
-| `marts` (the `fct_*`/`mart_*` half) | Gold (internal) | 3 objects | Analytical models. May change whenever an analyst needs it. | analysts, BI |
-| `serving` | Gold (contract) | 2 tables | Versioned, documented, stable. | other teams' applications |
+| Schema                              | Industry term      | Objects                  | What it holds                                                      | Who may read it           |
+| ----------------------------------- | ------------------ | ------------------------ | ------------------------------------------------------------------ | ------------------------- |
+| `raw_smartmoving`                   | Bronze             | 45 tables                | Source payloads exactly as received. No transformation.            | dbt only                  |
+| `staging`                           | Silver             | 9 seed tables + 15 views | Renamed, typed, lightly cleaned. **Money becomes `numeric` here.** | dbt only                  |
+| `marts` (the `int_*` half)          | Silver             | 6 views                  | The observation layer — "source S said this about O at time T".    | dbt only                  |
+| `core`                              | Silver (conformed) | 8 tables                 | The canonical business entities, reconciled across sources.        | dbt + read-only apps      |
+| `marts` (the `fct_*`/`mart_*` half) | Gold (internal)    | 3 objects                | Analytical models. May change whenever an analyst needs it.        | analysts, BI              |
+| `serving`                           | Gold (contract)    | 2 tables                 | Versioned, documented, stable.                                     | other teams' applications |
 
 The existing names are kept rather than renamed to Bronze/Silver/Gold: renaming
 schemas would break every model, the RLS script, and the consumer documentation for no
@@ -37,17 +38,17 @@ functional gain. The mapping above is the translation.
 
 Every one is a **table** with an `entity_id` column and an RLS policy.
 
-| Table | Grain | Rows | Cols |
-|---|---|---:|---:|
-| `opportunities` | `(source_instance_id, external_opportunity_id)` | 15,129 | 50 |
-| `jobs` | `(source_instance_id, external_job_id)` | 21,069 | 99 |
-| `lines_of_business` | one per job | 21,069 | 12 |
-| `opportunity_charges` | `(instance, external_job_id, charge_kind, seq)` — **job grain** | 8,812 | 15 |
-| `leads` | `(source_instance_id, external_lead_id)` | 3,069 | 33 |
-| `opportunity_payments` | `(instance, external_opportunity_id, seq)` | 1,654 | 13 |
-| `branches` | `(source_instance_id, branch_name)` — **the timezone authority** | 8 | 18 |
-| `agents` | one per CRM-written salesperson name | 34 | 8 |
-| `entity_access` | `(role_name, entity_id)` — **access control, owned by `postgres`** | — | 2 |
+| Table                  | Grain                                                              |   Rows | Cols |
+| ---------------------- | ------------------------------------------------------------------ | -----: | ---: |
+| `opportunities`        | `(source_instance_id, external_opportunity_id)`                    | 15,129 |   50 |
+| `jobs`                 | `(source_instance_id, external_job_id)`                            | 21,069 |   99 |
+| `lines_of_business`    | one per job                                                        | 21,069 |   12 |
+| `opportunity_charges`  | `(instance, external_job_id, charge_kind, seq)` — **job grain**    |  8,812 |   15 |
+| `leads`                | `(source_instance_id, external_lead_id)`                           |  3,069 |   33 |
+| `opportunity_payments` | `(instance, external_opportunity_id, seq)`                         |  1,654 |   13 |
+| `branches`             | `(source_instance_id, branch_name)` — **the timezone authority**   |      8 |   18 |
+| `agents`               | one per CRM-written salesperson name                               |     34 |    8 |
+| `entity_access`        | `(role_name, entity_id)` — **access control, owned by `postgres`** |      — |    2 |
 
 **An opportunity has many jobs.** 12,251 have exactly one, 1,044 have two, 146 have
 three, and a handful have more. Anything that divides an opportunity-level number
@@ -55,12 +56,12 @@ across its jobs is inventing an allocation.
 
 **Which grain carries what** — this trips people up:
 
-| Data | Lives on |
-|---|---|
-| Crew count, truck count, hours, hourly rate, pricing method, full actual cost breakdown | **job** |
-| `estimated_final_total` (the quote) | **opportunity** (echoed onto jobs) |
-| `invoiced_amount` — the **only** realised-revenue column in the warehouse | **opportunity** |
-| Status, cancellation reason | **opportunity** (copied onto jobs) |
+| Data                                                                                    | Lives on                           |
+| --------------------------------------------------------------------------------------- | ---------------------------------- |
+| Crew count, truck count, hours, hourly rate, pricing method, full actual cost breakdown | **job**                            |
+| `estimated_final_total` (the quote)                                                     | **opportunity** (echoed onto jobs) |
+| `invoiced_amount` — the **only** realised-revenue column in the warehouse               | **opportunity**                    |
+| Status, cancellation reason                                                             | **opportunity** (copied onto jobs) |
 
 ⚠️ **`total_actual_cost` is cost, not revenue.** Three money columns are routinely
 confused: `estimated_final_total` is a quote, `total_actual_cost` is what the job cost
@@ -71,22 +72,22 @@ misstates the business.
 
 ## `marts` — observation layer and analytics
 
-**The `int_*` observation layer** (views) exists to resolve *disagreement*. One row =
+**The `int_*` observation layer** (views) exists to resolve _disagreement_. One row =
 "this source, at this time, asserted this". Nothing is resolved there; `core` resolves
 it **per field** via the `pick_latest` macro, which is why a report can add
 `invoiced_amount` without erasing the API's `estimated_total`.
 
-| Object | Kind | Purpose |
-|---|---|---|
-| `int_opportunity_observations` | view | Every claim any source made about an opportunity |
-| `int_opportunity_latest_by_source` | table | Newest per (opportunity, source) — the fan-in point |
-| `int_job_observations` | view | Same, for jobs |
-| `int_job_latest_by_source` | table | Fan-in point for `core.jobs` |
-| `int_opportunity_quote_crosswalk` | view | **`(instance, quote_number)` → GUID.** The bridge every report needs |
-| `int_report_all_jobs_latest` | view | Newest All Jobs row per job — the ~60 single-source fields |
-| `int_report_lost_leads_latest` | view | Newest Lost Leads row per opportunity |
-| `fct_agent_leads_daily` | table | Sales KPIs, cohort grain: (agent, line, day the lead arrived) |
-| `mart_unmatched_report_rows` | view | Report rows that could not be crosswalked — a review queue |
+| Object                             | Kind  | Purpose                                                              |
+| ---------------------------------- | ----- | -------------------------------------------------------------------- |
+| `int_opportunity_observations`     | view  | Every claim any source made about an opportunity                     |
+| `int_opportunity_latest_by_source` | table | Newest per (opportunity, source) — the fan-in point                  |
+| `int_job_observations`             | view  | Same, for jobs                                                       |
+| `int_job_latest_by_source`         | table | Fan-in point for `core.jobs`                                         |
+| `int_opportunity_quote_crosswalk`  | view  | **`(instance, quote_number)` → GUID.** The bridge every report needs |
+| `int_report_all_jobs_latest`       | view  | Newest All Jobs row per job — the ~60 single-source fields           |
+| `int_report_lost_leads_latest`     | view  | Newest Lost Leads row per opportunity                                |
+| `fct_agent_leads_daily`            | table | Sales KPIs, cohort grain: (agent, line, day the lead arrived)        |
+| `mart_unmatched_report_rows`       | view  | Report rows that could not be crosswalked — a review queue           |
 
 **When a field goes through the observation layer, and when it does not:** only where
 two sources can disagree. Fields with exactly one source join straight in — that is why
@@ -97,41 +98,44 @@ adding sixty nullable columns to every other arm.
 
 ## `raw_smartmoving` — two loaders, not one
 
-| Written by | Tables | How |
-|---|---|---|
-| **n8n, direct SQL** | `webhook_events`, `report_*` | The webhook receiver must record and answer 200 before processing; the report landing is an email path. |
-| **dlt** (`pipeline/run.py`) | `customers_service_window*`, `opportunities_enriched*`, `leads`, `dim_*` | Everything pulled from the API. |
+| Written by                  | Tables                                                                   | How                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| **n8n, direct SQL**         | `webhook_events`, `report_*`                                             | The webhook receiver must record and answer 200 before processing; the report landing is an email path. |
+| **dlt** (`pipeline/run.py`) | `customers_service_window*`, `opportunities_enriched*`, `leads`, `dim_*` | Everything pulled from the API.                                                                         |
 
 Largest tables:
 
-| Table | Rows | Size |
-|---|---:|---:|
-| `report_all_jobs` | 88,349 | 160 MB |
-| `report_lead_status` | 125,996 | 86 MB |
-| `webhook_events` | 91,650 | 61 MB |
-| `report_booked_opportunities` | 37,005 | 34 MB |
-| `report_lost_leads` | 42,932 | 19 MB |
+| Table                         |    Rows |   Size |
+| ----------------------------- | ------: | -----: |
+| `report_all_jobs`             |  88,349 | 160 MB |
+| `report_lead_status`          | 125,996 |  86 MB |
+| `webhook_events`              |  91,650 |  61 MB |
+| `report_booked_opportunities` |  37,005 |  34 MB |
+| `report_lost_leads`           |  42,932 |  19 MB |
 
 ### The six report tables
 
-| Table | Key | Uniquely carries |
-|---|---|---|
-| `report_lead_status` | `Quote #` | The denominator — every lead regardless of outcome. `Received at`, on 100% of rows. |
-| `report_booked_opportunities` | `Quote #` | `Invoiced Amount` — **the only realised revenue in the warehouse**. |
-| `report_lost_leads` | `Quote #` | `Lost Date`, `Reason`, `Time to First Contact`. |
-| `report_all_jobs` | `Job Id` | Actual cost breakdown, crew and truck counts, hourly rates, pricing method. |
-| `report_cancellations` | `Quote #` | **`Cancelled Date`** — nothing else in the warehouse has one. Plus `Amount` and `Reason`. |
-| `report_payments` | hash of the row | `Date`, `Amount`, `Payment Category`, and links to Quote, Job **or Storage Account**. |
+| Table                         | Key             | Uniquely carries                                                                          |
+| ----------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| `report_lead_status`          | `Quote #`       | The denominator — every lead regardless of outcome. `Received at`, on 100% of rows.       |
+| `report_booked_opportunities` | `Quote #`       | `Invoiced Amount` — **the only realised revenue in the warehouse**.                       |
+| `report_lost_leads`           | `Quote #`       | `Lost Date`, `Reason`, `Time to First Contact`.                                           |
+| `report_all_jobs`             | `Job Id`        | Actual cost breakdown, crew and truck counts, hourly rates, pricing method.               |
+| `report_cancellations`        | `Quote #`       | **`Cancelled Date`** — nothing else in the warehouse has one. Plus `Amount` and `Reason`. |
+| `report_payments`             | hash of the row | `Date`, `Amount`, `Payment Category`, and links to Quote, Job **or Storage Account**.     |
 
-⚠️ **`report_payments` is keyed on a hash of the whole row, on purpose.** One customer
-can pay twice against the same quote on the same day, so `Quote` alone would collide
-on the primary key and `ON CONFLICT DO NOTHING` would silently drop the second
-payment. Two byte-identical rows genuinely are one observation.
+⚠️ **`report_payments` is keyed on the row's POSITION plus a hash**
+(`__row000123__abc`), because it has no natural key. A hash alone was tried and
+failed on the first real file: SmartMoving sent 531 rows, two were byte-identical,
+they hashed to the same key, and `ON CONFLICT DO NOTHING` dropped one. The row-count
+check caught it — 530 landed — and blocked the dbt rebuild behind it. Position keeps
+the key unique without breaking idempotency: the same email re-ingested yields the
+same rows in the same order, so the same keys.
 
 ⚠️ **A payment can attach to a storage account that has no quote number.** Storage
 accounts are a **third top-level entity** alongside opportunities and jobs. A payments
 model needs a nullable link to each of the three plus a target discriminator — the
-same shape `core.opportunity_charges` uses for estimated-vs-actual. Forcing every
+same shape `core.opportunity_charges` uses for estimatYed-vs-actual. Forcing every
 payment under an opportunity id would drop every storage payment.
 
 Report tables keep **every generation** — the primary key is
@@ -148,16 +152,16 @@ remember it.
 
 The 9 seeds are the business knowledge no source system holds:
 
-| Seed | Holds |
-|---|---|
-| `dim_instance` | instance → entity, timezones, LOB hint, API key variable name |
-| `branch_timezone` | per-branch timezone override |
-| `dim_agent` | the sales roster: canonical name, aliases, role, `is_sales_agent` |
-| `dim_agent_assignment` | agent × line of business × validity period |
-| `dim_lob_branch` | branch → line of business |
-| `dim_opportunity_status` | status code → boolean flags |
-| `dim_status_map` | report status string → flags |
-| `dim_referral_source`, `dim_sales_team` | loaded, not yet read by any model |
+| Seed                                    | Holds                                                             |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| `dim_instance`                          | instance → entity, timezones, LOB hint, API key variable name     |
+| `branch_timezone`                       | per-branch timezone override                                      |
+| `dim_agent`                             | the sales roster: canonical name, aliases, role, `is_sales_agent` |
+| `dim_agent_assignment`                  | agent × line of business × validity period                        |
+| `dim_lob_branch`                        | branch → line of business                                         |
+| `dim_opportunity_status`                | status code → boolean flags                                       |
+| `dim_status_map`                        | report status string → flags                                      |
+| `dim_referral_source`, `dim_sales_team` | loaded, not yet read by any model                                 |
 
 > ⚠️ **`dbt seed` DROPS AND RECREATES these tables on every build.** A row typed
 > straight into Postgres is destroyed at the next run, silently, while dbt reports
@@ -193,7 +197,7 @@ its policies with it.
 primary key is `(role_name, entity_id)`, so a role can hold many.
 
 `serving` is materialized as **tables**, not views, specifically so RLS applies. A
-serving *view* would need `security_invoker` or it would bypass the policy.
+serving _view_ would need `security_invoker` or it would bypass the policy.
 
 ---
 
@@ -210,12 +214,12 @@ fails when one breaks.
 
 **It only works if the tests exist.** Currently enforced:
 
-| Relationship | Status |
-|---|---|
-| `core.*.<key>` uniqueness and not-null | ✅ tested |
-| `dim_agent_assignment.agent_name` → `dim_agent.agent_name` | ✅ tested |
-| `line_of_business` accepted values | ✅ tested |
-| **any `entity_id` → a canonical entity list** | ❌ **no such list exists** |
+| Relationship                                               | Status                     |
+| ---------------------------------------------------------- | -------------------------- |
+| `core.*.<key>` uniqueness and not-null                     | ✅ tested                  |
+| `dim_agent_assignment.agent_name` → `dim_agent.agent_name` | ✅ tested                  |
+| `line_of_business` accepted values                         | ✅ tested                  |
+| **any `entity_id` → a canonical entity list**              | ❌ **no such list exists** |
 
 That last row is the open gap: `entity_id` is a string propagated up from raw, and
 nothing checks it is a real company. A typo in a seed creates a phantom tenant
@@ -234,7 +238,7 @@ access to what. Fix belongs in `sql/00_bootstrap.sql`.
 
 - **`snake_case`**, plural tables, singular columns.
 - Business keys are always `(entity_id, external_id)` — never a naked source id, because
-  SmartMoving GUIDs are unique only *within* an instance.
+  SmartMoving GUIDs are unique only _within_ an instance.
 - Every timestamp is `timestamptz` in **UTC**. A column holding a local business date is
   suffixed `_local`.
 - Money is `numeric`, cast at the `staging` boundary.

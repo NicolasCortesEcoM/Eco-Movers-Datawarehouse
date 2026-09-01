@@ -42,9 +42,20 @@
 --   * cancellations - `Quote #` is unique per report generation in practice, and the
 --     PK includes report_generated_at, so it is sufficient.
 --   * payments - a customer can make several payments on one quote on one day, so
---     `Quote` alone would collide. n8n hashes the whole row when the configured key
---     field is blank or duplicated (`__nokey__<hash>`), which is the correct fallback:
---     two identical rows ARE the same observation.
+--     `Quote` alone would collide. n8n falls back to `__row<NNNNNN>__<hash>`: the
+--     row's POSITION in the export plus a hash of its contents.
+--
+--     The position is not decoration. A hash alone was tried and failed on the first
+--     real file: SmartMoving sent 531 payment rows, two were byte-identical, they
+--     hashed to the same key, and ON CONFLICT DO NOTHING dropped one. 530 landed, the
+--     row-count assertion threw, and the dbt rebuild and mailbox cleanup behind it
+--     never ran.
+--
+--     Arguing that identical rows "are the same observation" was wrong twice over:
+--     raw must be faithful to what the source sent, and deciding whether two payments
+--     are duplicates belongs in dbt, not in the landing step. Position keeps the key
+--     unique without breaking idempotency - the same email re-ingested yields the same
+--     rows in the same order, so the same keys, so ON CONFLICT still no-ops.
 
 CREATE TABLE IF NOT EXISTS raw_smartmoving.report_cancellations (
   source_instance_id   text        NOT NULL,               -- 'ld' | 'local'
