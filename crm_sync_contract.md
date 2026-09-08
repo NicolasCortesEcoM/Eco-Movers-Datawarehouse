@@ -39,6 +39,7 @@ warehouse at 15% coverage for a month.
 | **Scheduled reports** (email) | Zero | The whole business | Hours | **Coverage and depth.** The backbone. |
 | **API sweep** — `/api/customers` | ~1 call per **200 customers** | Everything with a job in the service-date window | Minutes | **Identity.** GUID ↔ quote crosswalk, status, customer contact. |
 | **API detail** — `/api/opportunities/{id}` | **1 call per opportunity** | Only what you name | Minutes | **Depth on the few.** Charges, payments, addresses, contacts, surveys. |
+| **API quote resolver** — `/api/opportunities/quote/{n}` | **1 call per quote** | Any quote a report names, *including opportunities that have no job* | Minutes | **Identity the sweep structurally cannot reach.** See §2a. |
 
 **The rule that follows:** the sweep is cheap enough to run in every scheduled pass.
 The detail call must always be *triggered by something*, never scheduled broadly. A
@@ -77,6 +78,35 @@ wide, cheap sweep  →  big crosswalk  →  reports attach  →  opportunities a
 
 If report resolution is falling, the crosswalk is the thing to look at first.
 
+### 2a. The quote resolver, and why the sweep alone was never going to be enough
+
+The sweep is anchored on a job's service date (§3), so an opportunity that never got
+a job scheduled cannot enter the crosswalk at any window width. That is the endpoint's
+shape, not a tuning problem — and it is not a small residue. Measured 2026-09-07:
+**9,196 of 15,437 Lead Status quotes (59.6%) had no GUID**, and the gap is biased
+toward the outcomes that never produce a job:
+
+| Report status | Resolved | Unresolved |
+|---|---:|---:|
+| Booked / Closed / Completed | 3,135 | 2,516 |
+| Lost | 2,291 | 4,323 |
+| Bad lead | 81 | 1,463 |
+
+`core.opportunities` therefore reported **50.2% conversion against a true 36.6%** —
+overstated by 13.6 points, structurally, every month.
+
+`GET /api/opportunities/quote/{n}` closes it. Verified live 2026-09-07 against 8
+unresolved quotes including zero-job and null-service-date ones, then against a
+50-quote batch: **50 of 50 resolved, zero 404s.** It is not Premium, it takes the same
+`Include*` flags, and it returns the same payload shape as the detail call — so it
+lands in the same raw table and the crosswalk picks it up with no new dbt model.
+
+⚠️ **It costs one call per quote, the same as the detail call.** It is therefore a
+*budgeted drain*, never a sweep: `--job quote_backfill` selects unresolved quotes
+newest first, takes only as many as `--budget` allows, and records every attempt in
+`raw_smartmoving.quote_resolution_attempts` so a quote that genuinely does not exist
+is not paid for again every night.
+
 ⚠️ **The composite key is not optional.** Quote numbers are unique only *within* an
 instance. A naked quote number will silently attach a `local` quote to an `ld`
 opportunity — no error, just wrong numbers forever.
@@ -102,7 +132,8 @@ limit, not a guess.
   opportunities the sweep returned have at least one job; none had zero. An
   opportunity that never got a job scheduled is **structurally unreachable** by the
   sweep, no matter how wide the window. Bad leads resolve at only **5.6%** for exactly
-  this reason.
+  this reason. **This is now recoverable** — not by widening the window, which cannot
+  help, but by the quote resolver in §2a.
 - **It is blind to money and to `leadStatus`.** It returns status, quote number, and
   customer — never a charge, payment or estimate. This is why a change to a quote
   cannot be detected by the sweep and needs either a report or a trigger.
@@ -190,6 +221,7 @@ which is the best possible time to pay for it.
 | `Enrichment_worker` | every 5 min | Drains the trigger allowlist only |
 | `nightly_reconciliation` | 02:00 | `--refresh-stale-hours 336` |
 | `weekly_dims` | weekly | Dimensions |
+| `quote_backfill` | **not yet scheduled** — run manually until an n8n workflow exists | Resolves Lead Status quotes with no GUID, newest first, capped by `--budget`. See §2a. |
 | `report_bot_all_jobs` | **02:50** (full year) and **10:00, 13:00, 16:00, 20:00** (last 90 days) | Drives the SmartMoving UI so All Jobs is emailed - SmartMoving cannot schedule that report itself. Zero API quota: it is a browser, not a client, and it loads nothing. |
 
 ### The six reports, and what each one uniquely carries
@@ -246,6 +278,7 @@ carries its own budget and ledger; every call is logged to
 | Triggered enrichment (allowlist) | 1 per event | — | ~1,400 |
 | Staleness TTL backstop | — | — | ~6,000 |
 | Dimensions | ~13 | weekly | ~100 |
+| Quote backfill (drain) | 1 per unresolved quote | see §2a | **~9,200 once**, then ~1,500–3,000 |
 | Reports | **0** | 6 | **0** |
 | Webhooks | **0** | — | **0** |
 | **Total** | | | **~15,000 of 250,000 (6%)** |

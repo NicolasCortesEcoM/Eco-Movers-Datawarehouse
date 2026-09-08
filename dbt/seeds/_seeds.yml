@@ -43,6 +43,28 @@ seeds:
           sobre las reglas de linea de negocio).
       - name: api_key_env
         description: Variable de entorno con el API key.
+      - name: data_valid_from
+        description: >
+          First business date this instance's data belongs to THIS company. Records
+          before it are the prior tenant of the same SmartMoving account, and
+          core.opportunities / core.jobs flag them `is_in_scope = false`.
+
+          `ld` = 2025-01-01. That account was in use by another business before then,
+          and the 2026-09-07 sweep back to 2023 pulled 3,170 of their opportunities
+          and ~3,280 of their jobs in. The evidence is unambiguous: pre-2025 `ld` rows
+          carry NO branch, NO sales agent and NO lead date, where 2025+ carries all
+          three on 100% of rows, and the customer bases are disjoint - 50 shared names
+          out of 2,892 and 2,381. Quote numbers run CONTINUOUSLY across the boundary
+          (...9421 then 9391...), which is why the split must be a date and cannot be
+          inferred from the key.
+
+          `local` = 2023-01-01. Clean throughout: 100% branch and agent coverage every
+          year from 2023. Its only ragged edge is 212 jobs dated 2022, the tail of the
+          sweep window (opened 2022-12-27), not a prior tenant.
+
+          Rows are FLAGGED, never deleted - raw keeps what the API returned and an
+          out-of-scope record stays reviewable.
+        data_tests: [not_null]
 
   - name: branch_timezone
     description: >

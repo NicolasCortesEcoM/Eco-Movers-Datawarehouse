@@ -46,25 +46,23 @@ with opps as (
         o.invoiced_amount,
         o.time_to_first_contact_minutes,
         o.lost_reason,
+        o.status_subcategory,
         o.synced_at
     from {{ ref('opportunities') }} o
     where o.created_date_local is not null
       and not o.is_deleted
+      -- Prior-tenant guard. The `ld` SmartMoving account belonged to another business
+      -- before 2025 and a sweep back to 2023 pulled 3,170 of their opportunities in.
+      -- Almost none carry a sales agent, so the filter below already excluded most of
+      -- them by accident - this makes it deliberate, and survives the roster being
+      -- completed. See dim_instance.data_valid_from.
+      and o.is_in_scope
       and nullif(trim(o.sales_assignee_name), '') is not null
 ),
 
--- The line of business belongs to the JOB, and an opportunity can in principle have
--- jobs on more than one line. Five do, out of 15,028. `min` is not a judgement about
--- which line is right - it is a deterministic tie-break so the grain stays stable
--- across builds. Five rows do not justify a rule anyone has to remember.
+-- Shared with fct_lead_source_daily; the tie-break reasoning lives in the model.
 opportunity_line as (
-    select
-        source_instance_id,
-        external_opportunity_id,
-        min(line_of_business)                       as line_of_business,
-        count(distinct line_of_business) > 1        as has_mixed_lines
-    from {{ ref('lines_of_business') }}
-    group by 1, 2
+    select * from {{ ref('int_opportunity_line') }}
 ),
 
 -- Canonical identity, and the roster's own answer to "is this a salesperson".
@@ -120,8 +118,33 @@ aggregated as (
 
         count(*) filter (where has_mixed_lines)           as mixed_line_leads,
 
+        -- NO `quoted_leads` HERE, deliberately. The obvious definition - an
+        -- opportunity that carries an estimate - measures nothing: the Lead Status
+        -- report emits `Estimated Revenue` on every row, so it is never null, and a
+        -- positive value does not mean a quote was given. Measured 2026-09-08:
+        -- opportunities with a zero estimate convert at 50.0% and those with a
+        -- positive one at 48.9%. If a positive estimate meant "quoted", those two
+        -- numbers would not be the same. The quoting step is not observable in this
+        -- data and a column pretending otherwise is worse than its absence.
+
         sum(estimated_final_total) filter (where is_booked)  as booked_estimated_value,
+        -- REALISED revenue, not the estimate. `estimated_final_total` is never null
+        -- but is ZERO on 45% of booked opportunities, so averaging it reports $1,151
+        -- against a true $2,085 - understated by nearly half, and silently. Measured
+        -- 2026-09-08 on 26,614 booked leads: invoiced_amount is present on 96% of
+        -- them and is what the customer was actually billed.
         sum(invoiced_amount)                                 as invoiced_value,
+        count(*) filter (where invoiced_amount > 0)          as invoiced_deals,
+
+        -- WHY the losses happened, from dim_status_map's subcategory. This is the
+        -- half of the funnel a conversion rate cannot explain, and it only became
+        -- answerable once that seed was finally joined: lost-reason coverage went
+        -- from 56.6% to 95.6% of lost opportunities on 2026-09-08.
+        count(*) filter (where is_lost and status_subcategory = 'lost_competitor') as lost_to_competitor,
+        count(*) filter (where is_lost and status_subcategory = 'lost_price')      as lost_on_price,
+        count(*) filter (where is_lost and status_subcategory = 'lost_contact')    as lost_no_contact,
+        count(*) filter (where is_lost and status_subcategory = 'lost_diy')        as lost_to_diy,
+        count(*) filter (where is_lost and status_subcategory is null)             as lost_reason_unknown,
 
         -- Only the Lost Leads report carries this, so it is populated for lost
         -- records and null elsewhere. Averaged over the rows that have it.
@@ -166,8 +189,24 @@ select
          then round(100.0 * a.booked_leads / a.valid_leads, 1)
     end                                                   as conversion_pct,
 
+    -- Over the deals that actually have a figure, not over all booked deals: a
+    -- missing invoice is "not billed yet", and dividing by it would report a
+    -- shrinking deal size every time a new booking lands. Null, not zero, with no
+    -- denominator - a zero averages into a report as a real result.
+    case when a.invoiced_deals > 0
+         then round(a.invoiced_value / a.invoiced_deals, 2)
+    end                                                   as avg_invoiced_deal_size,
+    a.invoiced_deals,
+
     a.booked_estimated_value,
     a.invoiced_value,
+
+    a.lost_to_competitor,
+    a.lost_on_price,
+    a.lost_no_contact,
+    a.lost_to_diy,
+    a.lost_reason_unknown,
+
     a.avg_minutes_to_first_contact,
     a.leads_with_contact_timing,
 

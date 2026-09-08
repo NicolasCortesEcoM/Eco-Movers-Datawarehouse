@@ -104,3 +104,16 @@ models:
       - name: observed_at
         data_tests: [not_null]
 
+  - name: int_opportunity_line
+    description: >
+      One line of business per opportunity, collapsed from its jobs. `min` is a
+      deterministic tie-break, not a judgement - five opportunities out of 15,028
+      span two lines, and has_mixed_lines records that a choice was made. Shared by
+      fct_agent_leads_daily and fct_lead_source_daily so the tie-break exists once.
+    columns:
+      - name: external_opportunity_id
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests: [not_null]
+      - name: has_mixed_lines
+        data_tests: [not_null]

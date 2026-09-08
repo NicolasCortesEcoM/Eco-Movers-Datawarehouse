@@ -42,3 +42,6 @@ Lost service no longer needed moving themselves,lost,lost_diy,1,0,0,0,1,0,0,DIY 
 Lost STOP requested,lost,lost_stop_requested,1,0,0,0,1,0,0,Opted out of communications.
 Lost unable to contact,lost,lost_contact,1,0,0,0,1,0,0,Could not reach after attempts.
 Lost unable to service,lost,lost_no_service,1,0,0,0,1,0,0,Ops could not fulfill the job.
+Lost no response after quote given 1 6 follow ups completed,lost,lost_contact,1,0,0,0,1,0,0,No reply after the quote was sent and 1-6 follow-ups. Added 2026-09-08 from 2651 unmatched rows.
+Lost no response CMET from 1 to 6 completed,lost,lost_contact,1,0,0,0,1,0,0,No reply after 1-6 CMET attempts. Added 2026-09-08 from 576 unmatched rows.
+Bad lead we don t offer service requested unable to service,bad_lead,bad_service,0,0,0,0,0,1,0,Longer variant of the bad_service string. Added 2026-09-08 from 76 unmatched rows.

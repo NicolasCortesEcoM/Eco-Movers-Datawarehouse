@@ -101,6 +101,34 @@ bkd_extra as (
     order by x.external_opportunity_id, r.source_instance_id, r.report_generated_at desc
 ),
 
+-- THE MARKETING CHANNEL of each opportunity, from the dim_referral_source seed.
+--
+-- Seeded, documented and tested since the start, and read by nothing until now. It
+-- resolves 99.1% of in-scope opportunities that carry a referral source, and 90% of
+-- them get a channel_group - far better than the seed's own fill rate suggests,
+-- because the 41 rows that carry a channel are the high-volume sources.
+--
+-- DISTINCT ON is load-bearing. The seed intentionally holds several raw spellings of
+-- one source so every CRM value resolves ("FMC Yesler Towers" and "FMC- Yesler
+-- Towers"), and norm_text collapses them - two pairs collide today. Without the
+-- dedupe this join fans out and silently duplicates opportunities, which would
+-- inflate every count built on them. tests/assert_referral_source_collisions_agree.sql
+-- fails if colliding rows ever stop agreeing on what they mean.
+referral as (
+    select distinct on ({{ norm_text('referral_source_raw') }})
+        {{ norm_text('referral_source_raw') }} as referral_key,
+        nullif(trim(source_clean), '')         as referral_source_clean,
+        nullif(trim(channel_group), '')        as referral_channel_group,
+        nullif(trim(platform), '')             as referral_platform,
+        -- Already boolean: dbt's seed type inference turns the CSV's TRUE/FALSE into
+        -- a real boolean, so this must NOT be treated as text. NULL stays NULL - "we
+        -- do not know" and "not paid" are different answers, and a marketing ROI
+        -- denominator must not conflate them.
+        is_paid                                as referral_is_paid
+    from {{ ref('dim_referral_source') }}
+    order by 1, referral_source_raw
+),
+
 base as (
     select distinct
         opportunity_key,
@@ -320,6 +348,50 @@ select
     coalesce(s.is_bad_lead,  false)                         as is_bad_lead,
     coalesce(s.is_open,      false)                         as is_open,
     coalesce(s.is_valid_lead, true)                         as is_valid_lead,
+    -- PRIOR-TENANT GUARD. The `ld` SmartMoving account was in use by a different
+    -- business before 2025, and the 2026-09-07 sweep back to 2023 pulled its records
+    -- in alongside ours - they are indistinguishable by key, because quote numbers run
+    -- continuously across the handover. They are distinguishable by date, and by their
+    -- shape: pre-2025 `ld` rows carry no branch, no sales agent and no lead date.
+    --
+    -- Flagged, never filtered out here. `core` keeps everything the sources returned;
+    -- it is the KPI marts that exclude out-of-scope rows, so the exclusion is visible
+    -- and reversible instead of being a WHERE clause nobody can see. The boundary per
+    -- instance lives in dim_instance.data_valid_from.
+    --
+    -- coalesce(..., true): a record with no date at all is not PROVABLY prior-tenant,
+    -- and dropping it on a null would quietly lose in-scope rows.
+    coalesce(
+        coalesce(r.service_date,
+                 (r.created_at_utc at time zone coalesce(b.timezone, i.timezone))::date)
+            >= i.data_valid_from::date,
+        true
+    )                                   as is_in_scope,
+
+    -- THE LOST/CANCELLED SUBCATEGORY, which the status integer cannot express.
+    --
+    -- dim_status_map has been seeded, tested and documented since the beginning, and
+    -- three separate comments in this repo asserted that the Lead Status report joined
+    -- to it - stg_smartmoving__report_lead_status.sql, macros/norm_text.sql and
+    -- sql/33_report_lead_status.sql all say so. None of them was true: the join was
+    -- never written, and the subcategory never reached core. Measured 2026-09-08, it
+    -- resolves 93.5% of in-scope opportunities that carry a pipeline_status.
+    --
+    -- It contributes the SUBCATEGORY ONLY. status_category and every is_* flag stay
+    -- with dim_opportunity_status, because the platform integer is authoritative for
+    -- the outcome and the report string is not - 185 rows read `Closed` while the API
+    -- said Booked. Two vocabularies for one question is how they drift.
+    rs.referral_source_clean,
+    rs.referral_channel_group,
+    rs.referral_platform,
+    rs.referral_is_paid,
+
+    sm.status_subcategory,
+
+    -- What the REPORT thinks the category is, kept beside the authoritative one rather
+    -- than merged into it. Where the two disagree, that disagreement is the signal.
+    sm.status_category                                      as status_category_reported,
+
     b.timezone,
     (r.created_at_utc at time zone coalesce(b.timezone, i.timezone))::date as created_date_local
 from resolved r
@@ -330,3 +402,7 @@ left join {{ ref('branches') }} b
       and {{ norm_text('b.branch_name') }} = {{ norm_text('r.branch_name') }}
 left join {{ ref('dim_instance') }} i
        on i.instance_id = r.source_instance_id
+left join {{ ref('dim_status_map') }} sm
+       on {{ norm_text('sm.status_raw') }} = {{ norm_text('r.pipeline_status') }}
+left join referral rs
+       on rs.referral_key = {{ norm_text('r.referral_source') }}

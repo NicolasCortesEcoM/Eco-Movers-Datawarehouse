@@ -39,6 +39,11 @@ INCLUDE_ALL = {
 
 _ISO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
+# How old the recorded "complete sweep" may be before the deletion pass refuses to
+# infer anything from absence. Two days covers a missed nightly run without letting a
+# month-old note keep deciding what is deleted.
+SWEEP_PROOF_MAX_AGE = timedelta(days=2)
+
 
 def _opp_hash(opp: dict) -> str:
     """Signature of EVERYTHING the cheap /api/customers sweep exposes for one
@@ -158,12 +163,21 @@ def smartmoving_source(
     # it crashed on every invocation, on an older dlt it did not. Verified on the
     # droplet by calling dlt's own get_all_types_of_class_in_union with each hint.
     opp_ids: Any = None,
+    # Same `Any` annotation, same reason as opp_ids above - a parameterised generic
+    # in a Union makes dlt's config inspection raise before the source is built.
+    quotes: Any = None,
     call_budget: int = 300,
     pace: float = 0.6,
     hot_ttl_hours: float = 24.0,
     cold_ttl_hours: float = 336.0,
     refresh_stale_hours: float | None = None,
     sweep_only: bool = False,
+    # Page cap for every paginated pull. The client's own default is 50, which is
+    # ample for the scheduled windows and SILENTLY TRUNCATES a historical one - a
+    # 2023+ customers sweep on `local` is 235 pages and a 2023+ leads pull is 159.
+    # A truncated sweep looks exactly like a complete one from the outside, so this
+    # is raised explicitly by the caller rather than guessed at here.
+    max_pages: int = 50,
 ):
     cfg = INSTANCES[instance_id]
     # pace: proactive throttle (~1.6 calls/s) to stay under SmartMoving's
@@ -247,12 +261,98 @@ def smartmoving_source(
         yield opportunities_enriched_by_id
         yield opportunity_deletions_by_id
 
+    # QUOTE BACKFILL - resolve report quotes that no API source has ever seen.
+    #
+    # WHY THIS EXISTS. The customers sweep is anchored on a job's SERVICE DATE, so
+    # an opportunity that never got a job scheduled is structurally unreachable by
+    # it, no matter how wide the window. That is the shape of the endpoint, not a
+    # tuning problem. Those opportunities never enter
+    # int_opportunity_quote_crosswalk, so every scheduled report row keyed on their
+    # Quote # has nothing to attach to and lands in mart_unmatched_report_rows.
+    #
+    # Measured on the droplet 2026-09-07: 9,196 of 15,437 Lead Status quotes (59.6%)
+    # had no GUID, and the gap is BIASED - 95% of bad leads and 65% of lost leads
+    # were invisible while half the booked ones resolved fine, so core.opportunities
+    # reported 50.2% conversion against a true 36.6%.
+    #
+    # GET /api/opportunities/quote/{n} closes it. Verified live against 8 unresolved
+    # quotes, including zero-job and null-service-date ones: identical response
+    # shape to /api/opportunities/{id}, same Include* flags, and NOT Premium. So the
+    # payload lands in the same raw table the detail call already feeds and the
+    # crosswalk picks it up with no new dbt model.
+    #
+    # One call per quote - the same price as the detail call - so this is a BUDGETED
+    # DRAIN, never a sweep. run.py selects the unresolved quotes newest first, only
+    # as many as --budget allows, and the next run resumes where this one stopped.
+    if quotes:
+        # Eager extraction, deliberately. ONE call per quote has to produce rows in
+        # TWO tables - the payload and the attempt ledger - and dlt interleaves
+        # resources rather than running them in declaration order, so a lazy
+        # generator feeding the second table through shared state would let the
+        # ledger flush before the payloads it describes. --budget bounds the batch,
+        # so it also bounds what is held here.
+        quote_payloads: list[dict] = []
+        quote_attempts: list[dict] = []
+        for q in quotes:
+            q = str(q)
+            try:
+                detail = sm.get(
+                    "/api/opportunities/quote/" + q, allow_missing=True, **INCLUDE_ALL
+                )
+            except BudgetExceeded:
+                # Stop cleanly instead of propagating. Everything already fetched,
+                # and every attempt recorded beside it, must land - otherwise the
+                # next run pays a second time for the quotes this one already bought.
+                break
+            if detail:
+                detail["_sm_snapshot_at"] = extracted_at
+                # Which quote produced this row. The detail call and the quote call
+                # write the same table, and only this column says which door a row
+                # came through when the backfill is being audited.
+                detail["_sm_resolved_from_quote"] = q
+                quote_payloads.append(stamp(detail))
+            quote_attempts.append(
+                stamp(
+                    {
+                        "quote_number": q,
+                        "resolved": bool(detail),
+                        "external_opportunity_id": (detail or {}).get("id"),
+                        "_attempted_at": extracted_at,
+                    }
+                )
+            )
+
+        @dlt.resource(
+            name="opportunities_enriched",
+            primary_key=("source_instance_id", "id"),
+            write_disposition="merge",
+        )
+        def opportunities_enriched_by_quote():
+            yield from quote_payloads
+
+        @dlt.resource(
+            name="quote_resolution_attempts",
+            primary_key=("source_instance_id", "quote_number"),
+            write_disposition="merge",
+        )
+        def quote_resolution_attempts():
+            # The ledger that stops the drain paying for the same dead quote every
+            # night. A 404 means SmartMoving has no opportunity under that quote at
+            # all - which is NOT a deletion, because we never knew of one, so no
+            # soft-delete marker is written here. run.py re-offers a failed quote
+            # after 30 days in case the gap was transient.
+            yield from quote_attempts
+
+        yield opportunities_enriched_by_quote
+        yield quote_resolution_attempts
+
     if "leads" in jobs:
 
         @dlt.resource(name="leads", primary_key=("source_instance_id", "id"), write_disposition="merge")
         def leads():
             for row in sm.paginate(
                 "/api/leads",
+                max_pages=max_pages,
                 From=leads_from or _ymd(today_local),
                 To=leads_to or _ymd(today_local),
                 IncludeBad=True,
@@ -327,6 +427,7 @@ def smartmoving_source(
             try:
                 for row in sm.paginate(
                     "/api/customers",
+                    max_pages=max_pages,
                     FromServiceDate=sweep_from,
                     ToServiceDate=sweep_to,
                     IncludeOpportunityInfo=True,
@@ -347,9 +448,25 @@ def smartmoving_source(
             # early above deliberately skips this, so the deletion pass keeps using
             # the previous COMPLETE sweep rather than concluding that every
             # opportunity the truncated walk never reached has vanished.
-            dlt.current.source_state()["sweep"] = {
-                "at": now_iso, "from": sweep_from, "to": sweep_to,
-            }
+            #
+            # ...and only a run that also RECORDED THE SIGHTINGS proves it. In
+            # sweep_only mode the `opportunities_enriched` transformer is never
+            # yielded, so no opportunity's `seen` watermark is refreshed by this
+            # walk. Writing the presence window here anyway tells the deletion pass
+            # "everything in [from,to] was checked at `at`" while leaving every
+            # `seen` older than `at` - so the next deletion pass concludes that
+            # everything in the window has vanished.
+            #
+            # That is not hypothetical. The 2026-08-08 historical backfill was a
+            # --sweep-only run; it wrote {from: 20250204, to: 20270204}, and on
+            # 2026-08-13 the deletion pass marked 550 `ld` opportunities as
+            # sweep_disappearance. Four were re-checked against the API on
+            # 2026-09-07 and all four were alive - two of them Booked with a future
+            # service date. 203 were still flagged is_deleted a month later.
+            if not sweep_only:
+                dlt.current.source_state()["sweep"] = {
+                    "at": now_iso, "from": sweep_from, "to": sweep_to,
+                }
 
         @dlt.transformer(
             data_from=enrich_sweep,
@@ -464,9 +581,38 @@ def smartmoving_source(
             # `opportunity-deleted` webhook drives the 404 path immediately.
             st = dlt.current.source_state()
             opps = _migrate_opp_state(st, now_iso)
+            now_dt = datetime.now(timezone.utc)
 
             sweep = st.get("sweep") or {}
             swept_at = _parse_iso(sweep.get("at"))
+
+            # A STALE PRESENCE PROOF IS NOT A PRESENCE PROOF.
+            #
+            # The whole deletion pass rests on "a complete sweep of [from,to] happened
+            # at `at`, and this opportunity was not in it". That argument only holds
+            # while `at` is recent. Once the note ages, every opportunity whose `seen`
+            # watermark has since gone stale looks deleted, and the older the note the
+            # more of them there are.
+            #
+            # This is not hypothetical. On 2026-09-08 the note in state was
+            # {at: 2026-08-08, from: 20250204, to: 20270204} - a MONTH old, written by
+            # a --sweep-only backfill that recorded no sightings at all, and never
+            # overwritten since because the note is only rewritten by a sweep that
+            # paginates to completion and the scheduled runs exhaust their budget
+            # first. Five days after it was written the deletion pass marked 550 `ld`
+            # opportunities as vanished; four were re-checked against the API a month
+            # later and all four were alive, two of them Booked with a future service
+            # date.
+            #
+            # Deletion is a backstop anyway: `opportunity-deleted` drives the 404 path
+            # immediately, which is both faster and direct evidence rather than
+            # inference from absence. So the safe failure mode here is to do nothing.
+            if swept_at is not None and (now_dt - swept_at) > SWEEP_PROOF_MAX_AGE:
+                print(f"[{instance_id}] deletion pass skipped: the last complete sweep "
+                      f"is from {sweep.get('at')}, older than {SWEEP_PROOF_MAX_AGE}. "
+                      f"Absence proves nothing against a stale sweep.")
+                swept_at = None
+
             if swept_at is not None:
                 s_from, s_to = sweep.get("from"), sweep.get("to")
                 for rec in opps.values():

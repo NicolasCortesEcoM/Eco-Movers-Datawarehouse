@@ -185,7 +185,7 @@ adding sixty nullable columns to every other arm.
 | Written by                  | Tables                                                                   | How                                                                                                     |
 | --------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | **n8n, direct SQL**         | `webhook_events`, `report_*`                                             | The webhook receiver must record and answer 200 before processing; the report landing is an email path. |
-| **dlt** (`pipeline/run.py`) | `customers_service_window*`, `opportunities_enriched*`, `leads`, `dim_*` | Everything pulled from the API.                                                                         |
+| **dlt** (`pipeline/run.py`) | `customers_service_window*`, `opportunities_enriched*`, `leads`, `dim_*`, `quote_resolution_attempts` | Everything pulled from the API.                                                                         |
 
 Largest tables:
 
@@ -225,6 +225,36 @@ payment under an opportunity id would drop every storage payment.
 Report tables keep **every generation** — the primary key is
 `(source_instance_id, report_generated_at, row_key)` with `ON CONFLICT DO NOTHING`, so
 re-ingesting the same email is a no-op. `sql/34_report_retention.sql` prunes them.
+
+⚠️ **Two different Lead Status schedules land in `report_lead_status`.** The 03:0x
+generation covers `1/1/2026 → today` (~15,400 rows); every other generation covers a
+rolling ~90 days (~5,200 rows). They are different reports, not fresher snapshots of
+one report. Any model that filters to "the newest generation" therefore sees a
+population that changes size by 3× depending on the hour — which is exactly what
+`marts.mart_unmatched_report_rows` does, so its row count oscillates between ~3,000
+and ~9,100 and must not be read as a trend. Discovered 2026-09-07.
+
+### `quote_resolution_attempts` — the ledger that bounds the quote drain
+
+One row per Quote # the backfill has asked the API about. Grain
+`(source_instance_id, quote_number)`, merge.
+
+| Column | Meaning |
+| --- | --- |
+| `quote_number` | The quote asked about. |
+| `resolved` | Whether `/api/opportunities/quote/{n}` returned an opportunity. |
+| `external_opportunity_id` | The GUID it returned, when it did. |
+| `_attempted_at` | When. `run.py` re-offers a failed quote after 30 days. |
+
+**Why it exists.** The resolver costs one call per quote, so without a memory of what
+has already been asked, a nightly drain would pay for the same non-existent quote
+every night forever. It deliberately records the *attempt*, not just the success — a
+success is already visible in the crosswalk, and it is the failures that need
+remembering.
+
+It is **not** a deletion signal. A 404 here means SmartMoving has no opportunity under
+that quote at all, which is different from one that existed and was removed; no
+soft-delete marker is written. Deletions stay in `opportunity_deletions`.
 
 ---
 

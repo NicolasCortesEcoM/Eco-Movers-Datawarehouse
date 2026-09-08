@@ -8,15 +8,15 @@ models:
       API sweep window - so the reason column matters more than the count.
     columns:
       - name: unmatched_key
-        tests: [not_null, unique]
+        data_tests: [not_null, unique]
       - name: unmatched_reason
-        tests:
+        data_tests:
           - accepted_values:
               values: ['no_quote_number', 'quote_not_in_api']
       - name: source_instance_id
-        tests: [not_null]
+        data_tests: [not_null]
       - name: entity_id
-        tests: [not_null]
+        data_tests: [not_null]
 
   - name: fct_agent_leads_daily
     description: >
@@ -42,45 +42,111 @@ models:
     columns:
       - name: agent_day_key
         description: entity:agent:line:YYYYMMDD. Readable on purpose.
-        tests: [not_null, unique]
+        data_tests: [not_null, unique]
       - name: entity_id
-        tests: [not_null]
+        data_tests: [not_null]
       - name: agent_name
         description: Canonical name from core.agents, never the raw CRM string.
-        tests: [not_null]
+        data_tests: [not_null]
       - name: line_of_business
         description: >
           `unassigned` where the opportunity has no job and therefore no line. Those
           rows are kept so an agent's total still reconciles against
           core.opportunities.
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               values: ['local', 'long_distance', 'commercial', 'unassigned']
       - name: lead_received_date
-        tests: [not_null]
+        data_tests: [not_null]
       - name: valid_leads
         description: The conversion denominator. Excludes bad leads, which were never winnable.
-        tests: [not_null]
+        data_tests: [not_null]
       - name: booked_leads
-        tests: [not_null]
+        data_tests: [not_null]
       - name: open_leads
         description: The maturity signal. A cohort with open leads has not finished settling.
-        tests: [not_null]
+        data_tests: [not_null]
       - name: conversion_pct
         description: >
           booked_leads / valid_leads. NULL rather than 0 when there is no denominator,
           so an empty day cannot average into a report as a real 0% performance.
       - name: is_sales_agent
         description: false for shared CRM accounts. Filter on it; they are flagged, not dropped.
-        tests: [not_null]
+        data_tests: [not_null]
       - name: is_within_assignment
         description: >
           Whether the lead landed in a line dim_agent_assignment says the agent covers
           on that date. A signal, never a filter: a run of false means the roster is
           stale or work is being routed somewhere unexpected.
-        tests: [not_null]
+        data_tests: [not_null]
       - name: synced_at
         description: Inherited from the underlying opportunities, not the build time.
-        tests: [not_null]
+        data_tests: [not_null]
+      - name: invoiced_deals
+        description: >
+          Booked deals that carry a realised invoice figure. The denominator for
+          avg_invoiced_deal_size - never divide by booked_leads, which counts deals
+          not yet billed.
+        data_tests: [not_null]
+      - name: avg_invoiced_deal_size
+        description: >
+          Realised revenue per billed deal. Deliberately NOT based on
+          estimated_final_total: that column is never null but is zero on 45% of
+          booked opportunities, so averaging it reports $1,151 against a true $2,085.
+      - name: lost_to_competitor
+        description: From dim_status_map's subcategory, joined for the first time on 2026-09-08.
+        data_tests: [not_null]
+      - name: lost_on_price
+        data_tests: [not_null]
+      - name: lost_no_contact
+        data_tests: [not_null]
+      - name: lost_reason_unknown
+        description: >
+          Lost with no subcategory resolved - 913 of 20,770 lost opportunities (4.4%)
+          on 2026-09-08. A rise means the CRM emitted a status string dim_status_map
+          does not know, and the seed needs a row.
+        data_tests: [not_null]
+  - name: fct_lead_source_daily
+    description: >
+      Lead quality and conversion by marketing channel. Grain:
+      (entity_id, channel_group, line_of_business, lead_received_date) - a COHORT
+      row, same as fct_agent_leads_daily: it describes what became of the leads that
+      arrived on that day, whenever the outcome landed.
 
+      Recent cohorts are not comparable to old ones; read open_leads beside any
+      conversion figure. Excludes prior-tenant rows via core.opportunities.is_in_scope.
+
+      This is where marketing spend attaches when it arrives: cost per lead, CAC and
+      ROAS become joins onto this table at (date, channel), not new models.
+    columns:
+      - name: source_day_key
+        description: Grain key. Readable concatenation, not a hash.
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: channel_group
+        description: >
+          Marketing channel, or '(unmapped)' where the CRM referral source is not in
+          dim_referral_source. Unmapped is a real bucket carrying ~6,200 in-scope
+          opportunities - never filter it away silently.
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['local', 'long_distance', 'commercial', 'unclassified']
+      - name: lead_received_date
+        data_tests: [not_null]
+      - name: leads_received
+        data_tests: [not_null]
+      - name: booked_leads
+        data_tests: [not_null]
+      - name: invoiced_deals
+        data_tests: [not_null]
+      - name: conversion_pct
+        description: >
+          Against VALID leads, not everything received. Null when there is no
+          denominator - a zero would average into a report as a real 0%.
+      - name: synced_at
+        data_tests: [not_null]

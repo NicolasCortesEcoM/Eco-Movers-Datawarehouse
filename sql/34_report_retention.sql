@@ -4,6 +4,7 @@
 -- Policy (crm_sync_contract.md section 9):
 --   * Last 10 days  -> keep EVERY generation.
 --   * Older         -> keep ONE generation per calendar day.
+--   * Flagged `_is_historical_backfill` -> NEVER pruned. See 36_historical_backfill_marker.sql.
 --
 -- Why this exists at all: six report sends a day at ~4,800 rows is ~29,000 rows a
 -- day from Lead Status alone, about 10 million a year. The droplet is at 90% disk.
@@ -30,6 +31,10 @@ DECLARE
   deleted      bigint;
   total        bigint := 0;
   keep_all_for interval := interval '10 days';
+  -- Predicate that exempts a flagged generation. Empty string when the column is
+  -- not there yet, so this file does not depend on 36 having run first - the
+  -- deploy replays sql/*.sql in lexicographic order and 34 comes first.
+  keep_flagged text;
 BEGIN
   FOREACH tbl IN ARRAY ARRAY[
     'report_lead_status',
@@ -43,6 +48,20 @@ BEGIN
     IF to_regclass('raw_smartmoving.' || tbl) IS NULL THEN
       CONTINUE;
     END IF;
+
+    -- A historical backfill is exempt. It is excluded from the ranking as well as
+    -- from the DELETE: left in, it would take the rn=1 slot for its day and push a
+    -- routine generation into rn>1, deleting the wrong one. See 36 for why these
+    -- exist at all.
+    SELECT CASE WHEN EXISTS (
+             SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'raw_smartmoving'
+                AND table_name   = tbl
+                AND column_name  = '_is_historical_backfill')
+           THEN ' AND NOT %1$I._is_historical_backfill '
+           ELSE ''
+           END
+      INTO keep_flagged;
 
     EXECUTE format($f$
       WITH ranked AS (
@@ -60,13 +79,17 @@ BEGIN
           LEFT JOIN staging.dim_instance i
                  ON i.instance_id = r.source_instance_id
          WHERE r.report_generated_at < now() - %2$L::interval
+           %3$s
       )
       DELETE FROM raw_smartmoving.%1$I t
        USING ranked
        WHERE t.source_instance_id  = ranked.source_instance_id
          AND t.report_generated_at = ranked.report_generated_at
          AND ranked.rn > 1
-    $f$, tbl, keep_all_for);
+         %4$s
+    $f$, tbl, keep_all_for,
+         format(keep_flagged, 'r'),
+         format(keep_flagged, 't'));
 
     GET DIAGNOSTICS deleted = ROW_COUNT;
     total := total + deleted;

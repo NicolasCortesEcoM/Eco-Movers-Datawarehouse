@@ -69,26 +69,39 @@ models:
         description: Newest moment any source spoke about this opportunity.
         data_tests: [not_null]
 
-  - name: opportunity_charges
-    description: >
-      Charge lines, estimated and actual, separated by charge_kind. Grain:
-      (source_instance_id, external_job_id, charge_kind, charge_seq). Single-source,
-      so no observation layer.
-    columns:
-      - name: charge_key
-        data_tests: [not_null, unique]
-      - name: charge_kind
-        data_tests:
-          - not_null
-          - accepted_values: {values: ['estimated', 'actual']}
-      - name: total_cost
+      - name: is_in_scope
+        description: >
+          False when the row predates dim_instance.data_valid_from - i.e. it belongs
+          to the business that used this SmartMoving account before us. The KPI marts
+          filter on it; core keeps the rows so the exclusion stays visible.
         data_tests: [not_null]
-      - name: external_opportunity_id
-        data_tests:
-          - not_null
-          - relationships:
-              to: ref('opportunities')
-              field: external_opportunity_id
+      - name: referral_channel_group
+        description: >
+          Marketing channel from dim_referral_source - Paid Search, Paid Social, GBP,
+          Organic, Referral, Affiliate, Direct, AI. Present on 90% of in-scope
+          opportunities; null where the seed row exists but its channel is still blank
+          (long-tail sources) or where the CRM value is not in the seed at all.
+      - name: referral_platform
+        description: Google | Meta | Bing | Yelp | Word of Mouth | Return, from the same seed.
+      - name: referral_is_paid
+        description: >
+          True when the source needs marketing spend to produce the lead. NULL, not
+          false, when the seed is silent - "unknown" and "free" are different answers
+          and a ROI denominator must not conflate them.
+      - name: referral_source_clean
+        description: Tidied display name for the source. Group by channel or platform, not by this.
+      - name: status_subcategory
+        description: >
+          Lost/cancelled/bad-lead subcategory from dim_status_map, e.g. lost_contact,
+          lost_competitor, bad_duplicate. Nullable on purpose: it is null for the CRM
+          pipeline labels the seed deliberately does not map (CMET, Follow Up,
+          Tentative Booking) and for any report string not yet in the seed. 93.5% of
+          in-scope opportunities carrying a pipeline_status resolve, measured 2026-09-08.
+      - name: status_category_reported
+        description: >
+          The category the REPORT string implies. Kept beside status_category, which
+          comes from the authoritative platform integer, rather than merged into it -
+          where the two disagree that is a finding, not noise. Never group by this.
 
   - name: opportunity_payments
     description: >
@@ -126,6 +139,12 @@ models:
         description: Local business date of the job (never timezone-converted).
         data_tests: [not_null]
       - name: synced_at
+        data_tests: [not_null]
+      - name: is_in_scope
+        description: >
+          False when the row predates dim_instance.data_valid_from - i.e. it belongs
+          to the business that used this SmartMoving account before us. The KPI marts
+          filter on it; core keeps the rows so the exclusion stays visible.
         data_tests: [not_null]
 
   - name: leads
@@ -181,7 +200,44 @@ models:
       - name: entity_id
         data_tests: [not_null]
 
+  - name: lines_of_business
+    description: >
+      The line of business of each job. Grain: (source_instance_id, external_job_id),
+      one row per job, resolved from the instance hint and the branch->LOB seed.
+
+      This model shipped with no entry here at all, so it had zero tests while
+      feeding fct_agent_leads_daily - which does test line_of_business downstream.
+      It also has no synced_at, unlike every other core table; that is a real gap,
+      left alone here because adding it changes the model rather than its contract.
+    columns:
+      - name: job_key
+        description: Stable row id, same key as core.jobs.
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: source_instance_id
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['ld', 'local']}
+      - name: external_job_id
+        description: FK to core.jobs.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('jobs')
+              field: external_job_id
+      - name: line_of_business
+        data_tests: [not_null]
+      - name: is_unclassified
+        description: >
+          True when no rule matched and line_of_business fell back to a default.
+          207 of 63,441 rows on 2026-09-08 - watch it, do not gate on it.
+        data_tests: [not_null]
+
   - name: agents
+    # Grain is the PAIR (entity_id, source_agent_name), asserted by the singular test
+    # tests/assert_agents_unique_per_entity.sql. Not a `unique` on source_agent_name:
+    # that passes only while there is one entity.
     description: >
       The canonical sales roster: every salesperson name the CRM has written,
       resolved to one canonical person with a role and an active flag.
@@ -192,7 +248,7 @@ models:
     columns:
       - name: source_agent_name
         description: The raw CRM string. Join key from core.opportunities.sales_assignee_name.
-        data_tests: [not_null, unique]
+        data_tests: [not_null]
       - name: agent_name
         description: Canonical name. Group by this, never by source_agent_name.
         data_tests: [not_null]

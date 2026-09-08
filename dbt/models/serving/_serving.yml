@@ -44,3 +44,55 @@ models:
         data_tests: [not_null]
       - name: lead_disposition
         description: New / In Progress / Lost / Bad Lead (derived from reasons).
+
+  - name: sales_agent_daily_v1
+    description: >
+      PUBLIC CONTRACT. Sales performance per agent, line of business and lead-arrival
+      day - a cohort grain. Recent cohorts are not comparable to old ones; read
+      open_leads beside conversion_pct.
+    columns:
+      - name: agent_day_key
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('fct_agent_leads_daily')
+              field: agent_day_key
+      - name: entity_id
+        data_tests: [not_null]
+      - name: agent_name
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests: [not_null]
+      - name: lead_received_date
+        data_tests: [not_null]
+      - name: leads_received
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]
+
+  - name: lead_source_daily_v1
+    description: >
+      PUBLIC CONTRACT. Lead volume, quality and conversion per marketing channel,
+      line of business and lead-arrival day. Same cohort grain and maturity caveat.
+      '(unmapped)' is a real channel bucket - do not filter it away.
+    columns:
+      - name: source_day_key
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('fct_lead_source_daily')
+              field: source_day_key
+      - name: entity_id
+        data_tests: [not_null]
+      - name: channel_group
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests: [not_null]
+      - name: lead_received_date
+        data_tests: [not_null]
+      - name: leads_received
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]

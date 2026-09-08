@@ -172,6 +172,21 @@ select
     aj.hourly_rate_quoted, aj.hourly_rate_billed,
     aj.volume_cuft, aj.weight_lbs,
 
+    -- PRIOR-TENANT GUARD. The `ld` SmartMoving account was in use by a different
+    -- business before 2025, and the 2026-09-07 sweep back to 2023 pulled its records
+    -- in alongside ours - they are indistinguishable by key, because quote numbers run
+    -- continuously across the handover. They are distinguishable by date, and by their
+    -- shape: pre-2025 `ld` rows carry no branch, no sales agent and no lead date.
+    --
+    -- Flagged, never filtered out here. `core` keeps everything the sources returned;
+    -- it is the KPI marts that exclude out-of-scope rows, so the exclusion is visible
+    -- and reversible instead of being a WHERE clause nobody can see. The boundary per
+    -- instance lives in dim_instance.data_valid_from.
+    --
+    -- coalesce(..., true): a record with no date at all is not PROVABLY prior-tenant,
+    -- and dropping it on a null would quietly lose in-scope rows.
+    coalesce(r.service_date >= i.data_valid_from::date, true) as is_in_scope,
+
     coalesce(o.timezone, i.timezone)    as timezone,
     greatest(r.job_synced_at, coalesce(o.synced_at, '-infinity'::timestamptz)) as synced_at
 from resolved r

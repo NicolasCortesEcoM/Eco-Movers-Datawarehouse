@@ -9,7 +9,11 @@
 **Current workstream:** enriching **leads** and **opportunities** to the scheduled-report field set.
 **Where that stands:** P0-P4 done; **P5 in progress** (Lead Status lands end-to-end; three reports and
 their observation arms remain); **P6-P8 not started**. Detail in "Pending - the current workstream".
-**Last updated:** 2026-08-25.
+**Last updated:** 2026-09-07.
+**Active workstream board:** [`AUDIT_PLAN.md`](AUDIT_PLAN.md) - the 2026-09-07 warehouse
+audit and the sales KPI layer, at task granularity. This file stays the plan of record for
+the project as a whole; that one is one workstream inside it and is updated in the same
+commit as the work it describes.
 **Repository:** `https://github.com/NicolasCortesEcoM/Eco-Movers-Datawarehouse`
 
 ---
@@ -75,7 +79,63 @@ semillas, reconstruye todo y poda los reportes viejos.
 
 ---
 
-## LO ULTIMO QUE SE HIZO - 2026-08-25
+## LO ULTIMO QUE SE HIZO - 2026-09-07
+
+### El sesgo del 60% del embudo, y como se cerro sin tocar el modelo de identidad
+
+`core.opportunities` esta keyeada en el GUID del API. Los reportes keyean en `Quote #`.
+El puente es `int_opportunity_quote_crosswalk`, y estaba construido **solo desde el
+API** - que esta anclado en la fecha de servicio de un job. Una oportunidad que nunca
+tuvo job agendado es inalcanzable por el sweep a cualquier ancho de ventana.
+
+Medido el 2026-09-07: **9.196 de 15.437 quotes de Lead Status (59,6%) no tenian GUID**,
+y el hueco esta sesgado hacia lo que nunca genera un job:
+
+| Estado en el reporte | En core | Invisible |
+|---|---:|---:|
+| Booked / Closed / Completed | 3.135 | 2.516 |
+| Lost | 2.291 | 4.323 |
+| Bad lead | 81 | 1.463 |
+
+Es decir: **core reportaba 50,2% de conversion contra un 36,6% real.** Sobreestimada
+13,6 puntos, todos los meses, estructuralmente.
+
+**Lo que se hizo.** `GET /api/opportunities/quote/{n}` resuelve exactamente esa
+poblacion - verificado contra 8 quotes sin resolver (incluyendo con cero jobs y sin
+fecha de servicio) y luego contra un lote real de 50: **50 de 50 resueltas, cero 404**.
+No es Premium y devuelve el mismo payload que la llamada de detalle, asi que aterriza
+en `raw_smartmoving.opportunities_enriched`, la tabla que ya existia, y el crosswalk lo
+recoge solo. **Cero modelos nuevos de dbt.**
+
+Nuevo job: `python run.py --job quote_backfill --instance all --dest postgres --budget N`.
+Elige las quotes sin resolver de mas nuevas a mas viejas, gasta como mucho `--budget`
+llamadas por instancia, y anota cada intento en `raw_smartmoving.quote_resolution_attempts`
+para no volver a pagar por una quote que no existe. Mecanismo y coste:
+[`crm_sync_contract.md`](crm_sync_contract.md) seccion 2a.
+
+**Por que este camino y no hacer el GUID nullable**, que era el plan inicial: las 2.032
+filas sin quote en `core` resultaron ser **todas** solo-webhook - un GUID y un entero de
+estado, sin nombre, sin agente, sin fecha. Son las mismas oportunidades que las filas de
+reporte sin resolver, y sin clave compartida **no se pueden unir en SQL**. Meter las
+filas de reporte con clave sintetica habria anadido hasta 2.032 filas **duplicadas**
+justo sobre la poblacion que se queria arreglar. El backfill las disuelve en vez de
+duplicarlas: el lote de 50 bajo las shells de 2.032 a 1.990.
+
+**Estado:** probado de punta a punta, `dbt build` PASS=222 ERROR=0. Falta drenar las
+~9.150 quotes restantes y programarlo en n8n.
+
+### Un defecto encontrado de paso
+
+`marts.mart_unmatched_report_rows` no es fiable como indicador. Hay **dos programaciones
+distintas de Lead Status escribiendo en la misma tabla**: la generacion de las 03:0x
+cubre 1/1/2026 hasta hoy (~15.400 filas) y todas las demas cubren ~90 dias (~5.200). El
+modelo filtra por "ultima generacion", asi que su conteo oscila entre ~3.000 y ~9.100
+segun la hora a la que se consulte. La capa de observacion no esta afectada - acumula
+entre generaciones. Detalle en [`DATABASE.md`](DATABASE.md).
+
+---
+
+## LO ANTERIOR - 2026-08-25
 
 ### La fecha de servicio estaba mal, y se arreglo
 
