@@ -124,7 +124,7 @@ outside its validity windows. It is a data-quality signal until that seed is ext
 | `invoiced_deals` | int | Booked deals carrying a realised figure - the denominator for the average below. |
 | `avg_invoiced_deal_size` | numeric | **Realised** revenue per billed deal. Deliberately not based on `estimated_final_total`, which is zero on 45% of booked opportunities and would report $1,151 against a true $2,085. |
 | `booked_estimated_value` | numeric | Quoted value of booked deals. Understated for the same reason - prefer `invoiced_value`. |
-| `invoiced_value` | numeric | The only realised revenue in the warehouse. |
+| `invoiced_value` | numeric | Opportunity-grain realised revenue. All Jobs also carries itemised realised revenue at job grain in vendor columns misleadingly named `Actual * Cost`. |
 | `lost_to_competitor`, `lost_on_price`, `lost_no_contact`, `lost_to_diy` | int | Loss reasons from `dim_status_map`. |
 | `lost_reason_unknown` | int | Lost with no subcategory resolved - 4.4%. A rise means the CRM emitted a status the seed does not know. |
 | `avg_minutes_to_first_contact` | numeric | Only the Lost Leads report carries this, so it is populated for lost records only. |
@@ -166,3 +166,47 @@ than new models. `any_paid_source` says whether a cost denominator should exist 
 | `lost_to_competitor`, `lost_on_price`, `lost_no_contact` | int | Loss reasons from `dim_status_map`. |
 | `synced_at` | timestamptz | Data freshness. |
 
+## `serving.pipeline_current_v1`
+
+| Field | Value |
+|---|---|
+| **Business area** | Sales |
+| **Contents** | Every unresolved opportunity - open or booked - as of the last build. |
+| **Grain** | `(source_instance_id, external_opportunity_id)` - one row per opportunity. |
+| **Source systems** | SmartMoving -> `core.opportunities` -> `marts.fct_pipeline_current`. |
+| **Freshness** | Governed by the **Opportunity money / detail** row of [`crm_sync_contract.md`](crm_sync_contract.md) section 8. |
+| **Owner** | Reporting Manager / data-platform team. |
+| **Version** | v1. |
+| **RLS** | Filtered by `entity_id`. |
+
+WARNING: **this is a snapshot of now, not a time series.** It is rebuilt from scratch on
+every run, so it answers "what is in the pipeline today" and cannot answer "how did the
+pipeline move last week". A time series means an incremental model appending a dated
+snapshot per run; for 628 rows that has not been worth building yet.
+
+WARNING: **never sum `estimated_final_total` across the whole table.** `is_committed`
+(booked) and `is_speculative` (open) are different things, and their total is the number
+that gets quoted in a meeting and then missed.
+
+Calibration, measured 2026-09-08: 628 unresolved opportunities, 485 future-dated. By
+service month it is 2026-09 with $678k committed and $265k speculative, 2026-10 with
+$188k and $189k, then single digits per month. **The honest forecast horizon is about
+two months.** There is deliberately no probability-weighted column: weighting 162 open
+rows by a historical conversion rate produces something with the shape of a forecast and
+the reliability of a coin flip.
+
+| Column | Type | Notes |
+|---|---|---|
+| `opportunity_key` | text | Grain key. |
+| `entity_id` | text | RLS key. |
+| `quote_number`, `customer_name`, `branch_name`, `sales_assignee_name` | text | Who and where. |
+| `line_of_business` | text | `local`, `long_distance`, `commercial`, `unclassified`. |
+| `referral_channel_group`, `referral_is_paid` | text / bool | Marketing channel, from `dim_referral_source`. |
+| `status_label`, `status_category` | text | Only `open` and `booked` reach this model. `closed` and `completed` are WON - see `status_model.md`. |
+| `is_committed` | bool | Booked. Real revenue with a date on it. |
+| `is_speculative` | bool | Open. Might never happen. |
+| `service_date`, `service_month` | date / text | Null on 50 rows that have no date at all. |
+| `days_until_service` | int | Negative for work whose date has passed but which is still unresolved - that is a data-quality signal worth watching. **Null**, not zero, when there is no service date. |
+| `created_date_local`, `age_days` | date / int | How long the opportunity has been sitting. |
+| `estimated_final_total` | numeric | The quote. Zero on many rows - see the money notes in the other two sales views. |
+| `synced_at` | timestamptz | Data freshness. |

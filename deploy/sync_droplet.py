@@ -163,6 +163,12 @@ def main() -> int:
         f"SMARTMOVING_LD_PASSWORD={shq(env['SMARTMOVING_LD_PASSWORD'])}",
         f"SMARTMOVING_LOCAL_ACCOUNT={shq(env['SMARTMOVING_LOCAL_ACCOUNT'])}",
         f"SMARTMOVING_LOCAL_PASSWORD={shq(env['SMARTMOVING_LOCAL_PASSWORD'])}",
+        # Where scripts/pipeline_heartbeat.py sends a silence alert. Optional by
+        # design: without it the check still runs, still records and still exits
+        # non-zero, so a missing webhook degrades the alert channel rather than the
+        # detection. `.get` rather than `[...]` for the same reason - a deploy must
+        # not fail because monitoring is not wired up yet.
+        f"HEARTBEAT_SLACK_WEBHOOK={shq(env.get('HEARTBEAT_SLACK_WEBHOOK', ''))}",
         "",
     ])
     with sftp.open(posixpath.join(APP_DIR, ".env"), "w") as fh:

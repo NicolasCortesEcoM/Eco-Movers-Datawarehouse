@@ -46,7 +46,12 @@ import psycopg2
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# (mechanism, threshold hours, SQL returning one timestamptz, human detail)
+# (mechanism, threshold hours, SQL returning one timestamptz, what it means)
+#
+# The "what it means" string is the whole value of the alert. "reports is silent" sends
+# someone digging; "report_ingest has collected no email - check the workflow in n8n"
+# tells them where to look. An alert that does not shorten the diagnosis is just noise
+# with a timestamp on it.
 CHECKS = [
     ("reports", 8.0, """
         select max(t) from (
@@ -56,19 +61,19 @@ CHECKS = [
             union all select max(_ingested_at) from raw_smartmoving.report_lost_leads
             union all select max(_ingested_at) from raw_smartmoving.report_cancellations
             union all select max(_ingested_at) from raw_smartmoving.report_payments
-        ) x""", "report_ingest has landed nothing"),
+        ) x""", "No report email has been ingested. Check the report_ingest workflow in n8n."),
 
     ("webhooks", 6.0,
      "select max(received_at) from raw_smartmoving.webhook_events",
-     "the SmartMoving webhook receiver has recorded nothing"),
+     "No SmartMoving webhook received. Check that n8n is up and the webhook URL still resolves."),
 
     ("dlt_extraction", 8.0,
      "select max(inserted_at) from raw_smartmoving._dlt_loads",
-     "no dlt load package has completed (opps_sweep / leads_poll)"),
+     "No dlt load completed. Check the opps_sweep and leads_poll workflows."),
 
     ("dbt_build", 30.0,
      "select max(synced_at) from core.opportunities",
-     "core.opportunities has not been rebuilt"),
+     "core.opportunities has not been rebuilt. Check dbt_build_reports."),
 ]
 
 
@@ -122,9 +127,23 @@ def main() -> int:
         return 2
 
     now = datetime.now(timezone.utc)
-    silent, rows = [], []
+    silent, recovered, rows = [], [], []
 
     with conn, conn.cursor() as cur:
+        # What each mechanism looked like last time. Without this the alert can only
+        # ever say "still broken" - it can never say "back". A channel that reports
+        # failures and stays quiet about recoveries teaches people to ignore it,
+        # because they can never tell whether an old alert still stands.
+        previously_silent = set()
+        try:
+            cur.execute("""
+                select distinct on (mechanism) mechanism, is_silent
+                  from monitoring.pipeline_heartbeat
+                 order by mechanism, checked_at desc""")
+            previously_silent = {m for m, was in cur.fetchall() if was}
+        except Exception:  # noqa: BLE001 - first ever run, table may be empty
+            pass
+
         for mechanism, threshold, sql, detail in CHECKS:
             try:
                 cur.execute(sql)
@@ -140,6 +159,8 @@ def main() -> int:
             rows.append((mechanism, last, age, threshold, is_silent, detail))
             if is_silent:
                 silent.append((mechanism, age, threshold, detail))
+            elif mechanism in previously_silent:
+                recovered.append((mechanism, age))
 
             print(f"  {mechanism:16} last={last} age={age}h threshold={threshold}h "
                   f"{'SILENT' if is_silent else 'ok'}")
@@ -155,15 +176,38 @@ def main() -> int:
 
     conn.close()
 
+    stamp = now.strftime("%Y-%m-%d %H:%M UTC")
+
     if not silent:
-        print(f"heartbeat {now.isoformat(timespec='seconds')}: all mechanisms alive")
+        print(f"heartbeat {stamp}: all mechanisms alive")
+        if recovered:
+            names = ", ".join(f"*{m}*" for m, _ in recovered)
+            back = "\n".join(
+                [f":white_check_mark: Warehouse pipeline recovered — {names} "
+                 f"{'is' if len(recovered) == 1 else 'are'} landing data again."]
+                + [f"    {m} — last success {a}h ago" for m, a in recovered]
+                + [f"_{stamp}_"]
+            )
+            print(back)
+            notify(env, back)
         return 0
 
-    lines = [f":rotating_light: *Warehouse pipeline silence* ({now.isoformat(timespec='seconds')})"]
+    # Headline first, so the channel preview alone says whether to care.
+    n = len(silent)
+    lines = [
+        f":red_circle: *Warehouse pipeline: {n} mechanism{'' if n == 1 else 's'} silent*",
+        "",
+    ]
     for mechanism, age, threshold, detail in silent:
         seen = "never" if age is None else f"{age}h ago"
-        lines.append(f"• *{mechanism}* — last success {seen} (threshold {threshold}h): {detail}")
-    lines.append("Nothing threw an error. This is silence, which no n8n alert can see.")
+        lines.append(f"*{mechanism}* — last success {seen} _(alerts after {threshold:g}h)_")
+        lines.append(f"    {detail}")
+    lines += [
+        "",
+        "Nothing errored. n8n alerts only fire when a node throws, so a job that "
+        "never ran is invisible to them — which is why this check exists.",
+        f"_{stamp} · recorded in monitoring.pipeline_heartbeat_",
+    ]
     message = "\n".join(lines)
 
     print(message)
