@@ -153,6 +153,18 @@ def main() -> None:
     explicit_quotes = tuple(q.strip() for q in args.quotes.split(",") if q.strip()) if args.quotes else None
     quote_backfill = args.job == "quote_backfill" or bool(explicit_quotes)
 
+    # --ids and --quotes both make the source yield a resource NAMED
+    # opportunities_enriched. Passing both yields two resources with one name inside a
+    # single dlt source, which is not a configuration anyone meant to express - it is a
+    # typo that would land unpredictable data. Reject it here rather than letting dlt
+    # discover it halfway through a load.
+    if opp_ids and explicit_quotes:
+        raise SystemExit(
+            "--ids and --quotes cannot be combined: both drive the opportunities_enriched "
+            "resource, and together they would yield two resources with the same name. "
+            "Run them as two invocations."
+        )
+
     env = load_env()
 
     if args.dest == "duckdb":

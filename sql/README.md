@@ -29,4 +29,11 @@ and 69% of those rows are byte-identical copies of the generation before.
 
 Safe because dbt already collapses report rows to the newest observation, so an older
 intra-day generation contributes nothing once a newer one exists. Idempotent: running
-it twice is a no-op. Wired into `dbt_build_reports` (03:05 PT).
+it twice is a no-op.
+
+**Where it actually runs:** a cron on the droplet at 04:10 PT, beside
+`scripts/pipeline_heartbeat.py`. It is NOT part of `dbt_build_reports`, although
+`crm_sync_contract.md` claimed it was for months - the workflow only ever ran
+`dbt seed && dbt build`, so until 2026-09-08 pruning happened solely on manual
+`sync_droplet.py --sql` deploys. The cron time is stated in the contract's schedule
+table and nowhere else; do not restate it here.

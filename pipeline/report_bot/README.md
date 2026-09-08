@@ -14,7 +14,7 @@ scheduled in the UI and needs none of this.
 **This bot does not download, parse, or load anything. It produces zero rows.**
 
 Its entire job is to make an email arrive. From that point the existing
-`report_ingest` workflow does what it already does for the other three reports:
+`report_ingest` workflow does what it already does for every natively scheduled report:
 resolves the instance from the mailbox, downloads the attachment link, verifies the
 row count against the number stated in the email, lands the rows verbatim as `jsonb`,
 and rebuilds dbt.

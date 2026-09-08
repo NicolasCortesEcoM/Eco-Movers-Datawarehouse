@@ -9,7 +9,7 @@ was actually done and what section 4a's premise looks like once tested at scale.
 ## 1. The problem this is trying to solve
 
 `core.opportunities` is keyed on `(source_instance_id, external_opportunity_id)` -
-the SmartMoving GUID. Every scheduled report except All Jobs keys on the
+the SmartMoving GUID. Every emailed report except All Jobs keys on the
 human-readable **Quote #**. `int_opportunity_quote_crosswalk` bridges the two.
 
 The bridge is built **from API sources only**, deliberately. That is the defect:
@@ -342,4 +342,3 @@ quote-number immutability, and Option B still should not be attempted until it i
 `marts.mart_unmatched_report_rows` was found to be an unreliable gauge while this was
 being sized — two different Lead Status schedules write to one table, so "the latest
 generation" alternates between a ~15,400-row and a ~5,200-row report. See `DATABASE.md`.
-

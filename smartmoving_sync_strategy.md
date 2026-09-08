@@ -1,5 +1,16 @@
 ﻿# SmartMoving -> Postgres Synchronization Strategy (CDC / freshness)
 
+> ⚠️ **PARTIALLY SUPERSEDED — read `crm_sync_contract.md` first.**
+>
+> This is the original July 2026 design rationale and is still the best explanation of
+> *why* the CDC approach looks the way it does. It is no longer accurate about *what
+> runs*. Known drift, as of 2026-09-08: it names workflows `leads_today_poll` and
+> `jobs_window_sweep`, which are called `leads_poll` and `opps_sweep`; it instructs
+> `run.py --job jobs`, which no scheduled workflow uses; and it lists Phase 4 hardening
+> (deadletter, freshness checks, silence alerts) as future work when most of it is
+> built. Cadence, quota and mechanism live in `crm_sync_contract.md`, which outranks
+> this file.
+
 **Prepared for:** Nicolas - Data Team
 **Date:** July 2026, revised for a Postgres destination
 **Scope:** SmartMoving only (Premium API + webhooks + Scheduled Reports). Out of scope: Playwright web scraping, QuickBooks, marketing, phone systems, and payroll.

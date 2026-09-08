@@ -1,6 +1,15 @@
 ﻿# SmartMoving warehouse: extraction pipeline (Phase 1)
 
-Raw extraction with dlt from the two SmartMoving instances. Implements Path 2 from `../smartmoving_sync_strategy.md` (date-window polling); Path 1 (webhooks) and Path 3 (reports) are added in later phases.
+API extraction with dlt from the two SmartMoving instances. This package implements
+the polling, sweep, targeted enrichment and quote-resolution portions of the live
+warehouse. The other two ingestion paths are also live but intentionally use n8n
+instead of dlt: webhooks are persisted directly before the receiver answers HTTP 200,
+and emailed reports are downloaded, verified and landed directly as JSONB.
+
+All Jobs has a special producer: `pipeline/report_bot` controls the SmartMoving web
+application with Playwright, selects the report window and clicks **Run Report** so
+SmartMoving sends the email. The bot does not download or load the report; the common
+`report_ingest` workflow owns everything after the email arrives.
 
 ## Run
 
@@ -100,12 +109,14 @@ snapshot revives the opportunity in dbt. Two independent triggers:
 
 dlt injects configuration into **resource function arguments**: an argument named `path` resolves from the `PATH` environment variable. Never pass state through defaulted resource arguments; use closures through a factory function instead (see `_make_dim` in `sm_pipeline/source.py`).
 
-## Next Steps (in order)
+## Implementation status
 
 1. Done. Local seed: `leads`, `customers_service_window`, dims in duckdb.
 2. Done. Postgres bootstrap (`sql/00_bootstrap.sql`) + dlt destination env + first `--dest postgres` run.
 3. Done. Diff-driven opportunity enrichment (`--job enrich`): customers sweep + `GET /api/opportunities/{id}` with all 10 `Include*` flags -> `raw_smartmoving.opportunities_enriched`.
 4. Done. Direct n8n landing DDL: `../sql/20_webhook_events.sql` (Path 1) and `../sql/30_report_landing.sql` (Path 3).
-5. Pending. n8n webhook receiver -> `raw_smartmoving.webhook_events` + debounced enrichment worker invoking `run.py --ids ...`.
-6. Pending. **n8n** schedules (Dagster deferred, `decisions/0004`). Cadence is defined in [`crm_sync_contract.md`](../crm_sync_contract.md) section 6 - not here.
-7. Pending. Scheduled Reports IMAP flow -> `raw_smartmoving.report_all_jobs` and schedule the reports in the SmartMoving UI.
+5. Done. n8n webhook receiver -> `raw_smartmoving.webhook_events` + debounced, allowlisted enrichment worker invoking `run.py --ids ...`.
+6. Done. n8n extraction and dbt schedules are defined operationally; Dagster remains deferred by `decisions/0004`. Cadence is defined only in [`crm_sync_contract.md`](../crm_sync_contract.md) section 6.
+7. Done. `report_ingest` resolves report metadata from the email, downloads the XLSX, preserves empty cells, lands JSONB, verifies the vendor-stated row count and triggers dbt.
+8. Done. `report_bot_all_jobs` uses Playwright browser control to request All Jobs emails because that report cannot be scheduled natively.
+9. Open. Schedule the budgeted `quote_backfill` drain in n8n; until then it is run manually.

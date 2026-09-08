@@ -13,7 +13,7 @@
 > **Status vocabulary:** ✅ done and verified · 🔄 in progress · ⏳ not started ·
 > ⛔ blocked (says on what).
 
-**Last updated:** 2026-09-08 05:30 PT.
+**Last updated:** 2026-09-08 08:20 PT.
 
 ---
 
@@ -43,11 +43,11 @@ quality. Phone activity is out of scope (it needs RingCentral).
 | | Done | In progress | Pending | Blocked |
 |---|---:|---:|---:|---:|
 | A — critical defects | 4 | 0 | 0 | 0 |
-| B — KPI layer | 4 | 0 | 2 | 0 |
-| C — modelling defects | 3 | 0 | 5 | 0 |
-| D — redundancy cleanup | 0 | 0 | 1 | 0 |
+| B — KPI layer | 5 | 0 | 1 | 0 |
+| C — modelling defects | 7 | 0 | 1 | 0 |
+| D — redundancy cleanup | 1 | 0 | 0 | 0 |
 
-`dbt build`: **PASS=277, ERROR=0** (222 when the audit started).
+`dbt build`: **PASS=311, ERROR=0** (222 when the audit started).
 Both marts reconcile exactly against `core`: 53,910 = 53,910.
 Warehouse: 58,573 opportunities · 63,440 jobs · 36,847 leads · 2,133 MB · disk 42%.
 Committed on branch `warehouse-audit-and-sales-kpis` (commit `cfae435`).
@@ -149,11 +149,12 @@ two pairs of spelling variants.
 (`lost_to_competitor`, `lost_on_price`, `lost_no_contact`, `lost_to_diy`,
 `lost_reason_unknown`), realised deal size, and the prior-tenant filter.
 
-### ⏳ B2 — Pipeline and forecast
-Not started. Calibration note that must survive into the model: the open pipeline is
-**small** — 214 open and 414 booked, of which 329 booked ($968K) and 163 open ($1.23M)
-are future-dated. The value here is *revenue already committed*, not a speculative
-funnel, and it should not be presented as more than that.
+### ✅ B2 — Pipeline and forecast
+`marts.fct_pipeline_current` and `serving.pipeline_current_v1` are published. They are
+a current snapshot, not a time series, and deliberately separate committed (booked)
+from speculative (open) work. There is no probability-weighted forecast column. The
+measured horizon is short; the useful signal is revenue already committed, not an
+inflated combined funnel value.
 
 ### ✅ B3 — Lead source / quality mart
 `marts.fct_lead_source_daily`, 10,756 rows, 2023-01-01 → 2026-09-07, cohort grain
@@ -165,7 +166,8 @@ marketing spend attaches later: cost per lead, CAC and ROAS become joins at
 `serving.sales_agent_daily_v1` (12,643 rows) and `serving.lead_source_daily_v1`
 (10,756 rows), both catalogued in `serving_catalog.md`, both RLS-enabled, both verified
 queryable by `app_read`. Also added the `relationships` tests back to `core` that the
-two pre-existing serving views never had.
+original two operational serving views never had. `serving.pipeline_current_v1` is also
+published, catalogued and related back to `marts.fct_pipeline_current`.
 
 **Still pending:** `serving.opportunities_v1`, the view the project has declared its
 number-one priority since the beginning.
@@ -191,26 +193,65 @@ filter on it.
 | C1 | `core.lines_of_business` had **no YAML entry and zero tests** while feeding a mart | ✅ documented and tested |
 | C2 | `_core.yml` defined `opportunity_charges` **twice** with contradictory grain descriptions. It does **not** break the build — verified — the second block silently wins | ✅ stale block removed |
 | C3 | `core.agents` tested `unique` on the name when the grain is `(entity_id, source_agent_name)`; passes only while there is one entity | ✅ singular test on the pair |
-| C4 | `report_cancellations` and `report_payments` are **not even declared as sources** and have no staging model. `Cancelled Date` exists nowhere else; payments are the only link to storage accounts | ⏳ |
-| C5 | The Booked-report join is duplicated between `int_opportunity_observations` and the `bkd_extra` CTE in `core/opportunities.sql` — the one report that never got its own `int_report_*_latest` | ⏳ |
-| C6 | `--max-pages` is **not propagated** to `--job jobs` or the dims pulls, which still truncate silently at 50 pages | ⏳ |
-| C7 | `--ids` together with `--quotes` makes the source yield two resources with the same name; nothing rejects it | ⏳ |
-| C8 | The contract says `dbt_build_reports` runs the retention prune; **the workflow only runs `dbt seed && dbt build`**. The cron is documented four different ways | ⏳ |
+| C4 | `report_cancellations` and `report_payments` were **not even declared as sources** and had no staging model | ✅ both declared and modelled — see below |
+| C5 | The Booked-report join is duplicated between `int_opportunity_observations` and the `bkd_extra` CTE in `core/opportunities.sql` — the one report that never got its own `int_report_*_latest` | ⏳ the last one left |
+| C6 | `--max-pages` was **not propagated** to `--job jobs` or the dims pulls, which truncated silently at 50 pages | ✅ every paginated pull now honours it |
+| C7 | `--ids` with `--quotes` yielded two resources with the same name; nothing rejected it | ✅ rejected up front with an explanation |
+| C8 | The contract said `dbt_build_reports` runs the retention prune; **the workflow only ever ran `dbt seed && dbt build`**, so pruning happened only on manual deploys. The cron was documented four different ways | ✅ retention now runs from cron at 04:10 PT and is proven to execute; the contract, `sql/README.md` and the workflow's own sticky note now agree |
 
 Also fixed along the way: `_marts.yml` used the deprecated `tests:` key throughout — 15
 occurrences migrated to `data_tests:`.
 
+### C4 in detail — the two reports nothing read
+
+Both were landing and row-count verified since 2026-08 and had **no source declaration
+at all**, let alone a model.
+
+- **`stg_smartmoving__report_cancellations`** — 33,725 rows, 2026-01-02 → 2026-09-07.
+  `cancelled_date_local` exists in no other source: "cancelled" without a date cannot be
+  trended, or compared against the booking it undid.
+- **`stg_smartmoving__report_payments`** — 162,660 rows, the only per-payment record
+  anywhere. `invoiced_amount` is one total per opportunity; this is the transactions
+  behind it.
+
+The payments model carries a hard three-way discriminator, and measuring it corrected
+the assumption the contract has carried for months:
+
+| | rows |
+|---|---:|
+| Quote only → opportunity | 130,171 |
+| Quote **and** Job → opportunity | 13,988 |
+| Storage Account, no quote or job → storage | 18,501 |
+| **Job without a Quote** | **0** |
+| None of the three | 0 |
+
+**There is no such thing as a job-only payment in this data.** `Job` refines a payment
+that already belongs to an opportunity; it is not an alternative target. The `job` arm
+is kept as a defensive branch that has never fired.
+
+What does matter is the storage third: forcing every payment under an opportunity id —
+the obvious shortcut — would silently drop 18,501 payments, **$8.9M and 11% of the
+cash**, and the remaining total would still look entirely plausible.
+
+`payment_target` is tested with **warn** severity, not error: an unattached payment is a
+real finding and must be loud, but payments are not yet promoted into `core`, and a
+changed vendor export should not take down the nightly build of the whole warehouse over
+a report nothing depends on yet. Promote to error when a core model starts reading it.
+
 ---
 
-## D. Redundancy and cleanup — ⏳ not started
+## D. Redundancy and cleanup — ✅ done (warehouse side)
 
-**Inside the warehouse:** 8 source declarations nothing reads; a stale description
-claiming `report_lost_leads` is "deliberately not modelled" when it is;
-`jobs.json` (a sample report row, referenced by nothing); `.notes.json`; the empty
-`.agents/`; `scripts/sm_client.py`, which **no file imports** although `CLAUDE.md` rule 2
-mandates its use; `OLD_TABLES/SCRDLA - dim_lob_map.csv` for a seed deleted in August;
-9 of 11 weekly `dim_*` pulls that nothing reads; and `smartmoving_sync_strategy.md`,
-which names workflows that no longer exist.
+**Done inside the warehouse:** the 8 source declarations nothing read are gone; the
+stale "deliberately not modelled" description of `report_lost_leads` is corrected;
+`jobs.json` and `OLD_TABLES/SCRDLA - dim_lob_map.csv` are deleted; `CLAUDE.md` rule 2
+now names the client the code actually imports rather than a shim nothing does; and
+`smartmoving_sync_strategy.md` carries a header listing its known drift instead of
+quietly misleading whoever opens it first.
+
+**Deliberately left alone:** `.notes.json` and the empty `.agents/` (harmless, and not
+mine to decide), and the 9 weekly `dim_*` pulls that nothing reads — they cost ~100 API
+calls a month and are the reference lists a future model will want.
 
 **Outside the agreed scope — reported only.** This database is shared by at least three
 other applications:

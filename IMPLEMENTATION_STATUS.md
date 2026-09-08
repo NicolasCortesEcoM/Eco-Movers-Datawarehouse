@@ -6,10 +6,13 @@
 > `smartmoving_sync_strategy.md`, and `decisions/`; this file is the progress board and the plan of record.
 
 **Current phase:** Phase 1 - SmartMoving -> Postgres.
-**Current workstream:** enriching **leads** and **opportunities** to the scheduled-report field set.
-**Where that stands:** P0-P4 done; **P5 in progress** (Lead Status lands end-to-end; three reports and
-their observation arms remain); **P6-P8 not started**. Detail in "Pending - the current workstream".
-**Last updated:** 2026-09-07.
+**Current workstream:** completing Phase 1 publication and operational hardening.
+**Where that stands:** all six report types land with row-count validation; All Jobs is
+requested by a Playwright browser bot because it cannot be scheduled natively; Lost
+Leads is modelled through `core.opportunities`; five serving contracts are published.
+The main open items are `serving.opportunities_v1`, scheduling the quote-backfill
+drain, and modelling the landed Cancellations and Payments reports.
+**Last updated:** 2026-09-08.
 **Active workstream board:** [`AUDIT_PLAN.md`](AUDIT_PLAN.md) - the 2026-09-07 warehouse
 audit and the sales KPI layer, at task granularity. This file stays the plan of record for
 the project as a whole; that one is one workstream inside it and is updated in the same
@@ -203,9 +206,9 @@ completa tarda unos 25 segundos.
 
 ## LO QUE SIGUE ABIERTO
 
-1. **Publicar `serving.opportunities_v1` y `serving.jobs_v1`.** Todo el dato vive en `core`, que
-   por contrato solo leen dbt y analistas. Hasta que exista una vista `serving`, ningun equipo
-   puede construir sobre el - y esa es la prioridad numero uno declarada del proyecto.
+1. **Publicar `serving.opportunities_v1`.** Ya existen cinco contratos publicos,
+   incluido `pipeline_current_v1`, pero todavia no existe el contrato general de
+   oportunidades que el proyecto declaro como prioridad principal.
 2. **La tabla de vendedores.** Decidido que la mantiene Nicolas, no el CRM: hay admins que venden
    (Jesus Carranza, 140 oportunidades) y "vendedores" que no son personas ("Admin team"). Faltan
    12 vendedores por asignar. Pendiente decidir si se edita como archivo o con un formulario.
@@ -417,10 +420,10 @@ confirmed to fire against a planted violation rather than merely passing.
 - **The exit-code sweep is not finished.** The 2026-08-08 audit established that *every* n8n workflow
   piping `run.py` hides failures. The migration doc carries the correct shape; the sweep itself is
   step 1 of Next Immediate Step and is what turns a 17-day silent outage into a visible one.
-- **Three seeds have no consumer.** `dim_lob_map`, `dim_sales_team` and `dim_referral_source` load and
-  are documented, but no model under `dbt/models/` references any of them. They are Phase 2 material
-  (LOB and marketing reporting), not an oversight - recorded here so the next audit does not
-  re-discover it as a gap.
+- **Seed consumers are now explicit.** `dim_referral_source` feeds
+  `core.opportunities` and `fct_lead_source_daily`; `dim_sales_team` is the only loaded
+  seed without a current model consumer. `dim_lob_map` was removed because it
+  duplicated `dim_lob_branch`.
 - **`raw_*` has no database-level uniqueness on the business key**, only on `_dlt_id`. Idempotency
   rests entirely on dlt's merge logic. Zero duplicates observed across every table checked, but rule 5
   ("composite primary keys, idempotent loads") is currently enforced by application behaviour rather
@@ -429,16 +432,19 @@ confirmed to fire against a planted violation rather than merely passing.
 
 ---
 
-## Reports connected to dbt - 2026-08-13
+## Reports connected to dbt - current state (updated 2026-09-08)
 
-All four reports now land. **Three are modelled; one is deliberately not.**
+All six reports now land and are row-count verified. Four have dbt models; two remain
+preserved in raw JSONB for future modelling.
 
 | Report | Grain | Connected? | Why |
 |---|---|---|---|
 | **Lead Status** | opportunity | ✅ | The denominator. Every lead and opportunity received in a period, with the authoritative status and its lost/cancelled subcategory. |
 | **All Jobs** | job | ✅ | The richest source in the warehouse - job GUID, structured addresses, the full ACTUAL cost breakdown, lifecycle dates. Nothing else has any of it. |
-| **Booked Opportunities** | opportunity | ✅ thin | Three columns only. `Invoiced Amount` is the **sole record of realised revenue** anywhere. |
-| **Lost Leads** | opportunity | ❌ **skipped** | Of its 8 columns only `Lost Date` is not already in Lead Status, which reports every lost opportunity with the full reason. A whole staging model, observation arm and test suite for one date column is complexity that buys nothing. |
+| **Booked Opportunities** | opportunity | ✅ thin | `Invoiced Amount` is the opportunity-grain realised-revenue total. |
+| **Lost Leads** | opportunity | ✅ | Supplies loss reason, lost date and time to first contact through `int_report_lost_leads_latest` into `core.opportunities`. |
+| **Cancellations** | opportunity | Raw only | Landed and verified; no staging/core model yet. |
+| **Payments** | opportunity, job or storage account | Raw only | Landed and verified; its future model must preserve the target discriminator. |
 
 ### The design decision worth understanding
 
@@ -492,9 +498,11 @@ Grain intact: 14,337 / 14,337 opportunities, 17,636 / 17,636 jobs. Droplet
 
 ## Full eight-report run - 2026-08-13
 
-All four reports scheduled on both instances. **Seven of eight landed with zero ingest
-errors**, including **All Jobs** - the report that carries the job GUID and was
-previously assumed to need a Playwright bot.
+Historical test of the first four report types across both instances: **seven of eight
+landed with zero ingest errors**. The test proved the common email ingestion path, but
+it did not prove that All Jobs could be scheduled natively. The current production
+design uses the Playwright browser bot because SmartMoving does not expose native
+scheduling for All Jobs.
 
 | Report | `ld` | `local` |
 |---|---|---|
@@ -793,7 +801,7 @@ the API. Deliberately skipped; the reports give structured addresses without it.
 
 ---
 
-## The Plan - dependency-ordered
+## Historical dependency plan — retained for decision history
 
 ```
 P0  probes + deploy dbt + on-run-end RLS        <- blocks everything
@@ -919,12 +927,13 @@ one-liner. Flags load as booleans (not 0/1) so `where is_booked` works without `
   > A generic mailbox cannot identify an instance, so any later report sent there would be silently
   > attributed to `local`. Delete that entry from the `Resolve Report Metadata` node once the two
   > per-instance aliases are configured in the SmartMoving UI.
-- **H2 - Report schedules in the SmartMoving UI.** Recommend, per instance, daily:
-  **Lead Status 05:55 (schedule this one FIRST - it is the denominator)**, All Jobs 06:00,
-  Booked-by-Date-Booked 06:05, Lost Leads 06:10, all *This Month*. Plus a one-time **All Time** export
-  of **Lead Status** and All Jobs per instance for zero-quota historical backfill. Schedule only the
-  `by-date-booked` booked variant - the `by-service-date` variant is schema-identical and would
-  collide on the primary key.
+- ~~**H2 - Report schedules in the SmartMoving UI.**~~ **CORRECTED.** Lead Status,
+  Booked Opportunities, Lost Leads, Cancellations and Payments can use SmartMoving's
+  native schedule. **All Jobs cannot.** `report_bot_all_jobs` controls a real browser,
+  logs into the SmartMoving web application, sets the All Jobs date window and clicks
+  Run Report so SmartMoving emails it. The bot only produces the email; the common
+  `report_ingest` workflow downloads, validates and lands the workbook. Current times
+  live only in `crm_sync_contract.md` section 6.
 - **H3 - RESOLVED.** The report `*at Utc` columns are CRM-configured-timezone, not UTC. See
   "Timezone Semantics" above.
 - ~~H4 - `dim_status_map` keying~~ **RESOLVED 2026-08-05.** The seed keys on the **scheduled-report
@@ -1035,7 +1044,7 @@ never paused.
       `weekly_dims` (id `p6fjQ24sIBHRSWfM`), `nightly_reconciliation` (id `Sve0TiQArFuEcAXX`).
 - [ ] Deploy the pipeline on the host, confirm the SSH credential, publish the 6 workflows.
 
-### Pending - the current workstream
+### Historical checklist snapshot — superseded by the current status at the top
 - [ ] **P0** Deploy dbt to the droplet; run the four probes; `on-run-end` RLS hook.
 - [x] **P1** Fix the six `source.py` / `client.py` bugs (2026-08-05). New CLI flags
       `--hot-ttl-hours` (24), `--cold-ttl-hours` (336), `--refresh-stale-hours`. State migrates itself
@@ -1073,8 +1082,8 @@ never paused.
       cent (2,313,887.88 core vs staging); charges 1,579 and payments 41 preserved.
       **The design correction is empirically validated** - see the note below and
       [decisions/0005](decisions/0005-latest-observation-wins-is-per-field.md).
-- [~] **P5** **n8n `report_ingest` workflow built (2026-08-06)** - id `3NRvDchKPT5RK4tn`, currently
-      INACTIVE pending the IMAP credential. One IMAP route serves all four reports: resolve instance
+- [~] **P5** **n8n `report_ingest` workflow built (2026-08-06)** - id `3NRvDchKPT5RK4tn`; at this
+      historical snapshot it was inactive pending the IMAP credential. One IMAP route served the four then-configured reports: resolve instance
       from the recipient alias -> resolve report type from the subject -> parse xlsx -> land `row_data`
       verbatim as jsonb with `ON CONFLICT DO NOTHING`. `sql/32_report_ingest_errors.sql` created and
       applied; `sql/31` also applied locally so dev matches the droplet.
@@ -1141,9 +1150,13 @@ never paused.
       service-date sentinels, 1,543 blank Quote Sent, 134 blank + 3 `--` time-to-contact), 0
       unexplained; status classified **5,278/5,278 with zero unmatched**; timezone conversion verified
       (`12:16 AM` Pacific -> `07:16` UTC). Test PII was truncated from the dev table afterwards.
-      Remaining for P5: the n8n IMAP flow, the other three reports, and the observation arms.
+      At that historical snapshot, P5 still required the n8n IMAP flow, three more
+      report types and their observation arms. See the current status at the top.
 - [ ] **P6** `mart_enrichment_candidates` + `enrichment_from_reports` workflow.
-- [ ] **P7** Additive columns on both serving views; new `serving.opportunities_v1` and `serving.jobs_v1`.
+- [ ] **P7** Historical proposal: additive columns on the original two serving
+      contracts plus new opportunity/job contracts. Superseded in part by the five
+      serving contracts listed in `serving_catalog.md`; `serving.opportunities_v1`
+      remains open.
 - [ ] **P8** Align schedules with the sync contract; update `serving_catalog.md`.
 - [ ] Complete the sweep `status` enum mapping (3/10/20/30/50).
 

@@ -41,7 +41,7 @@ Change policy: additive changes ship freely; breaking changes (rename, type chan
 | `customer_address` | text | |
 | `synced_at` | timestamptz | When this row's source data was last extracted (data freshness). |
 
-**Not yet included** (arrive later as additive columns - no version bump, tracked as P7 in `IMPLEMENTATION_STATUS.md`): branch, structured origin/destination addresses, crew/dispatch, estimated total. Structured addresses come from the All Jobs scheduled report, not from any API source - the enriched payload carries flat address strings whose order does not identify origin vs destination.
+**Not yet included** (arrive later as additive columns - no version bump, tracked as P7 in `IMPLEMENTATION_STATUS.md`): branch, structured origin/destination addresses, crew/dispatch, estimated total. Structured addresses come from the All Jobs report requested by the browser bot, not from any API source - the enriched payload carries flat address strings whose order does not identify origin vs destination.
 
 **dbt tests:** not-null on `job_key`/`entity_id`/`external_job_id`/`service_date`/`synced_at`; unique on `job_key` (grain); not-null + unique enforced on `core.jobs` upstream. RLS cross-entity isolation verified.
 

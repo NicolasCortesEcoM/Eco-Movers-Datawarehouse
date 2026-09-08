@@ -7,7 +7,8 @@ schemas exist, what lives in each, how they relate, and which rules are enforced
 > `marts` / `serving` object, a seed, or a key relationship must update this file in
 > the same commit. A stale map is worse than none.
 
-Last verified against the live database: **2026-08-26**.
+Last reconciled with the current dbt project and live-audit documentation:
+**2026-09-08**.
 
 Related documents, each owning something this one does not:
 
@@ -23,10 +24,10 @@ Related documents, each owning something this one does not:
 | ----------------------------------- | ------------------ | ------------------------ | ------------------------------------------------------------------ | ------------------------- |
 | `raw_smartmoving`                   | Bronze             | 45 tables                | Source payloads exactly as received. No transformation.            | dbt only                  |
 | `staging`                           | Silver             | 9 seed tables + 15 views | Renamed, typed, lightly cleaned. **Money becomes `numeric` here.** | dbt only                  |
-| `marts` (the `int_*` half)          | Silver             | 6 views                  | The observation layer — "source S said this about O at time T".    | dbt only                  |
+| `marts` (the `int_*` half)          | Silver             | 8 objects: 6 views + 2 tables | The observation layer — "source S said this about O at time T". | dbt only                  |
 | `core`                              | Silver (conformed) | 8 tables                 | The canonical business entities, reconciled across sources.        | dbt + read-only apps      |
-| `marts` (the `fct_*`/`mart_*` half) | Gold (internal)    | 3 objects                | Analytical models. May change whenever an analyst needs it.        | analysts, BI              |
-| `serving`                           | Gold (contract)    | 2 tables                 | Versioned, documented, stable.                                     | other teams' applications |
+| `marts` (the `fct_*`/`mart_*` half) | Gold (internal)    | 4 objects: 3 tables + 1 view | Analytical models. May change whenever an analyst needs it.     | analysts, BI              |
+| `serving`                           | Gold (contract)    | 5 tables                 | Versioned, documented, stable.                                     | other teams' applications |
 
 The existing names are kept rather than renamed to Bronze/Silver/Gold: renaming
 schemas would break every model, the RLS script, and the consumer documentation for no
@@ -208,6 +209,7 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `int_opportunity_line`             | view  | One line of business per opportunity, collapsed from its jobs. Shared by both cohort marts so the `min` tie-break exists once |
 | `fct_agent_leads_daily`            | table | Sales KPIs, cohort grain: (agent, line, day the lead arrived) — 12,643 rows |
 | `fct_lead_source_daily`            | table | Same cohort grain by **marketing channel** — 10,756 rows. Where ad spend attaches later |
+| `fct_pipeline_current`             | table | Current unresolved opportunities, separating committed from speculative work; snapshot, not history |
 | `mart_unmatched_report_rows`       | view  | Report rows that could not be crosswalked — a review queue. Its count oscillates; see the Lead Status note under `raw_smartmoving` |
 
 **When a field goes through the observation layer, and when it does not:** only where
@@ -219,7 +221,7 @@ adding sixty nullable columns to every other arm.
 
 ## `serving` — the published contract
 
-Four objects, materialised as **tables** (not views) so RLS applies, each with
+Five objects, materialised as **tables** (not views) so RLS applies, each with
 `entity_id` and `synced_at`, each catalogued in
 [`serving_catalog.md`](serving_catalog.md). A view that is not catalogued does not exist.
 
@@ -229,6 +231,7 @@ Four objects, materialised as **tables** (not views) so RLS applies, each with
 | `leads_today_v1` | one per lead created today, entity-local | ~20 |
 | `sales_agent_daily_v1` | `(entity_id, agent, line, lead day)` — cohort | 12,643 |
 | `lead_source_daily_v1` | `(entity_id, channel, line, lead day)` — cohort | 10,756 |
+| `pipeline_current_v1` | one per unresolved opportunity; current snapshot | ~628 |
 
 WARNING: the two cohort views carry two caveats a consumer must honour, both written
 into the catalogue. Recent cohorts are not comparable to old ones — a lead from last
@@ -264,9 +267,9 @@ Largest tables:
 | Table                         | Key             | Uniquely carries                                                                          |
 | ----------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
 | `report_lead_status`          | `Quote #`       | The denominator — every lead regardless of outcome. `Received at`, on 100% of rows.       |
-| `report_booked_opportunities` | `Quote #`       | `Invoiced Amount` — **the only realised revenue in the warehouse**.                       |
+| `report_booked_opportunities` | `Quote #`       | `Invoiced Amount` — the opportunity-grain realised-revenue total.                         |
 | `report_lost_leads`           | `Quote #`       | `Lost Date`, `Reason`, `Time to First Contact`.                                           |
-| `report_all_jobs`             | `Job Id`        | Actual cost breakdown, crew and truck counts, hourly rates, pricing method.               |
+| `report_all_jobs`             | `Job Id`        | Itemised realised revenue (misnamed `Actual * Cost` by the vendor), crew/truck counts, hourly rates and pricing method. |
 | `report_cancellations`        | `Quote #`       | **`Cancelled Date`** — nothing else in the warehouse has one. Plus `Amount` and `Reason`. |
 | `report_payments`             | hash of the row | `Date`, `Amount`, `Payment Category`, and links to Quote, Job **or Storage Account**.     |
 
@@ -337,7 +340,8 @@ The 9 seeds are the business knowledge no source system holds:
 | `dim_lob_branch`                        | branch → line of business                                         |
 | `dim_opportunity_status`                | status code → boolean flags                                       |
 | `dim_status_map`                        | report status string → flags                                      |
-| `dim_referral_source`, `dim_sales_team` | loaded, not yet read by any model                                 |
+| `dim_referral_source`                   | CRM referral source -> channel, platform and paid/free classification |
+| `dim_sales_team`                        | loaded for future use; currently has no model consumer             |
 
 > ⚠️ **`dbt seed` DROPS AND RECREATES these tables on every build.** A row typed
 > straight into Postgres is destroyed at the next run, silently, while dbt reports
@@ -351,13 +355,14 @@ The 9 seeds are the business knowledge no source system holds:
 - **`entity_id`** = the company. **`source_instance_id`** = one SmartMoving API
   account. Many instances → one entity. Today both `ld` and `local` map to
   `ecomovers`.
-- `entity_id` is present on **every** table in `core` (8/8), `marts` (8/9 — the quote
-  crosswalk is instance-keyed) and `serving` (2/2).
+- `entity_id` is present on **every** dbt-owned table in `core` (8/8), on 11 of 12
+  `marts` objects (the quote crosswalk is intentionally instance-keyed), and on every
+  `serving` table (5/5).
 
 **Verified working on 2026-08-26:**
 
 ```
-11 core/serving tables:  relrowsecurity = true, 1 policy each
+13 dbt-owned core/serving tables: relrowsecurity = true, 1 policy each
 core.current_role_can_see() as app_read:  'ecomovers' → true,  other → false
 app_read reading serving:  570 rows       reading core:  15,129 rows
 app_read reading marts:    permission denied for schema marts

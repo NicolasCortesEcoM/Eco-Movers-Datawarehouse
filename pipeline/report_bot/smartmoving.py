@@ -7,7 +7,7 @@ WHAT THIS MODULE DOES NOT DO
 ----------------------------
 It does not download the report, parse it, or write a single row. It fills in the
 "send results to" field and clicks Run Report, which makes SmartMoving email the
-file. `report_ingest` then does what it already does for the other three reports -
+file. `report_ingest` then does what it already does for every natively scheduled report -
 see README.md for why splitting it this way is the point rather than a shortcut.
 """
 

@@ -372,6 +372,7 @@ def smartmoving_source(
         def customers_service_window():
             for row in sm.paginate(
                 "/api/customers",
+                max_pages=max_pages,
                 FromServiceDate=_ymd(today_local),
                 ToServiceDate=_ymd(today_local + timedelta(days=days_ahead)),
                 IncludeOpportunityInfo=True,
@@ -678,7 +679,11 @@ def smartmoving_source(
                 write_disposition="merge",
             )
             def dim():
-                for row in sm.paginate(endpoint, **extra_params):
+                # max_pages here too. A reference list is small today - the largest
+                # is 175 rows - but the flag exists so no paginated pull can truncate
+                # in silence, and "it is small" is a property of today's data rather
+                # than a guarantee.
+                for row in sm.paginate(endpoint, max_pages=max_pages, **extra_params):
                     yield stamp(row)
 
             return dim

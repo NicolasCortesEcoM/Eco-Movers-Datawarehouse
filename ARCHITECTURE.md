@@ -42,8 +42,8 @@ SmartMoving (ld + local)          9 CSV seeds in the repo
         +-- API detail ---+                |
                           v                v
                raw_smartmoving         (dbt seed)
-               43 tables, 276 MB           |
-               payload verbatim            |
+               API, webhook and report     |
+               payloads preserved          |
                           |                |
                           v                v
                        staging  <----------+
@@ -51,7 +51,7 @@ SmartMoving (ld + local)          9 CSV seeds in the repo
                renamed, typed, money -> numeric
                           |
                           v
-               marts (int_* observation layer)
+               marts (8 int_* models)
                "source S said this about O at time T"
                           |
                           v
@@ -61,7 +61,7 @@ SmartMoving (ld + local)          9 CSV seeds in the repo
                           |
                           v
                       serving
-               versioned, documented, RLS-scoped
+               5 versioned, documented, RLS-scoped tables
 ```
 
 **Two loaders write `raw_*`, not one.** `dlt` (via `pipeline/run.py`) lands everything
@@ -100,6 +100,18 @@ append-only. A model does not care which loader filled its source table.
 > more calls per day than the allowlist costs per month.
 
 ## What happens when a report arrives
+
+There are two ways to make a report email arrive, but only one ingestion path after
+that point:
+
+- Lead Status, Booked Opportunities, Lost Leads, Cancellations and Payments use
+  SmartMoving's native report schedules.
+- **All Jobs cannot be scheduled by SmartMoving.** The separate Playwright bot in
+  `pipeline/report_bot` logs into the web application, opens All Jobs, sets the date
+  range and clicks **Run Report**. This makes SmartMoving send the same kind of report
+  email. The bot does not download, parse or load the workbook.
+
+Once either producer has generated an email:
 
 1. **The mailbox decides the instance** — `reporting@` is local, `ld.reporting@` is
    ld. Never guessed: a misattributed quote number does not error, it just makes the
@@ -149,27 +161,22 @@ a single CSV row and no SQL change.
 
 ---
 
-## Audited 2026-08-25
+## Current implementation snapshot — 2026-09-08
 
-**Working:** report ingestion (4 types across 2 instances, with per-report row-count
-verification), webhooks (87,706 events), sweep plus enrichment, dbt (219 models and
-tests, 0 errors).
+**Working:** webhook landing and allowlisted enrichment; scheduled API polling;
+browser-driven All Jobs requests; common IMAP report ingestion with per-report row
+count verification; dbt staging, observation, core and analytical layers; five
+versioned serving contracts; RLS; scheduled rebuilds; retention; and an out-of-band
+heartbeat that detects a silent pipeline.
 
-**Gaps, in priority order:**
+**Still open:**
 
-1. **`local` is 84% of the business and sends one report a day** — which was rejected
-   for twelve consecutive days because `ecomovers.com` was not in the alias map.
-   Fixed 2026-08-25. Everything `local` in the warehouse today was forwarded by hand.
-2. **All Jobs is scheduled on neither instance.** Same consequence.
-3. **`serving.opportunities_v1` and `serving.jobs_v1` are not published** — the stated
-   Phase 1 deliverable.
-4. **service_date is 88%, and that is the ceiling from free sources.** The missing
-   1,815 are exactly the 1,815 with no quote number, so no report can reach them and
-   they have no job to inherit from. Recovering them costs one detail call each.
-   Deliberately not spent — see the contract.
-
-**Removed or fixed in this audit:** `report_lost_leads` connected (13 MB landing daily
-that nothing read; it now supplies loss reason and time-to-first-contact to 2,345
-opportunities); 4 dead staging models deleted; the daily build's schedule reconciled
-(it was written four different ways, none of them the actual `30 3 * * *`); seed
-tables given their in-database warning; roughly 5 false alerts a day silenced.
+1. `serving.opportunities_v1` remains unpublished. The existing public contracts are
+   `jobs_upcoming_v1`, `leads_today_v1`, `sales_agent_daily_v1`,
+   `lead_source_daily_v1` and `pipeline_current_v1`.
+2. The quote-number backfill is built and proven but is still a manual, budgeted
+   drain until an n8n schedule is added.
+3. Cancellations and Payments land and pass row-count validation, but neither has a
+   dbt staging/core model yet.
+4. `mart_unmatched_report_rows` is not a stable trend because differently sized Lead
+   Status windows share one landing table. See `DATABASE.md` for the limitation.

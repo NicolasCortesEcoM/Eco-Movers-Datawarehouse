@@ -214,16 +214,17 @@ which is the best possible time to pay for it.
 | Workflow | When | What it does |
 |---|---|---|
 | `report_ingest` | IMAP trigger | Lands whatever report email arrives, then rebuilds dbt immediately |
-| SmartMoving report sends | **03:00, 11:00, 13:00, 15:00, 18:00, 21:00** | Configured in the SmartMoving UI, not in n8n. Six reports per send: Lead Status, Booked, Lost Leads, All Jobs, Cancellations, Payments. |
+| SmartMoving native report sends | **03:00, 11:00, 13:00, 15:00, 18:00, 21:00** | Configured in the SmartMoving UI. Five report types can send themselves: Lead Status, Booked, Lost Leads, Cancellations and Payments. **All Jobs is excluded because SmartMoving does not allow it to be scheduled.** |
 | `opps_sweep` | 06:30, 10:30, 13:30, 16:30, 20:30 | Sweep `[-180, +60]`, both instances |
 | `leads_poll` | aligned with the sweep | Leads have no webhook; polling is their only path |
-| `dbt_build_reports` | **03:30 daily** (`30 3 * * *`) | `dbt seed` + `dbt build` + retention prune, under `flock` |
+| `dbt_build_reports` | **03:30 daily** (`30 3 * * *`) | `dbt seed` + `dbt build`, under `flock`. It does **not** prune - see the row below |
+| `report_retention` | **04:10 daily** (cron on the droplet, not n8n) | Replays `sql/34_report_retention.sql`. This contract claimed for months that `dbt_build_reports` did it; the workflow never has, so until 2026-09-08 pruning only happened on manual deploys |
 | `Enrichment_worker` | every 5 min | Drains the trigger allowlist only |
 | `nightly_reconciliation` | 02:00 | `--refresh-stale-hours 336` |
 | `weekly_dims` | weekly | Dimensions |
 | `pipeline_heartbeat` | **every 30 min at :05/:35** (cron on the droplet, NOT n8n) | Asks when each mechanism last SUCCEEDED and alerts on silence. It is outside n8n on purpose: every other alert here fires when a node throws, which cannot see a job that never ran. See §11. |
 | `quote_backfill` | **not yet scheduled** — run manually until an n8n workflow exists | Resolves Lead Status quotes with no GUID, newest first, capped by `--budget`. See §2a. |
-| `report_bot_all_jobs` | **02:50** (full year) and **10:00, 13:00, 16:00, 20:00** (last 90 days) | Drives the SmartMoving UI so All Jobs is emailed - SmartMoving cannot schedule that report itself. Zero API quota: it is a browser, not a client, and it loads nothing. |
+| `report_bot_all_jobs` | **02:50** (full year) and **10:00, 13:00, 16:00, 20:00** (last 90 days) | Runs the Playwright browser bot on the droplet. The bot logs in, opens All Jobs, sets the date range and clicks **Run Report**, causing SmartMoving to email the XLSX. SmartMoving cannot schedule this report itself. The bot uses zero API quota and never downloads, parses or loads the file; `report_ingest` owns those steps. |
 
 ### The six reports, and what each one uniquely carries
 
@@ -235,7 +236,7 @@ warehouse carries the columns in the right-hand column.
 | Lead Status | `Quote #` | The denominator - every lead regardless of outcome. `Received at` (the lead date, on 100% of rows). |
 | Booked Opportunities | `Quote #` | `Invoiced Amount` - **the only realised-revenue column in the warehouse**. |
 | Lost Leads | `Quote #` | `Lost Date`, `Reason`, `Time to First Contact`. |
-| All Jobs | `Job Id` | The full actual cost breakdown, crew and truck counts, hourly rates, pricing method. Driven by `report_bot` because SmartMoving cannot schedule it. |
+| All Jobs | `Job Id` | The itemised realised-revenue breakdown (vendor columns are misleadingly named `Actual * Cost`), crew and truck counts, hourly rates and pricing method. Requested through browser control by `report_bot` because SmartMoving cannot schedule it. |
 | **Cancellations** | `Quote #` | **`Cancelled Date`** - the warehouse had no cancellation date at all before this. Plus `Amount` (revenue lost) and `Reason`. |
 | **Payments** | hash of the row | `Date`, `Amount`, `Payment Category`, and links to **Quote, Job OR Storage Account**. |
 

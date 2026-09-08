@@ -131,3 +131,64 @@ models:
         data_tests: [not_null, unique]
       - name: branch_name
         data_tests: [not_null]
+
+  - name: stg_smartmoving__report_cancellations
+    description: >
+      The Cancellation Details report, typed. Carries `cancelled_date_local`, which
+      exists in no other source in the warehouse - "cancelled" without a date cannot
+      be trended or compared against the booking it undid. All generations kept;
+      collapsing to the newest is the observation layer's job.
+    columns:
+      - name: report_row_key
+        description: (instance, row_key, generation) - unique per landed row.
+        data_tests: [not_null, unique]
+      - name: source_instance_id
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['ld', 'local']}
+      - name: entity_id
+        data_tests: [not_null]
+      - name: report_generated_at
+        data_tests: [not_null]
+      - name: quote_number
+        description: >
+          The opportunity this cancellation belongs to. Nullable: the report has been
+          seen to omit it, and dropping such a row would lose a real cancellation.
+
+  - name: stg_smartmoving__report_payments
+    description: >
+      The Payments report, typed. The only per-payment record in the warehouse -
+      core.opportunities.invoiced_amount is one total per opportunity, this is the
+      transactions behind it.
+
+      A payment attaches to an opportunity, a job, OR a storage account, and storage
+      accounts are a third top-level entity with no opportunity at all. Measured on
+      162,660 rows: 144,159 quote / 13,988 job / 18,501 storage / 0 none. Forcing them
+      all under an opportunity id would silently drop 11% of the cash.
+    columns:
+      - name: report_row_key
+        data_tests: [not_null, unique]
+      - name: source_instance_id
+        data_tests:
+          - not_null
+          - accepted_values: {values: ['ld', 'local']}
+      - name: entity_id
+        data_tests: [not_null]
+      - name: payment_target
+        description: >
+          Which of the three entities this payment is against. 'unattached' must never
+          appear - it means the report emitted a payment with no quote, job or storage
+          account, which has never happened in 162,660 rows.
+        data_tests:
+          - not_null
+          # WARN, not error, on purpose. An unattached payment is a real finding and
+          # must be loud, but payments are not yet promoted into core, and a changed
+          # vendor export should not take down the nightly build of the whole
+          # warehouse over a report nothing depends on yet. Promote to error when a
+          # core model starts reading this.
+          - accepted_values:
+              values: ['opportunity', 'job', 'storage_account']
+              config:
+                severity: warn
+      - name: payment_amount
+        description: Cast to numeric at this boundary, like all money in this project.

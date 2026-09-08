@@ -45,29 +45,10 @@ sources:
         description: Quoted charge lines per job. Identical shape to actual_charges.
       - name: opportunities_enriched__jobs__actual_charges
         description: Billed charge lines per job. Identical shape to estimated_charges.
-      - name: opportunities_enriched__jobs__job_addresses
-        description: >
-          Flat address STRINGS per job, ordered by _dlt_list_idx. Not an
-          origin/destination pair: 84 jobs carry one address, 645 two, 29 three, 2 four.
-          Structured components come from the All Jobs report, not from here.
-      - name: opportunities_enriched__jobs__crew_members
-        description: Crew member names per job (flat strings).
-      - name: opportunities_enriched__jobs__job_documents
-        description: Document titles per job. High volume (~12 per job); only counted, not modeled row-by-row.
-      - name: opportunities_enriched__opportunity_documents
-        description: Document titles per opportunity. Counted, not modeled row-by-row.
-      - name: opportunities_enriched__opportunity_files
-        description: Blob URLs of files attached to the opportunity. Counted only.
-      - name: opportunities_enriched__photos
-        description: Blob URLs of photos attached to the opportunity. Counted only.
       - name: opportunities_enriched__payments
         description: >
           Payments recorded against the opportunity. No natural id in the payload,
           so the grain is (opportunity, _dlt_list_idx).
-      - name: opportunities_enriched__contacts
-        description: Additional named contacts on the opportunity. Not available from any list endpoint.
-      - name: opportunities_enriched__surveys
-        description: Scheduled surveys/estimates with assignee and notes.
       - name: opportunity_deletions
         description: >
           Soft-delete markers. Raw never physically deletes: an opportunity that a
