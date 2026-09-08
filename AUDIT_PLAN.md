@@ -13,7 +13,7 @@
 > **Status vocabulary:** ✅ done and verified · 🔄 in progress · ⏳ not started ·
 > ⛔ blocked (says on what).
 
-**Last updated:** 2026-09-08.
+**Last updated:** 2026-09-08 05:30 PT.
 
 ---
 
@@ -42,13 +42,15 @@ quality. Phone activity is out of scope (it needs RingCentral).
 
 | | Done | In progress | Pending | Blocked |
 |---|---:|---:|---:|---:|
-| A — critical defects | 2 | 0 | 1 | 1 |
+| A — critical defects | 4 | 0 | 0 | 0 |
 | B — KPI layer | 4 | 0 | 2 | 0 |
 | C — modelling defects | 3 | 0 | 5 | 0 |
 | D — redundancy cleanup | 0 | 0 | 1 | 0 |
 
 `dbt build`: **PASS=277, ERROR=0** (222 when the audit started).
 Both marts reconcile exactly against `core`: 53,910 = 53,910.
+Warehouse: 58,573 opportunities · 63,440 jobs · 36,847 leads · 2,133 MB · disk 42%.
+Committed on branch `warehouse-audit-and-sales-kpis` (commit `cfae435`).
 
 ---
 
@@ -65,15 +67,22 @@ group and silently destroyed 2023 and 2024. Row counts would have looked healthy
 `sql/34` skips them in both the ranking and the delete.
 **Verified:** zero generations are both flagged and unflagged — the only failure mode.
 
-### ⛔ A2 — `report_ingest` has been stalled since 2026-09-07 18:10 PT
-All 39 SmartMoving emails in the mailbox were unread and none was collected; the 21:00
-batch had still not landed at 21:34. n8n itself is alive (webhooks arriving, dlt running
-on schedule), so the fault is specific to that workflow. The 31 pending reports were
-loaded by hand and the 34 processed emails marked read, but **new reports still do not
-arrive on their own.**
+### ✅ A2 — `report_ingest` stalled for nine hours, and recovered on a restart
+From 2026-09-07 18:10 PT nothing was collected: all 39 SmartMoving emails sat unread and
+the 21:00 batch had still not landed at 21:34, while n8n itself was demonstrably alive
+(webhooks arriving, dlt running on schedule). The 31 pending reports were loaded by hand
+and the 34 processed emails marked read.
 
-**Blocked on:** access to n8n. The MCP connector is not present in the session; being
-diagnosed over SSH against the droplet instead.
+**Resolved, but not by a fix.** The n8n containers restarted around 03:00 PT on 09-08 and
+ingestion resumed on its own: the 03:03 generations landed normally at 03:13, with zero
+ingest errors. Verified afterwards - payments did **not** duplicate (162,660 rows =
+162,660 distinct keys, so marking the processed emails read did its job), and the 15
+protected historical generations are intact.
+
+⚠️ **The root cause is unknown and unaddressed.** A stuck workflow cleared itself by
+chance after nine hours, and nothing anywhere would have reported it. That is precisely
+the failure class A4 exists to catch, and it is the strongest argument for building it:
+without a heartbeat, the next stall is equally invisible and might not restart itself.
 
 ### ✅ A3 — A month-old presence proof was still deciding what counted as deleted
 `_dlt_pipeline_state` held `{at: 2026-08-08, from: 20250204, to: 20270204}`, written by
@@ -90,7 +99,7 @@ nothing about absence, so the safe failure mode is to do nothing; real deletions
 come through the `opportunity-deleted` webhook's 404 path, which is direct evidence
 rather than inference.
 
-### ⏳ A4 — Nothing detects an n8n execution that *dies*
+### ✅ A4 — Nothing detected an n8n execution that *dies*
 Every alerting mechanism in the project lives *inside* an execution: a node throws and
 `errorWorkflow` catches it. An execution killed by the OOM reaper, a container restart
 mid-run, or a schedule trigger that never fires produce **no signal at all** — which is
@@ -98,9 +107,22 @@ exactly how A2 went unnoticed. The one liveness check (`Assert Serving Is Fresh`
 evaluated only inside the 03:30 build, so if that execution is the one that dies,
 nothing evaluates it.
 
-**Plan:** a heartbeat *outside* n8n — a cron on the droplet that queries
-`max(_ingested_at)` across the report tables and `max(received_at)` on `webhook_events`,
-and alerts on silence rather than on error. Detail in the section below.
+**Done.** `scripts/pipeline_heartbeat.py` + `monitoring.pipeline_heartbeat`
+(`sql/37_pipeline_heartbeat.sql`), on cron at :05/:35 — outside n8n on purpose. It
+checks four mechanisms (reports, webhooks, dlt extraction, dbt build) and asks when each
+last *succeeded*, not whether anything threw.
+
+**Verified both ways**, because a silence detector that has never fired is not a
+detector: with real thresholds all four report alive; with thresholds forced to four
+minutes all four flag `SILENT`, the alert message formats, exit code is 1, and the rows
+land in the table. Test rows were then deleted so the table does not lie.
+
+Every run is recorded, not just the bad ones — a heartbeat table with no recent
+heartbeat is the only way to notice that the monitor itself stopped.
+
+⚠️ **One value still needed from you:** set `HEARTBEAT_SLACK_WEBHOOK` in the droplet
+`.env` to a Slack incoming-webhook URL. Until then the check runs, records and exits
+non-zero, but the finding only reaches cron's local mail — which nobody reads.
 
 ---
 

@@ -221,6 +221,7 @@ which is the best possible time to pay for it.
 | `Enrichment_worker` | every 5 min | Drains the trigger allowlist only |
 | `nightly_reconciliation` | 02:00 | `--refresh-stale-hours 336` |
 | `weekly_dims` | weekly | Dimensions |
+| `pipeline_heartbeat` | **every 30 min at :05/:35** (cron on the droplet, NOT n8n) | Asks when each mechanism last SUCCEEDED and alerts on silence. It is outside n8n on purpose: every other alert here fires when a node throws, which cannot see a job that never ran. See §11. |
 | `quote_backfill` | **not yet scheduled** — run manually until an n8n workflow exists | Resolves Lead Status quotes with no GUID, newest first, capped by `--budget`. See §2a. |
 | `report_bot_all_jobs` | **02:50** (full year) and **10:00, 13:00, 16:00, 20:00** (last 90 days) | Drives the SmartMoving UI so All Jobs is emailed - SmartMoving cannot schedule that report itself. Zero API quota: it is a browser, not a client, and it loads nothing. |
 
@@ -319,6 +320,35 @@ generations loses nothing analytical — only the ability to replay a specific
 mid-morning snapshot from more than ten days ago.
 
 Implemented in `sql/34_report_retention.sql`, run from the daily dbt workflow.
+
+---
+
+## 9a. Silence is a failure mode, and it had no detector
+
+Every alerting path in this project lives INSIDE an n8n execution: a node throws and
+`errorWorkflow` catches it. That covers a job that runs and fails. It covers nothing
+when the job does not run at all - an execution killed by the OOM reaper, a container
+restart mid-run, a schedule trigger that never fires, or a workflow wedged in a state
+where it neither errors nor progresses.
+
+**The last one happened.** `report_ingest` collected nothing between 2026-09-07 18:10 PT
+and a container restart around 03:00 the next morning: nine hours, 39 unread emails in
+the mailbox, zero errors logged, zero alerts raised. It then recovered on its own. The
+stall was found by hand while auditing something else.
+
+`scripts/pipeline_heartbeat.py` runs from cron on the droplet and asks the opposite
+question - not "did anything fail?" but "when did each mechanism last succeed?" - for
+reports, webhooks, dlt extraction and the dbt build. Findings are recorded in
+`monitoring.pipeline_heartbeat` on EVERY run, not only bad ones, so a heartbeat table
+with no recent heartbeat is itself the signal that the monitor stopped.
+
+Its thresholds are deliberately looser than the freshness targets in §8 and are not a
+restatement of them: a target describes what consumers are promised, an alert threshold
+has to sit beyond normal variation or it becomes noise nobody reads.
+
+⚠️ **Slack delivery needs one value.** Set `HEARTBEAT_SLACK_WEBHOOK` in the droplet
+`.env` to an incoming-webhook URL. Without it the check still runs, still records, and
+still exits non-zero - but the finding only reaches cron's local mail.
 
 ---
 

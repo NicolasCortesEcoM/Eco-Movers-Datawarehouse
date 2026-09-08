@@ -40,15 +40,50 @@ Every one is a **table** with an `entity_id` column and an RLS policy.
 
 | Table                  | Grain                                                              |   Rows | Cols |
 | ---------------------- | ------------------------------------------------------------------ | -----: | ---: |
-| `opportunities`        | `(source_instance_id, external_opportunity_id)`                    | 15,129 |   50 |
-| `jobs`                 | `(source_instance_id, external_job_id)`                            | 21,069 |   99 |
-| `lines_of_business`    | one per job                                                        | 21,069 |   12 |
-| `opportunity_charges`  | `(instance, external_job_id, charge_kind, seq)` — **job grain**    |  8,812 |   15 |
-| `leads`                | `(source_instance_id, external_lead_id)`                           |  3,069 |   33 |
-| `opportunity_payments` | `(instance, external_opportunity_id, seq)`                         |  1,654 |   13 |
+| `opportunities`        | `(source_instance_id, external_opportunity_id)`                    | 58,573 |   57 |
+| `jobs`                 | `(source_instance_id, external_job_id)`                            | 63,440 |  100 |
+| `lines_of_business`    | one per job                                                        | 63,440 |   12 |
+| `opportunity_charges`  | `(instance, external_job_id, charge_kind, seq)` — **job grain**    |  9,886 |   15 |
+| `leads`                | `(source_instance_id, external_lead_id)`                           | 36,847 |   33 |
+| `opportunity_payments` | `(instance, external_opportunity_id, seq)`                         |  1,907 |   13 |
 | `branches`             | `(source_instance_id, branch_name)` — **the timezone authority**   |      8 |   18 |
-| `agents`               | one per CRM-written salesperson name                               |     34 |    8 |
+| `agents`               | one per CRM-written salesperson name                               |     65 |    8 |
 | `entity_access`        | `(role_name, entity_id)` — **access control, owned by `postgres`** |      — |    2 |
+
+### WARNING: `is_in_scope` — read this before counting anything
+
+`core.opportunities` and `core.jobs` carry `is_in_scope`. **False means the row belongs
+to the business that used the SmartMoving account before this one.**
+
+The `ld` account had a previous tenant. Sweeping back to 2023 on 2026-09-07 pulled in
+**3,170 opportunities and 3,283 jobs** that are not this company data. They cannot be
+told apart by key — quote numbers run *continuously* across the handover (…9421 then
+9391…) — but their shape is unmistakable: pre-2025 `ld` rows carry no branch, no sales
+agent and no lead date, where 2025+ carries all three on 100% of rows, and the two
+customer bases share 50 names out of 2,892 and 2,381. `local` has the same flag on 197
+rows dated 2022, which are the tail of the sweep window rather than a prior tenant.
+
+The boundary per instance is `staging.dim_instance.data_valid_from` (`ld` 2025-01-01,
+`local` 2023-01-01). Rows are **flagged, never deleted**: raw keeps what the API
+returned and the exclusion stays visible and reversible. **The KPI marts filter on it;
+anything counting `core` directly must too.**
+
+### Columns added 2026-09-08
+
+| Column | On | What it carries |
+| --- | --- | --- |
+| `is_in_scope` | opportunities, jobs | See above. |
+| `status_subcategory` | opportunities | `lost_contact`, `lost_competitor`, `bad_duplicate`… from the `dim_status_map` seed. That seed existed, tested and documented, and **nothing read it** — three separate comments claimed a join that was never written. Wiring it took lost-reason coverage from 56.6% to 95.6%; overall 97.4%. |
+| `status_category_reported` | opportunities | The category the report string implies, kept *beside* `status_category` (which comes from the authoritative platform integer) rather than merged into it. They disagree on 167 rows, and that disagreement is a finding, not noise. Never group by this. |
+| `referral_channel_group` | opportunities | Paid Search / Paid Social / GBP / Organic / Referral / Affiliate / Direct / AI, from `dim_referral_source` — the other seed nothing read. Present on 90% of in-scope rows. |
+| `referral_platform`, `referral_source_clean` | opportunities | Google / Meta / Bing / Yelp…, and a tidy display name. |
+| `referral_is_paid` | opportunities | True when the source needs spend. **NULL, not false, when the seed is silent** — "unknown" and "free" are different answers, and an ROI denominator must not conflate them. |
+
+WARNING: both seed joins go through `norm_text` on **both sides**, and `norm_text` can
+collapse two distinct seed keys into one. In `dim_referral_source` it already does, for
+two pairs of spelling variants, so that join deduplicates with `distinct on`. Singular
+tests under `dbt/tests/` fail if colliding rows ever stop agreeing on what they mean —
+without them the join fans out and silently multiplies opportunity rows.
 
 **An opportunity has many jobs.** 12,251 have exactly one, 1,044 have two, 146 have
 three, and a handful have more. Anything that divides an opportunity-level number
@@ -170,13 +205,40 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `int_opportunity_quote_crosswalk`  | view  | **`(instance, quote_number)` → GUID.** The bridge every report needs |
 | `int_report_all_jobs_latest`       | view  | Newest All Jobs row per job — the ~60 single-source fields           |
 | `int_report_lost_leads_latest`     | view  | Newest Lost Leads row per opportunity                                |
-| `fct_agent_leads_daily`            | table | Sales KPIs, cohort grain: (agent, line, day the lead arrived)        |
-| `mart_unmatched_report_rows`       | view  | Report rows that could not be crosswalked — a review queue           |
+| `int_opportunity_line`             | view  | One line of business per opportunity, collapsed from its jobs. Shared by both cohort marts so the `min` tie-break exists once |
+| `fct_agent_leads_daily`            | table | Sales KPIs, cohort grain: (agent, line, day the lead arrived) — 12,643 rows |
+| `fct_lead_source_daily`            | table | Same cohort grain by **marketing channel** — 10,756 rows. Where ad spend attaches later |
+| `mart_unmatched_report_rows`       | view  | Report rows that could not be crosswalked — a review queue. Its count oscillates; see the Lead Status note under `raw_smartmoving` |
 
 **When a field goes through the observation layer, and when it does not:** only where
 two sources can disagree. Fields with exactly one source join straight in — that is why
 `int_report_all_jobs_latest` and `int_report_lost_leads_latest` exist instead of
 adding sixty nullable columns to every other arm.
+
+---
+
+## `serving` — the published contract
+
+Four objects, materialised as **tables** (not views) so RLS applies, each with
+`entity_id` and `synced_at`, each catalogued in
+[`serving_catalog.md`](serving_catalog.md). A view that is not catalogued does not exist.
+
+| View | Grain | Rows |
+| --- | --- | ---: |
+| `jobs_upcoming_v1` | one per job scheduled in the next 10 days | ~390 |
+| `leads_today_v1` | one per lead created today, entity-local | ~20 |
+| `sales_agent_daily_v1` | `(entity_id, agent, line, lead day)` — cohort | 12,643 |
+| `lead_source_daily_v1` | `(entity_id, channel, line, lead day)` — cohort | 10,756 |
+
+WARNING: the two cohort views carry two caveats a consumer must honour, both written
+into the catalogue. Recent cohorts are not comparable to old ones — a lead from last
+week has not had time to be lost, and August 2026 read 71% against a 45-50% baseline.
+And `is_within_assignment` must not be used as a slicer yet: it reads false for 42% of
+leads because `dim_agent_assignment` covers only 2026.
+
+WARNING: `materialized` here is load-bearing. `apply_rls` filters on
+`table_type = 'BASE TABLE'`, so switching `serving` to views would silently drop RLS.
+The catalogue calls them views in the contract sense; on disk they are tables.
 
 ---
 
