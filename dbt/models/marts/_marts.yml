@@ -50,13 +50,21 @@ models:
         data_tests: [not_null]
       - name: line_of_business
         description: >
-          `unassigned` where the opportunity has no job and therefore no line. Those
-          rows are kept so an agent's total still reconciles against
-          core.opportunities.
+          From int_opportunity_line: the line of the opportunity's jobs, or - while it
+          has none, because SmartMoving creates the job only on conversion - the line
+          its branch maps to. `unassigned` means no job AND no mapped branch; those
+          rows are kept rather than dropped so an agent's total still reconciles
+          against core.opportunities. See provisional_line_leads.
         data_tests:
           - not_null
           - accepted_values:
               values: ['local', 'long_distance', 'commercial', 'unassigned']
+      - name: provisional_line_leads
+        description: >
+          Of leads_received, how many have their line inferred from the branch because
+          no job exists yet. Decays to zero as the cohort converts; non-zero only on
+          the last few days. Show it beside any recent split by line of business.
+        data_tests: [not_null]
       - name: lead_received_date
         data_tests: [not_null]
       - name: valid_leads
@@ -135,7 +143,7 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['local', 'long_distance', 'commercial', 'unclassified']
+              values: ['local', 'long_distance', 'commercial', 'unassigned']
       - name: lead_received_date
         data_tests: [not_null]
       - name: leads_received
@@ -168,7 +176,7 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['local', 'long_distance', 'commercial', 'unclassified']
+              values: ['local', 'long_distance', 'commercial', 'unassigned']
       - name: status_category
         description: Only unresolved categories reach this model.
         data_tests:

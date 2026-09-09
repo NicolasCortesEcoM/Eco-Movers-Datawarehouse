@@ -106,14 +106,39 @@ models:
 
   - name: int_opportunity_line
     description: >
-      One line of business per opportunity, collapsed from its jobs. `min` is a
-      deterministic tie-break, not a judgement - five opportunities out of 15,028
-      span two lines, and has_mixed_lines records that a choice was made. Shared by
-      fct_agent_leads_daily and fct_lead_source_daily so the tie-break exists once.
+      One line of business per opportunity - every opportunity in core, not only the
+      ones that have a job. The line is a property of the JOB, and SmartMoving does
+      not create the job until the lead converts, so a fresh lead has nothing at job
+      grain to read; that is what used to surface as `unassigned` on the agent
+      dashboard. This model applies the same rule hierarchy as core.lines_of_business
+      one grain up - jobs, then the opportunity's own branch via dim_lob_branch, then
+      dim_instance.lob_hint, then `unassigned` - so a pre-conversion lead still lands
+      on the right line. lob_source says which rule answered and is_provisional_line
+      marks the inferences. Shared by fct_agent_leads_daily, fct_lead_source_daily and
+      fct_pipeline_current so the tie-break and the hierarchy exist once.
     columns:
       - name: external_opportunity_id
         data_tests: [not_null]
       - name: line_of_business
-        data_tests: [not_null]
+        description: >
+          local, long_distance, commercial, or `unassigned` when the opportunity has
+          neither a job nor a mapped branch. Never null.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['local', 'long_distance', 'commercial', 'unassigned']
       - name: has_mixed_lines
+        data_tests: [not_null]
+      - name: lob_source
+        description: >
+          Which rule decided the line: job (observed work), opportunity_branch,
+          instance, or unassigned.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['job', 'opportunity_branch', 'instance', 'unassigned']
+      - name: is_provisional_line
+        description: >
+          True while the opportunity has no job, so the line is an inference that the
+          job will replace on conversion. Exclude or display it when comparing lines.
         data_tests: [not_null]

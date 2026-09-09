@@ -116,7 +116,8 @@ outside its validity windows. It is a data-quality signal until that seed is ext
 | `entity_id` | text | Business entity (RLS key). |
 | `agent_name` | text | Canonical name from `dim_agent`. Group by this, never by the raw CRM string. |
 | `is_sales_agent`, `role` | bool / text | From the hand-maintained roster. 34 of 65 CRM names are not yet in it and surface with `is_known = false` upstream. |
-| `line_of_business` | text | `local`, `long_distance`, `commercial`, `unclassified`. |
+| `line_of_business` | text | `local`, `long_distance`, `commercial`. The line comes from the opportunity's JOBS; while a lead has none - SmartMoving creates the job only on conversion - it is inferred from the branch. `unassigned` is reserved for an opportunity with neither, and no in-scope lead currently hits it. |
+| `provisional_line_leads` | int | Of `leads_received`, how many still have an inferred line because the lead has not converted yet. Non-zero only on the last few days; show it beside any recent split by line. |
 | `lead_received_date` | date | The cohort date. |
 | `leads_received`, `valid_leads`, `bad_leads` | int | A bad lead was never winnable and is excluded from the conversion denominator. |
 | `booked_leads`, `lost_leads`, `cancelled_leads`, `open_leads` | int | `open_leads` is the cohort-maturity signal. |

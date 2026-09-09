@@ -83,11 +83,16 @@ joined as (
         coalesce(a.agent_name, o.sales_assignee_name)            as agent_name,
         coalesce(a.is_sales_agent, true)                         as is_sales_agent,
         a.role,
-        -- An opportunity with no job has no line. It is attributed to `unassigned`
-        -- rather than dropped, so the agent's total still reconciles against
-        -- core.opportunities and the gap is visible instead of missing.
+        -- int_opportunity_line now answers for EVERY opportunity, including the ones
+        -- with no job yet - it falls back to the opportunity's own branch. The
+        -- coalesce stays as a guard, not as the normal path: `unassigned` here means
+        -- no job and no mapped branch, which no in-scope lead currently hits.
         coalesce(l.line_of_business, 'unassigned')               as line_of_business,
         coalesce(l.has_mixed_lines, false)                       as has_mixed_lines,
+        -- The line came from the branch, not from observed work, because the lead has
+        -- not converted yet. Carried so a line-by-line comparison can show how much of
+        -- a bucket is still provisional instead of implying it is settled.
+        coalesce(l.is_provisional_line, true)                    as is_provisional_line,
         o.*
     from opps o
     left join opportunity_line l
@@ -117,6 +122,10 @@ aggregated as (
         count(*) filter (where is_open)                   as open_leads,
 
         count(*) filter (where has_mixed_lines)           as mixed_line_leads,
+        -- Leads whose line is inferred from the branch because no job exists yet. It
+        -- decays to zero as the cohort converts, and it is the honest caveat on any
+        -- recent-day split by line of business.
+        count(*) filter (where is_provisional_line)       as provisional_line_leads,
 
         -- NO `quoted_leads` HERE, deliberately. The obvious definition - an
         -- opportunity that carries an estimate - measures nothing: the Lead Status
@@ -179,6 +188,7 @@ select
     a.cancelled_leads,
     a.open_leads,
     a.mixed_line_leads,
+    a.provisional_line_leads,
 
     -- Conversion is expressed against VALID leads, not against everything received.
     -- A bad lead - a wrong number, a spam form fill - was never winnable, and

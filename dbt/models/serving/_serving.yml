@@ -64,6 +64,12 @@ models:
         data_tests: [not_null]
       - name: line_of_business
         data_tests: [not_null]
+      - name: provisional_line_leads
+        description: >
+          Of leads_received, how many still have their line of business inferred from
+          the branch because the lead has not converted to a job yet. Non-zero only on
+          recent cohorts.
+        data_tests: [not_null]
       - name: lead_received_date
         data_tests: [not_null]
       - name: leads_received

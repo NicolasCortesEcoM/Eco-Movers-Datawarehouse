@@ -67,7 +67,7 @@ group and silently destroyed 2023 and 2024. Row counts would have looked healthy
 `sql/34` skips them in both the ranking and the delete.
 **Verified:** zero generations are both flagged and unflagged — the only failure mode.
 
-### ✅ A2 — `report_ingest` stalled for nine hours, and recovered on a restart
+### ✅ A2 — `report_ingest` stalled, then crash-looped on out-of-memory for 24 h
 From 2026-09-07 18:10 PT nothing was collected: all 39 SmartMoving emails sat unread and
 the 21:00 batch had still not landed at 21:34, while n8n itself was demonstrably alive
 (webhooks arriving, dlt running on schedule). The 31 pending reports were loaded by hand
@@ -79,10 +79,37 @@ ingest errors. Verified afterwards - payments did **not** duplicate (162,660 row
 162,660 distinct keys, so marking the processed emails read did its job), and the 15
 protected historical generations are intact.
 
-⚠️ **The root cause is unknown and unaddressed.** A stuck workflow cleared itself by
-chance after nine hours, and nothing anywhere would have reported it. That is precisely
-the failure class A4 exists to catch, and it is the strongest argument for building it:
-without a heartbeat, the next stall is equally invisible and might not restart itself.
+**Root cause found on 2026-09-09, after it recurred and did not recover.** From 09-08
+11:10 PT every execution died for 24 hours. n8n named it itself on the crashed runs:
+*"Node crashed, possible out-of-memory issue"* at `Build Landing Rows`.
+
+Three compounding causes, in order of importance:
+
+1. **The batch was unbounded.** The Gmail sweep took every report email in the inbox -
+   `newer_than:2d`, ~60 emails, ~200,000 rows - and processed them in ONE execution.
+2. **Cleanup sat at the end of the graph**, behind the dbt rebuild, so a crash left
+   every email in the inbox and the next sweep re-collected the same batch plus new
+   arrivals. That is what turned one bad run into a 24-hour outage.
+3. **Landing was per row.** One INSERT per row, ~5,000 round trips per report, and n8n
+   retains each node's input and output for the whole execution, so every report was
+   held in memory five or six times over. Executions ran 20-30 minutes.
+
+**Fixed:** one report per execution (Gmail `limit: 1`, sweep `*/5 * * * *`); a single
+set-based INSERT via `jsonb_to_recordset`; cleanup moved to immediately after the
+row-count check, the point at which the email is provably consumed; the IMAP trigger
+disabled, having fired zero executions in weeks while being the unbounded entry point.
+Verified: the 18:09 payments report landed 524/524 rows in **154 ms** and its email was
+trashed - the whole graph ran in under two seconds.
+
+The *"Paired item data for item from node 'Download Report File' is unavailable"* error
+was a symptom, not the cause: n8n replaces a crashed run's node output with stubs that
+carry no `pairedItem`, so retrying one fails on the first `$('...').item`. Those are now
+`.first()`, unambiguous because there is exactly one report per execution.
+
+⚠️ **A4 is still the right thing to build.** Nothing alerted for 24 hours, because a
+process killed for memory throws no error for `errorWorkflow` to catch. Also worth
+doing: the droplet has 8 GB of RAM and **zero swap**, so Node dies outright instead of
+degrading.
 
 ### ✅ A3 — A month-old presence proof was still deciding what counted as deleted
 `_dlt_pipeline_state` held `{at: 2026-08-08, from: 20250204, to: 20270204}`, written by

@@ -84,7 +84,7 @@ select
     l.customer_name,
     l.branch_name,
     l.sales_assignee_name,
-    coalesce(ln.line_of_business, 'unclassified')      as line_of_business,
+    coalesce(ln.line_of_business, 'unassigned')        as line_of_business,
     l.referral_channel_group,
     l.referral_is_paid,
 

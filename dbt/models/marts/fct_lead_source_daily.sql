@@ -62,7 +62,7 @@ opportunity_line as (
 joined as (
     select
         o.*,
-        coalesce(l.line_of_business, 'unclassified') as line_of_business
+        coalesce(l.line_of_business, 'unassigned') as line_of_business
     from opps o
     left join opportunity_line l
       on  l.source_instance_id      = o.source_instance_id

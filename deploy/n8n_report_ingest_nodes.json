@@ -1,15 +1,103 @@
 {
-  "meta": { "instanceId": "report_ingest_patch" },
+  "_comment": [
+    "Paste-ready node JSON for the n8n workflow `report_ingest` (id 3NRvDchKPT5RK4tn).",
+    "State as of 2026-09-09, after the out-of-memory fix. Only the nodes on the ingestion",
+    "path are here; the error/alert branch and the sticky notes live in n8n.",
+    "",
+    "THE INVARIANT: one report email per execution. `Find Unprocessed Reports` is capped at",
+    "limit 1 and the sweep runs every 5 minutes. Raising that limit reintroduces the crash",
+    "loop of 2026-09-08 - see AUDIT_PLAN.md A2 and crm_sync_contract.md section 11."
+  ],
+  "meta": {
+    "instanceId": "report_ingest_patch"
+  },
   "nodes": [
     {
       "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "76975196-9e06-4312-a3bf-56d9cf357bbb",
+      "name": "Sweep every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -320,
+        192
+      ],
+      "notes": "Every 5 minutes. Throughput comes from frequency, not from batch size - Find Unprocessed Reports takes exactly one email per run."
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "simple": false,
+        "filters": {
+          "q": "from:no-reply@smartmoving.com subject:\"Report is Ready\" in:inbox newer_than:7d",
+          "readStatus": "both"
+        },
+        "options": {
+          "downloadAttachments": false
+        }
+      },
+      "id": "15a79838-eab9-46a6-996a-f5efc469c7ef",
+      "name": "Find Unprocessed Reports",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -144,
+        192
+      ],
+      "webhookId": "1bf60ec6-0c00-46b8-b29f-2c32246fdf2a",
+      "notes": "Every report email still in the inbox. Trashing on success is what makes the inbox the queue.",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LRuQ7N5goNwmVT7Q",
+          "name": "Gmail account - Nicolas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Gmail's message shape differs from the IMAP node's. Rather than teach Resolve\n// Report Metadata two shapes, normalise here - one adapter, and the node that does\n// the attribution keeps a single input contract.\n//\n// Resolve Report Metadata reads: headers, to, cc, from, text, html, date, messageId.\nconst g = $input.item.json;\nconst h = g.headers || {};\n\nreturn {\n  json: {\n    headers: h,\n    to: g.to || h.to || null,\n    cc: g.cc || h.cc || null,\n    from: g.from || h.from || null,\n    // `simple: false` on the Gmail node is what makes these available. The download\n    // link lives in the body, and without it there is nothing to resolve.\n    text: g.text || '',\n    html: g.textAsHtml || g.html || '',\n    date: g.date || h.date || null,\n    messageId: g.messageId || h['message-id'] || null,\n    // The Gmail API id, carried through so the cleanup step can trash this exact\n    // message without having to search for it again.\n    gmail_id: g.id || null,\n    subject: g.subject || h.subject || null,\n  },\n};"
+      },
+      "id": "7aa9c051-8f7c-46b4-bf7c-2af3522369fe",
+      "name": "Shape Gmail Like IMAP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        192
+      ],
+      "notes": "Gmail's shape differs from IMAP's. One adapter here so Resolve Report Metadata stays untouched."
+    },
+    {
+      "parameters": {
         "url": "={{ $json.download_url }}",
-        "options": { "timeout": 120000, "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } } }
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 120000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, -100],
-      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "position": [
+        720,
+        -96
+      ],
+      "id": "8ba6cbcf-fb3b-49e3-8e41-6b732003f5ab",
       "name": "Download Report File",
       "retryOnFail": true,
       "maxTries": 3,
@@ -18,51 +106,369 @@
     {
       "parameters": {
         "operation": "xlsx",
-        "binaryPropertyName": "data",
         "options": {
           "headerRow": true,
           "includeEmptyCells": true,
           "readAsString": true,
-          "sheetName": "={{ $('Resolve Report Metadata').item.json.sheet_name }}"
+          "sheetName": "={{ $('Resolve Report Metadata').first().json.sheet_name }}"
         }
       },
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
-      "position": [880, -100],
-      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "position": [
+        944,
+        -96
+      ],
+      "id": "b5a7f7db-3dca-4c31-89bc-7417d2eb34dd",
       "name": "Extract Report Rows"
     },
     {
       "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ONE report per execution. `Find Unprocessed Reports` is capped at a single email,\n// so the metadata is unambiguous and no paired-item lookup is needed anywhere in\n// this graph. That is deliberate, not a shortcut: the only reason this workflow ever\n// raised \"Paired item data for item from node 'Download Report File' is unavailable\"\n// is that when n8n recovers a CRASHED run it replaces every node's output with a stub\n// that carries no pairedItem. Reading .first() removes the dependency entirely, so a\n// recovered or retried run behaves like a fresh one.\n//\n// This node returns a SINGLE item holding the whole report rather than one item per\n// row. n8n retains the input and output of every node run for the life of the\n// execution, so one item per row meant the report was held in memory five or six\n// times over. A 60-email backlog of ~200,000 rows is what exhausted the heap on\n// 2026-09-08 and put the workflow in a crash loop.\nconst meta = $('Resolve Report Metadata').first().json;\nconst rowKeyField = meta.row_key_field;\n\nconst payload = $input.all().map((item, i) => {\n  const row = { ...item.json };\n\n  let rowKey = rowKeyField ? String(row[rowKeyField] ?? '').trim() : '';\n\n  if (!rowKey) {\n    // NO NATURAL KEY - the payments report is the case this exists for.\n    //\n    // A hash of the row alone is NOT enough. SmartMoving sent 531 payment rows and\n    // 530 landed: two rows were byte-identical, hashed to the same key, and\n    // ON CONFLICT DO NOTHING dropped one. That failed the row-count assertion on\n    // every run, which blocked the dbt rebuild and the mailbox cleanup behind it.\n    //\n    // Arguing that identical rows \"are the same observation\" was wrong on both\n    // counts: raw must be faithful to what the source sent (CLAUDE.md rule 1), and\n    // deciding whether two payments are duplicates is dbt's job, not the landing\n    // step's. Two customers paying the same amount on the same day against the same\n    // quote is a real thing.\n    //\n    // The position makes the key unique WITHOUT breaking idempotency: re-ingesting\n    // the same email yields the same rows in the same order, so the same keys, so\n    // ON CONFLICT still no-ops. The hash stays in the key so a row that moved\n    // position between generations is still recognisable.\n    let h = 5381;\n    const s = JSON.stringify(row);\n    for (let k = 0; k < s.length; k++) h = ((h * 33) ^ s.charCodeAt(k)) >>> 0;\n    rowKey = '__row' + String(i).padStart(6, '0') + '__' + h.toString(36);\n  }\n\n  return {\n    source_instance_id: meta.source_instance_id,\n    entity_id: meta.entity_id,\n    report_generated_at: meta.report_generated_at,\n    row_key: rowKey,\n    row_data: row,\n    _source_email: meta.message_id,\n  };\n});\n\nreturn [{\n  json: {\n    target_table: meta.target_table,\n    report_type: meta.report_type,\n    source_instance_id: meta.source_instance_id,\n    report_generated_at: meta.report_generated_at,\n    row_count: payload.length,\n    // Serialised here so the Postgres node passes it as one bind parameter.\n    rows: JSON.stringify(payload),\n  },\n}];\n"
+      },
+      "id": "8b9be1a3-e500-412e-8dab-18466152e4d5",
+      "name": "Build Landing Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        -96
+      ]
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT\n  {{ $('Resolve Report Metadata').first().json.expected_records }}::int AS expected_records,\n  (SELECT count(*)\n     FROM raw_smartmoving.{{ $('Resolve Report Metadata').first().json.target_table }}\n    WHERE source_instance_id  = $1\n      AND report_generated_at = $2::timestamptz) AS landed_records",
+        "query": "-- One statement for the whole report. This used to be one INSERT per row, which\n-- turned a 5,000-row report into 5,000 round trips - executions ran 20 to 30 minutes\n-- and n8n held an item per row for the entire run. Set-based landing is the same\n-- write with the same conflict semantics, in one call.\nINSERT INTO raw_smartmoving.{{ $json.target_table }}\n  (source_instance_id, entity_id, report_generated_at, row_key, row_data, _source_email)\nSELECT r.source_instance_id,\n       r.entity_id,\n       r.report_generated_at::timestamptz,\n       r.row_key,\n       r.row_data,\n       r._source_email\nFROM jsonb_to_recordset($1::jsonb) AS r(\n  source_instance_id  text,\n  entity_id           text,\n  report_generated_at text,\n  row_key             text,\n  row_data            jsonb,\n  _source_email       text)\nON CONFLICT (source_instance_id, report_generated_at, row_key) DO NOTHING;\n",
         "options": {
-          "queryReplacement": "={{ [$('Resolve Report Metadata').first().json.source_instance_id, $('Resolve Report Metadata').first().json.report_generated_at] }}"
+          "queryBatching": "single",
+          "queryReplacement": "={{ [$json.rows] }}"
+        }
+      },
+      "id": "a362fe39-363a-48b2-9f0c-da1fab89bf7c",
+      "name": "Land Report Rows",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1312,
+        -96
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "V1zOLBFlGPXLCEWH",
+          "name": "Datawarehouse Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per DISTINCT report present in THIS execution.\n//\n// The IMAP trigger does not deliver one email per execution. When SmartMoving sends\n// all eight scheduled reports at once they arrive together, and on 2026-08-13 seven\n// reports were processed across five executions - several sharing a run.\n//\n// The previous verification read $('Resolve Report Metadata').first(), so exactly one\n// report per execution was row-count checked and every other one landed unverified.\n// That is the precise situation a truncated report slips through: the rows are in the\n// table, nothing failed, and no one knows the count was short.\nconst seen = new Map();\n\nfor (const item of $('Resolve Report Metadata').all()) {\n  const m = item.json || {};\n  if (!m.is_valid || !m.target_table) continue;\n\n  // A report is identified by where it lands, for whom, and when it was generated -\n  // the same three columns as the landing table's primary key.\n  const key = m.source_instance_id + '|' + m.target_table + '|' + m.report_generated_at;\n  if (seen.has(key)) continue;\n\n  seen.set(key, {\n    report_type: m.report_type,\n    target_table: m.target_table,\n    source_instance_id: m.source_instance_id,\n    report_generated_at: m.report_generated_at,\n    expected_records: m.expected_records,\n  });\n}\n\nreturn Array.from(seen.values()).map(json => ({ json }));"
+      },
+      "id": "aa64595b-a954-47f9-961e-655c50ea7cf7",
+      "name": "Collect Reports To Verify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  $3::int AS expected_records,\n  (SELECT count(*)\n     FROM raw_smartmoving.{{ $json.target_table }}\n    WHERE source_instance_id  = $1\n      AND report_generated_at = $2::timestamptz) AS landed_records",
+        "options": {
+          "queryReplacement": "={{ [$json.source_instance_id, $json.report_generated_at, $json.expected_records] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
-      "position": [1540, -100],
-      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "position": [
+        1488,
+        -96
+      ],
+      "id": "051fcefd-aa04-461a-a12a-5237a4970a6d",
       "name": "Verify Landed Row Count",
-      "executeOnce": true,
-      "credentials": { "postgres": { "id": "V1zOLBFlGPXLCEWH", "name": "Datawarehouse Postgres" } }
+      "executeOnce": false,
+      "credentials": {
+        "postgres": {
+          "id": "V1zOLBFlGPXLCEWH",
+          "name": "Datawarehouse Postgres"
+        }
+      }
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const r = $input.first().json;\nconst meta = $('Resolve Report Metadata').first().json;\n\nconst expected = (r.expected_records === null || r.expected_records === undefined)\n  ? null\n  : Number(r.expected_records);\nconst landed = Number(r.landed_records);\n\n// SmartMoving states the record count in the email body. A mismatch means rows were\n// dropped somewhere between the download and the insert. Throwing routes this to\n// datawarehouse_error_handler, which alerts on Slack: a truncated report that lands\n// quietly is far worse than one that fails loudly, because every downstream number\n// silently becomes wrong.\nif (expected !== null && landed !== expected) {\n  throw new Error(\n    'Row count mismatch for ' + meta.report_type + ' / ' + meta.source_instance_id +\n    ': SmartMoving reported ' + expected + ' records, ' + landed + ' landed. ' +\n    'Do not trust downstream numbers for this report until resolved.'\n  );\n}\n\nreturn [{\n  json: {\n    report_type: meta.report_type,\n    source_instance_id: meta.source_instance_id,\n    report_generated_at: meta.report_generated_at,\n    expected_records: expected,\n    landed_records: landed,\n    verified: true,\n  },\n}];"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const r = $input.item.json;\nconst meta = $('Collect Reports To Verify').item.json;\n\nconst expected = (r.expected_records === null || r.expected_records === undefined)\n  ? null\n  : Number(r.expected_records);\nconst landed = Number(r.landed_records);\n\n// Runs once per REPORT now, not once per execution. SmartMoving states the record\n// count in the email body; a mismatch means rows were dropped between the download\n// and the insert. Throwing routes this to datawarehouse_error_handler and Slack: a\n// truncated report that lands quietly is far worse than one that fails loudly,\n// because every downstream number silently becomes wrong.\nif (expected !== null && landed !== expected) {\n  throw new Error(\n    'Row count mismatch for ' + meta.report_type + ' / ' + meta.source_instance_id +\n    ': SmartMoving reported ' + expected + ' records, ' + landed + ' landed. ' +\n    'Do not trust downstream numbers for this report until resolved.'\n  );\n}\n\nreturn { json: {\n  report_type: meta.report_type,\n  source_instance_id: meta.source_instance_id,\n  report_generated_at: meta.report_generated_at,\n  expected_records: expected,\n  landed_records: landed,\n  verified: true,\n} };"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, -100],
-      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "position": [
+        1664,
+        -96
+      ],
+      "id": "d56aec58-9b1b-47bf-b377-98694096406d",
       "name": "Assert Row Count Matches"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per DISTINCT email that was successfully processed in THIS execution.\n//\n// Runs immediately after the row-count check, and BEFORE the dbt rebuild. That order\n// is the important part. Cleanup used to sit behind Assert Rebuild Succeeded, so any\n// failure anywhere downstream left the email sitting in the inbox - and the sweep\n// picks up everything still in the inbox. One crash on 2026-09-08 therefore fed a\n// bigger batch into the next run, which crashed harder, for 24 hours.\n//\n// The row-count assertion is the right place to stop: it proves the email was fully\n// consumed and every row SmartMoving announced is in raw. Whether dbt then rebuilds\n// successfully is a separate concern - the rows are landed either way, and\n// re-downloading the email would not fix a broken model. A failed rebuild still\n// throws and still alerts through datawarehouse_error_handler.\nconst seen = new Set();\nconst out = [];\n\nfor (const item of $('Resolve Report Metadata').all()) {\n  const m = item.json || {};\n  if (!m.is_valid || !m.rfc822_msgid) continue;\n  if (seen.has(m.rfc822_msgid)) continue;\n  seen.add(m.rfc822_msgid);\n  out.push({ json: {\n    rfc822_msgid: m.rfc822_msgid,\n    report_type: m.report_type,\n    source_instance_id: m.source_instance_id,\n  } });\n}\n\nreturn out;\n"
+      },
+      "id": "7b4e9523-cee5-4f5f-99cb-3f516b57e037",
+      "name": "Collect Emails To Clean",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        -96
+      ],
+      "notes": "One item per distinct message that landed successfully in this execution."
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 1,
+        "filters": {
+          "q": "=rfc822msgid:{{ $json.rfc822_msgid }}",
+          "readStatus": "both"
+        }
+      },
+      "id": "4a275e09-11e3-4ddb-bac8-57d9a3ca65e9",
+      "name": "Find Email In Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2368,
+        -96
+      ],
+      "webhookId": "00962d85-e0b8-4fda-8249-4669d2b01c2e",
+      "notes": "Resolves the RFC822 Message-ID to a Gmail message id. IMAP gives us the header id; the Gmail API needs its own.",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LRuQ7N5goNwmVT7Q",
+          "name": "Gmail account - Nicolas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "TRASH"
+        ]
+      },
+      "id": "bbb613aa-3914-4edd-b345-dcfb8f0f4cf9",
+      "name": "Move Email To Trash",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2544,
+        -96
+      ],
+      "webhookId": "68237265-eee2-4312-9d9e-cec1d9606788",
+      "notes": "Adds the TRASH label to THIS message only. Never the thread - all reports share one.",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LRuQ7N5goNwmVT7Q",
+          "name": "Gmail account - Nicolas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "out=$(flock -w 900 /tmp/dw-dbt.lock -c 'cd /home/datawarehouse_user/datawarehouse/dbt && set -a && . /home/datawarehouse_user/datawarehouse/.env && set +a && /home/datawarehouse_user/datawarehouse/venv/bin/dbt build --profiles-dir . --target dev --no-use-colors' 2>&1); rc=$?; echo \"$out\" | tail -40; exit $rc",
+        "cwd": "/home/datawarehouse_user/datawarehouse"
+      },
+      "id": "5a37d0cd-d147-4d74-bdfa-274b121799c8",
+      "name": "Rebuild dbt now",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        -96
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "executeOnce": true,
+      "credentials": {
+        "sshPassword": {
+          "id": "nWVW3MrcW3hpTfeZ",
+          "name": "SSH Datawarehouse"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst out = String(r.stdout || '') + '\\n' + String(r.stderr || '');\nconst code = Number(r.code ?? r.exitCode ?? 0);\n\n// Same guard as the nightly build. The SSH node reports the remote exit status but\n// does not fail the workflow on it, so without this a broken rebuild leaves the\n// report looking ingested while core and serving still hold yesterday's numbers.\nconst m = (out.match(/Done\\. PASS=(\\d+) WARN=(\\d+) ERROR=(\\d+) SKIP=(\\d+)/) || null);\n\nif (code !== 0 || !m) {\n  throw new Error(\n    'dbt rebuild FAILED after ingesting a report (exit ' + code + '). The rows are ' +\n    'landed but core and serving have NOT been refreshed.\\n\\n' + out.slice(-3000)\n  );\n}\n\nconst [, pass, warn, error, skip] = m.map(Number);\nif (error > 0 || skip > 0) {\n  throw new Error(\n    'dbt rebuild finished with ERROR=' + error + ' SKIP=' + skip + '.\\n\\n' + out.slice(-3000)\n  );\n}\n\nreturn [{ json: { ok: true, pass, warn, rebuilt_at: new Date().toISOString() } }];"
+      },
+      "id": "5abe423b-c54d-4d2e-ae93-fde34fcfa2f1",
+      "name": "Assert Rebuild Succeeded",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -96
+      ]
     }
   ],
   "connections": {
-    "Download Report File": { "main": [[{ "node": "Extract Report Rows", "type": "main", "index": 0 }]] },
-    "Verify Landed Row Count": { "main": [[{ "node": "Assert Row Count Matches", "type": "main", "index": 0 }]] }
+    "Sweep every 5 min": {
+      "main": [
+        [
+          {
+            "node": "Find Unprocessed Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Unprocessed Reports": {
+      "main": [
+        [
+          {
+            "node": "Shape Gmail Like IMAP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Gmail Like IMAP": {
+      "main": [
+        [
+          {
+            "node": "Resolve Report Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Report File": {
+      "main": [
+        [
+          {
+            "node": "Extract Report Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Report Rows": {
+      "main": [
+        [
+          {
+            "node": "Build Landing Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Landing Rows": {
+      "main": [
+        [
+          {
+            "node": "Land Report Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Land Report Rows": {
+      "main": [
+        [
+          {
+            "node": "Collect Reports To Verify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Reports To Verify": {
+      "main": [
+        [
+          {
+            "node": "Verify Landed Row Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Landed Row Count": {
+      "main": [
+        [
+          {
+            "node": "Assert Row Count Matches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assert Row Count Matches": {
+      "main": [
+        [
+          {
+            "node": "Collect Emails To Clean",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Emails To Clean": {
+      "main": [
+        [
+          {
+            "node": "Find Email In Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Email In Gmail": {
+      "main": [
+        [
+          {
+            "node": "Move Email To Trash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move Email To Trash": {
+      "main": [
+        [
+          {
+            "node": "Rebuild dbt now",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rebuild dbt now": {
+      "main": [
+        [
+          {
+            "node": "Assert Rebuild Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "pinData": {}
 }

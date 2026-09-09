@@ -43,6 +43,11 @@ select
     open_leads,
     conversion_pct,
 
+    -- Leads whose line of business is inferred from the branch because the lead has
+    -- not converted to a job yet. Non-zero only on recent cohorts; it is the caveat
+    -- to attach to any split by line on the last few days.
+    provisional_line_leads,
+
     invoiced_deals,
     avg_invoiced_deal_size,
     booked_estimated_value,

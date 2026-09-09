@@ -3,10 +3,45 @@
 Exact configuration for the n8n workflow `report_ingest` (id `3NRvDchKPT5RK4tn`), kept
 under version control so the flow can be rebuilt without archaeology.
 
-**Status: applied and verified end-to-end on 2026-08-07.** A real Lead Status email
-landed 4,801 rows against 4,801 expected. See `IMPLEMENTATION_STATUS.md` for the
-full post-run database audit. The paste-ready node JSON is in
-[`n8n_report_ingest_nodes.json`](n8n_report_ingest_nodes.json).
+**Status: applied and verified end-to-end on 2026-08-07**, rebuilt on **2026-09-09**
+after an out-of-memory crash loop. A real Lead Status email landed 4,801 rows against
+4,801 expected; after the rebuild, a payments report landed 524/524 rows in 154 ms. See
+`IMPLEMENTATION_STATUS.md` for the full post-run database audit. The paste-ready node
+JSON is in [`n8n_report_ingest_nodes.json`](n8n_report_ingest_nodes.json).
+
+## ⚠️ ONE report email per execution. Do not raise the limit.
+
+`Find Unprocessed Reports` is `limit: 1`, and the sweep runs `*/5 * * * *`. Throughput
+comes from frequency, not from batch size: 288 runs a day against ~34 reports is ample.
+
+It was unbounded until 2026-09-09, and on 09-08 that meant ~60 emails and ~200,000 rows
+in one execution. n8n retains every node's input AND output for the life of a run, and
+rows were landed one INSERT at a time, so each report was held in memory five or six
+times over. The heap gave out at `Build Landing Rows`; runs took 20-30 minutes before
+dying. Because the mailbox cleanup sat at the END of the graph, a crash left every email
+in the inbox, so the next sweep collected the same batch plus new arrivals - a loop that
+ran for 24 hours with no alert, because a process killed for memory throws nothing.
+
+Three things keep it fixed, and all three matter:
+
+1. **`limit: 1`** - memory is bounded by one xlsx, whatever the backlog.
+2. **Set-based landing** - `jsonb_to_recordset` in a single statement, not a query per
+   row. The whole graph now runs in under two seconds; only the dbt rebuild takes time.
+3. **Cleanup before the rebuild** - the email is trashed as soon as its row count is
+   verified, which is the point at which it is provably consumed. A later failure can no
+   longer feed the loop.
+
+A useful corollary: with one report per run there is exactly one metadata item, so every
+`$('Resolve Report Metadata').item` became `.first()` and the flow no longer depends on
+paired-item tracing at all. The *"Paired item data for item from node 'Download Report
+File' is unavailable"* error was never the bug - n8n rebuilds a crashed run's node
+outputs as stubs with no `pairedItem`, so retrying one always failed there.
+
+## ⚠️ The IMAP trigger is DISABLED
+
+It had not fired an execution in weeks - every run came from the Gmail sweep - and it is
+the one entry point that cannot be capped, because an IMAP trigger delivers however many
+messages are waiting. The filter below applies only if it is ever re-enabled.
 
 ## ⚠️ The IMAP filter is a safety device, not an optimisation
 

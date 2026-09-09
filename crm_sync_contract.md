@@ -213,7 +213,7 @@ which is the best possible time to pay for it.
 
 | Workflow | When | What it does |
 |---|---|---|
-| `report_ingest` | IMAP trigger | Lands whatever report email arrives, then rebuilds dbt immediately |
+| `report_ingest` | **every 5 min** (`*/5 * * * *`, Gmail sweep) | Lands **one** report email per execution, verifies its row count, trashes the email, then rebuilds dbt. The IMAP trigger is disabled: it had not fired a single execution in weeks, and it is unbounded - it delivers however many emails are waiting, which is what exhausted the heap on 2026-09-08. One report per run bounds memory to a single xlsx and removes every paired-item lookup from the graph. |
 | SmartMoving native report sends | **03:00, 11:00, 13:00, 15:00, 18:00, 21:00** | Configured in the SmartMoving UI. Five report types can send themselves: Lead Status, Booked, Lost Leads, Cancellations and Payments. **All Jobs is excluded because SmartMoving does not allow it to be scheduled.** |
 | `opps_sweep` | 06:30, 10:30, 13:30, 16:30, 20:30 | Sweep `[-180, +60]`, both instances |
 | `leads_poll` | aligned with the sweep | Leads have no webhook; polling is their only path |
@@ -336,6 +336,31 @@ where it neither errors nor progresses.
 and a container restart around 03:00 the next morning: nine hours, 39 unread emails in
 the mailbox, zero errors logged, zero alerts raised. It then recovered on its own. The
 stall was found by hand while auditing something else.
+
+**Then it happened again, and the second time it did not recover.** From 2026-09-08
+11:10 PT the workflow ran out of memory on every execution for 24 hours. The mechanism
+is worth recording because it was a loop, not a fault:
+
+1. The Gmail sweep collected **every** report email still in the inbox - `newer_than:2d`,
+   roughly 60 emails and 200,000 rows - and processed them in ONE execution.
+2. Rows were landed one INSERT per row, and n8n retains the input and output of every
+   node for the life of the execution, so the reports were held in memory five or six
+   times over. Executions ran 20 to 30 minutes; then the heap gave out.
+3. Cleanup - trashing the processed emails - sat at the very END of the graph, behind
+   the dbt rebuild. A crash therefore left every email in the inbox, so the next sweep
+   picked up the same batch plus the new arrivals, and crashed harder.
+
+Nothing alerted, because a process killed for memory throws nothing. Fixed 2026-09-09
+by bounding the batch to one report per execution, landing each report with a single
+set-based INSERT, and moving the cleanup to immediately after the row-count check -
+the point at which the email is provably consumed - so a downstream failure can no
+longer feed the loop.
+
+The "Paired item data for item from node 'Download Report File' is unavailable" error
+seen while debugging was a SYMPTOM, not the cause: when n8n recovers a crashed run it
+replaces every node's output with a stub carrying no `pairedItem`, so re-running one
+fails on the first `$('...').item` lookup. Those lookups are now `.first()`, which is
+unambiguous because there is exactly one report per execution.
 
 `scripts/pipeline_heartbeat.py` runs from cron on the droplet and asks the opposite
 question - not "did anything fail?" but "when did each mechanism last succeed?" - for
