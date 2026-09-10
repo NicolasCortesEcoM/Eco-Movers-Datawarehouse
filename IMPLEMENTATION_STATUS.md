@@ -10,9 +10,25 @@
 **Where that stands:** all six report types land with row-count validation; All Jobs is
 requested by a Playwright browser bot because it cannot be scheduled natively; Lost
 Leads is modelled through `core.opportunities`; five serving contracts are published.
-The main open items are `serving.opportunities_v1`, scheduling the quote-backfill
-drain, and modelling the landed Cancellations and Payments reports.
-**Last updated:** 2026-09-08.
+The quote-backfill drain is now scheduled inside `report_ingest` (once per burst, 300
+per instance, before the dbt build). The main open items are
+`serving.opportunities_v1` and modelling the landed Cancellations and Payments reports.
+**Last updated:** 2026-09-09.
+
+⚠️ **2026-09-09 — two corrections that changed the numbers, both recorded in
+[`AUDIT_PLAN.md`](AUDIT_PLAN.md):**
+
+- **A5. `core.opportunities` was missing 13,196 rows**, and they were the leads that
+  never converted. Every API opportunity path finds an opportunity through its *jobs*,
+  so bad leads (88% missing), in-progress leads (72%) and lost leads (39%) were absent
+  while closed and completed ones were at 100%. They were missing from the conversion
+  denominator, so every rate in the sales layer read high. Fixed with **zero API calls**:
+  the lead's `id` is the opportunity GUID, so `/api/leads` became an arm of the
+  observation layer. `core.opportunities` 58,678 → **71,874**; booked unchanged.
+- **A2. `report_ingest` crash-looped on out-of-memory for 24 h.** Unbounded batch,
+  per-row inserts, and cleanup behind the dbt build so a crash re-fed itself. Now one
+  report per execution, set-based landing, cleanup before the build, alias-filtered
+  queue, and unusable mail archived out of the inbox.
 **Active workstream board:** [`AUDIT_PLAN.md`](AUDIT_PLAN.md) - the 2026-09-07 warehouse
 audit and the sales KPI layer, at task granularity. This file stays the plan of record for
 the project as a whole; that one is one workstream inside it and is updated in the same
@@ -1161,8 +1177,13 @@ never paused.
 - [ ] Complete the sweep `status` enum mapping (3/10/20/30/50).
 
 ### Deferred, deliberately
-- [ ] Lead -> opportunity map. Sync strategy 10.1 proposes a fuzzy email/phone/branch/date match. Out of
-      scope: leads and opportunities stay separate this phase.
+- [x] **Lead -> opportunity map. DONE 2026-09-09, and no fuzzy match was needed.** Sync strategy 10.1
+      proposed matching on email/phone/branch/date, and this item was deferred on the premise that
+      `/api/leads` returns no opportunity id. The premise was false: the lead's `id` IS the opportunity
+      GUID (23,717 byte-identical ids; six absent ones confirmed live against
+      `GET /api/opportunities/{id}`). `/api/leads` is now an arm of `int_opportunity_observations`.
+      `core.opportunities` 58,678 -> 71,874; booked unchanged at ~26,640, so the entire correction is in
+      the conversion denominator. See `AUDIT_PLAN.md` A5.
 - [ ] Notes, follow-ups, interaction history, inventory item lines, document URLs, Premium per-job calls.
 
 ---

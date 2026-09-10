@@ -176,9 +176,25 @@ limit, not a guess.
 | 5 | **A job closes** | `job-closed` / `job-finalized` / `payment-made` → **one** detail call | `opportunities_enriched` |
 | 6 | **Historical backfill** | `--sweep-only` over a wide window; All Time report exports | crosswalk + `report_*` |
 
-Leads and opportunities are **separate, independent records**. There is no
-lead→opportunity map, and `/api/leads` does not return an opportunity id. Note that
-the *lost-leads* report keys on `Quote #`, so despite its name it enriches
+⚠️ **A LEAD AND AN OPPORTUNITY ARE THE SAME RECORD.** This section said the opposite
+for months — *"separate, independent records… `/api/leads` does not return an
+opportunity id"* — and it was wrong. The lead's own `id` **is** the opportunity GUID.
+Evidence, 2026-09-09: 23,717 of 36,895 lead ids are byte-identical to an existing
+`core.opportunities.external_opportunity_id`, and six lead ids that were *not* in that
+table were put to `GET /api/opportunities/{id}` — all six returned 200, echoed the same
+id, and carried a `quoteNumber`.
+
+What the belief cost: **13,196 opportunities missing from `core`**, overwhelmingly bad
+leads and leads still in progress. Every API opportunity path reaches an opportunity
+**through its jobs** (the sweep window is a service-date window, and service dates live
+on jobs), so a lead that never converted was invisible to all of them — 98.4% of the
+opportunities present in `core` have a job, against 5.5% of the absent ones. They were
+missing from the conversion *denominator*, so every rate in the sales layer read high.
+
+`/api/leads` is now an arm of `int_opportunity_observations`, joined on the identifier
+SmartMoving itself issues. No fuzzy matching is involved and none is needed.
+
+Note that the *lost-leads* report keys on `Quote #`, so despite its name it enriches
 opportunities, not leads.
 
 ---
@@ -223,7 +239,7 @@ which is the best possible time to pay for it.
 | `nightly_reconciliation` | 02:00 | `--refresh-stale-hours 336` |
 | `weekly_dims` | weekly | Dimensions |
 | `pipeline_heartbeat` | **every 30 min at :05/:35** (cron on the droplet, NOT n8n) | Asks when each mechanism last SUCCEEDED and alerts on silence. It is outside n8n on purpose: every other alert here fires when a node throws, which cannot see a job that never ran. See §11. |
-| `quote_backfill` | **not yet scheduled** — run manually until an n8n workflow exists | Resolves Lead Status quotes with no GUID, newest first, capped by `--budget`. See §2a. |
+| `quote_backfill` | **once per report burst**, inside `report_ingest`, at `--budget 300` per instance | Resolves Lead Status quotes with no GUID, newest first. Runs only when `Inbox Drained?` is true — i.e. the last execution of a burst — and **before** `Rebuild dbt now`, so one build publishes the reports and the newly resolved quotes together. Holds a non-blocking `flock`, so overlapping executions skip rather than spend the budget twice, and is `onError: continue` because the reports are already row-count verified by then and an enrichment failure must not block publishing them. See §2a. |
 | `report_bot_all_jobs` | **02:50** (full year) and **10:00, 13:00, 16:00, 20:00** (last 90 days) | Runs the Playwright browser bot on the droplet. The bot logs in, opens All Jobs, sets the date range and clicks **Run Report**, causing SmartMoving to email the XLSX. SmartMoving cannot schedule this report itself. The bot uses zero API quota and never downloads, parses or loads the file; `report_ingest` owns those steps. |
 
 ### The six reports, and what each one uniquely carries

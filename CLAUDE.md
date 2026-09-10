@@ -103,6 +103,14 @@ Where a source schema is volatile, preserve the full payload in a `JSONB` column
 - Employee identity is anchored on the Paylocity Employee ID
 - Cross-source matches live in explicit crosswalk tables, never inferred at query time
 - An unmatched record is surfaced for review, never silently dropped
+- **A SmartMoving lead and a SmartMoving opportunity are the same record.** The lead's
+  `id` from `GET /api/leads` **is** the opportunity GUID - verified on 23,717
+  byte-identical ids and six live `GET /api/opportunities/{id}` calls (2026-09-09).
+  Several documents used to assert the opposite and defer a "lead -> opportunity map"
+  to a fuzzy email/phone/date match; that match was never needed and must not be
+  built. Believing otherwise cost 13,196 missing opportunities - almost all of them
+  leads that never converted, which meant they were missing from every conversion
+  denominator. If a source already carries the vendor's own identifier, join on it.
 
 ## Serving contracts
 

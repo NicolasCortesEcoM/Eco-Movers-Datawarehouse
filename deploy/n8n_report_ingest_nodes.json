@@ -16,7 +16,9 @@
     "     nicolas@ecomovers.com did on 2026-09-09, silently, until it was found by hand.",
     "",
     "  Plus: dbt rebuilds ONCE PER BURST. `Any Reports Left?` asks whether the inbox still",
-    "  holds a report; if it does, this run skips the rebuild and the last run pays for it."
+    "  holds a report; if it does, this run skips the tail and the last run pays for it.",
+    "  The tail is ordered drain-then-build on purpose: the resolved quotes must be in raw",
+    "  BEFORE the build, or they wait for the next one."
   ],
   "meta": {
     "instanceId": "report_ingest_patch"
@@ -348,6 +350,28 @@
       "notes": "TRUE = nothing left, so rebuild dbt now. FALSE = more reports queued, skip the rebuild and let the last run of the burst pay for it once."
     },
     {
+      "name": "Drain Quote Backlog",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        3072,
+        -96
+      ],
+      "parameters": {
+        "command": "out=$(flock -E 99 -n /tmp/dw-quote-backfill.lock -c 'cd /home/datawarehouse_user/datawarehouse && set -a && . ./.env && set +a && ./venv/bin/python pipeline/run.py --job quote_backfill --dest postgres --budget 300 --pace 0.6' 2>&1); rc=$?; if [ $rc -eq 99 ]; then echo 'quote_backfill: another drain is already in flight, skipped'; exit 0; fi; echo \"$out\" | grep -Ei 'unresolved quotes selected|load package|failed|Error|Traceback' | tail -20; exit $rc",
+        "cwd": "/home/datawarehouse_user/datawarehouse"
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "sshPassword": {
+          "id": "nWVW3MrcW3hpTfeZ",
+          "name": "SSH Datawarehouse"
+        }
+      },
+      "notes": "Resolves report Quote #s the API has never seen, newest first, 300 per instance. Runs BEFORE the dbt build so one build publishes the reports and the newly resolved quotes together."
+    },
+    {
       "parameters": {
         "command": "out=$(flock -w 900 /tmp/dw-dbt.lock -c 'cd /home/datawarehouse_user/datawarehouse/dbt && set -a && . /home/datawarehouse_user/datawarehouse/.env && set +a && /home/datawarehouse_user/datawarehouse/venv/bin/dbt build --profiles-dir . --target dev --no-use-colors' 2>&1); rc=$?; echo \"$out\" | tail -40; exit $rc",
         "cwd": "/home/datawarehouse_user/datawarehouse"
@@ -595,7 +619,7 @@
       "main": [
         [
           {
-            "node": "Rebuild dbt now",
+            "node": "Drain Quote Backlog",
             "type": "main",
             "index": 0
           }
@@ -619,6 +643,17 @@
         [
           {
             "node": "Archive Out Of Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drain Quote Backlog": {
+      "main": [
+        [
+          {
+            "node": "Rebuild dbt now",
             "type": "main",
             "index": 0
           }
