@@ -151,7 +151,18 @@ seeds:
       - name: is_paid
         description: TRUE si requiere spend de marketing para generar el lead.
       - name: campaign_clean_fk
-        description: FK -> dim_campaign.campaign_clean (solo si is_paid=TRUE).
+        description: >
+          Columna historica. Agrupaba de forma INCONSISTENTE - para Yelp y Bing traia
+          la familia, para Google Ads traia la campana individual - y ningun modelo la
+          lee. Sustituida por campaign_group; se conserva porque documenta como estaban
+          agrupadas las fuentes antes de 2026-09-10.
+      - name: campaign_group
+        description: >
+          La FAMILIA de marketing a la que pertenece la fuente. `Google Ads Snohomish`
+          y `Google Ads King` son ambas `Google Ads`; `Yelp Seattle` y `Yelp Tacoma`
+          son ambas `Yelp`. Existe porque las dos preguntas son reales y una sola
+          columna solo puede responder una: source_clean mide la campana individual y
+          esta mide el conjunto. 178 fuentes -> 59 grupos. Nunca nula.
       - name: lob_affinity
         description: Primary LOB que esta fuente tiende a generar (Local/LD/Commercial/Mixed).
       - name: pct_commercial

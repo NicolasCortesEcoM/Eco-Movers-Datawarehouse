@@ -133,6 +133,12 @@ referral as (
     select distinct on ({{ norm_text('referral_source_raw') }})
         {{ norm_text('referral_source_raw') }} as referral_key,
         nullif(trim(source_clean), '')         as referral_source_clean,
+        -- The marketing FAMILY the source rolls up to: `Google Ads Snohomish` and
+        -- `Google Ads King` are both `Google Ads`. Two levels are needed because both
+        -- questions are real - "how is the Snohomish campaign doing" and "how is
+        -- Google Ads doing" - and a single column can only answer one of them.
+        -- referral_source_clean stays the individual campaign; this is the roll-up.
+        nullif(trim(campaign_group), '')       as referral_campaign_group,
         nullif(trim(channel_group), '')        as referral_channel_group,
         nullif(trim(platform), '')             as referral_platform,
         -- Already boolean: dbt's seed type inference turns the CSV's TRUE/FALSE into
@@ -415,6 +421,7 @@ select
     -- the outcome and the report string is not - 185 rows read `Closed` while the API
     -- said Booked. Two vocabularies for one question is how they drift.
     rs.referral_source_clean,
+    rs.referral_campaign_group,
     rs.referral_channel_group,
     rs.referral_platform,
     rs.referral_is_paid,
