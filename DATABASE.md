@@ -39,17 +39,56 @@ functional gain. The mapping above is the translation.
 
 Every one is a **table** with an `entity_id` column and an RLS policy.
 
+Counts measured 2026-09-10.
+
 | Table                  | Grain                                                              |   Rows | Cols |
 | ---------------------- | ------------------------------------------------------------------ | -----: | ---: |
-| `opportunities`        | `(source_instance_id, external_opportunity_id)`                    | 58,573 |   57 |
-| `jobs`                 | `(source_instance_id, external_job_id)`                            | 63,440 |  100 |
-| `lines_of_business`    | one per job                                                        | 63,440 |   12 |
-| `opportunity_charges`  | `(instance, external_job_id, charge_kind, seq)` — **job grain**    |  9,886 |   15 |
-| `leads`                | `(source_instance_id, external_lead_id)`                           | 36,847 |   33 |
-| `opportunity_payments` | `(instance, external_opportunity_id, seq)`                         |  1,907 |   13 |
+| `opportunities`        | `(source_instance_id, external_opportunity_id)`                    | 71,914 |   60 |
+| `jobs`                 | `(source_instance_id, external_job_id)`                            | 63,576 |  100 |
+| `lines_of_business`    | one per job                                                        | 63,576 |   12 |
+| `leads`                | `(source_instance_id, external_lead_id)`                           | 36,932 |   33 |
+| `opportunity_charges`  | `(instance, external_job_id, charge_kind, seq)` — **job grain**    | 10,209 |   15 |
+| `payments`             | `(instance, row position in the newest Payments export)`           |  3,037 |   19 |
+| `opportunity_payments` | `(instance, external_opportunity_id, seq)`                         |  2,006 |   13 |
+| `agents`               | one per CRM-written salesperson name                               |     68 |    8 |
 | `branches`             | `(source_instance_id, branch_name)` — **the timezone authority**   |      8 |   18 |
-| `agents`               | one per CRM-written salesperson name                               |     65 |    8 |
 | `entity_access`        | `(role_name, entity_id)` — **access control, owned by `postgres`** |      — |    2 |
+
+### WARNING: `opportunities` grew by 13,196 rows on 2026-09-09, and it was a bug fix
+
+It was 58,678. `/api/leads` became an arm of `int_opportunity_observations` because the
+lead's `id` **is** the opportunity GUID — a fact three documents in this repo denied. The
+rows added are almost entirely leads that never converted, which every API opportunity
+path had been blind to: those paths reach an opportunity through its **jobs**, and a lead
+that never converted has none. 98.4% of the opportunities already present have a job,
+against 5.5% of the ones that were missing.
+
+**Booked did not move** (26,644 → 26,639). The whole correction is in the denominator, so
+every conversion rate published before that date read high. See `AUDIT_PLAN.md` A5.
+
+### WARNING: `payments` and `opportunity_payments` are different tables on purpose
+
+`opportunity_payments` holds payments embedded in the API's enriched opportunity payload —
+only the opportunities a detail call reached, but with a real GUID and ordinal.
+`payments` is the Payments scheduled report taken whole: every payment in the report
+window at zero quota, carrying the payment **date**, method, card confirmation, terminal,
+and payments made against a **job** or a **storage account** rather than an opportunity.
+
+They are **not merged, and must not be.** There is no shared payment identifier to merge
+on — SmartMoving emits no payment id and the report carries no GUID — so any union would
+either double count or invent a match.
+
+`payments` is a **snapshot, not a ledger**: it is the newest export, because the report's
+row key is the row's position in the file. A payment that falls out of the report window
+disappears from it. Never use it as a financial system of record, and never diff two
+builds of it to detect refunds.
+
+### WARNING: `core` also holds three tables that are not ours
+
+`workspace_tasks` (13,217), `workspace_projects` (60) and `workspace_departments` (6) are
+written by a different application in the group that shares this database. They have no
+`entity_id` contract with this warehouse and no dbt model owns them. **Reported, never
+touched.** See section D of `AUDIT_PLAN.md`.
 
 ### WARNING: `is_in_scope` — read this before counting anything
 
@@ -206,9 +245,12 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `int_opportunity_quote_crosswalk`  | view  | **`(instance, quote_number)` → GUID.** The bridge every report needs |
 | `int_report_all_jobs_latest`       | view  | Newest All Jobs row per job — the ~60 single-source fields           |
 | `int_report_lost_leads_latest`     | view  | Newest Lost Leads row per opportunity                                |
+| `int_report_cancellation_latest`   | view  | Newest Cancellation Details row per opportunity — **when** a deal died and **how much** it cost |
+| `int_report_payments_latest`       | view  | The newest Payments generation, **whole**. It cannot be a per-row winner: the export carries no payment id, so its row key is the row's position in the file |
 | `int_opportunity_line`             | view  | One line of business per opportunity, collapsed from its jobs. Shared by both cohort marts so the `min` tie-break exists once |
 | `fct_agent_leads_daily`            | table | Sales KPIs, cohort grain: (agent, line, day the lead arrived) — 12,643 rows |
 | `fct_lead_source_daily`            | table | Same cohort grain by **marketing channel** — 10,756 rows. Where ad spend attaches later |
+| `fct_cancellations_daily`          | table | Cancellations on the day they **happened** — 1,007 rows. The PERIOD view. Publishes no rate, deliberately: on a calendar grain the denominator is unknowable |
 | `fct_pipeline_current`             | table | Current unresolved opportunities, separating committed from speculative work; snapshot, not history |
 | `mart_unmatched_report_rows`       | view  | Report rows that could not be crosswalked — a review queue. Its count oscillates; see the Lead Status note under `raw_smartmoving` |
 
@@ -221,7 +263,7 @@ adding sixty nullable columns to every other arm.
 
 ## `serving` — the published contract
 
-Five objects, materialised as **tables** (not views) so RLS applies, each with
+Six objects, materialised as **tables** (not views) so RLS applies, each with
 `entity_id` and `synced_at`, each catalogued in
 [`serving_catalog.md`](serving_catalog.md). A view that is not catalogued does not exist.
 
@@ -229,15 +271,31 @@ Five objects, materialised as **tables** (not views) so RLS applies, each with
 | --- | --- | ---: |
 | `jobs_upcoming_v1` | one per job scheduled in the next 10 days | ~390 |
 | `leads_today_v1` | one per lead created today, entity-local | ~20 |
-| `sales_agent_daily_v1` | `(entity_id, agent, line, lead day)` — cohort | 12,643 |
-| `lead_source_daily_v1` | `(entity_id, channel, line, lead day)` — cohort | 10,756 |
-| `pipeline_current_v1` | one per unresolved opportunity; current snapshot | ~628 |
+| `sales_agent_daily_v1` | `(entity_id, agent, line, lead day)` — cohort | 12,748 |
+| `lead_source_daily_v1` | `(entity_id, channel, line, lead day)` — cohort | 11,181 |
+| `pipeline_current_v1` | one per unresolved opportunity; current snapshot | 636 |
+| `cancellations_daily_v1` | `(entity_id, agent, line, cancelled day)` — **period, not cohort** | 1,007 |
 
 WARNING: the two cohort views carry two caveats a consumer must honour, both written
 into the catalogue. Recent cohorts are not comparable to old ones — a lead from last
 week has not had time to be lost, and August 2026 read 71% against a 45-50% baseline.
 And `is_within_assignment` must not be used as a slicer yet: it reads false for 42% of
 leads because `dim_agent_assignment` covers only 2026.
+
+WARNING: **two cancellation views, two grains, and summing them double counts.**
+`sales_agent_daily_v1.cancellation_pct` is keyed on the day the lead **arrived** — it
+answers "how well does this intake hold up" and is the only grain where a cancellation
+RATE has a real denominator. `cancellations_daily_v1` is keyed on the day the deal was
+**cancelled** — it answers "how much did we lose in July". The same cancellation appears
+in both, on two different dates. The rate formula is
+`cancelled / (booked + cancelled)`, because a cancellation *replaces* the booked status
+upstream (status 20 clears `is_booked`), so adding it back is what reconstructs
+everything ever won.
+
+WARNING: `cancelled_date` coverage starts **2026-01-02**, the Cancellation Details report
+window, so the period view holds 1,476 of the 6,331 cancellations in `core`. The cohort
+view counts all 6,331, because the cancelled flag comes from the status integer. A
+disagreement between the two totals is this, not a bug.
 
 WARNING: `materialized` here is load-bearing. `apply_rls` filters on
 `table_type = 'BASE TABLE'`, so switching `serving` to views would silently drop RLS.

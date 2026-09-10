@@ -204,7 +204,23 @@ Concrete decisions:
 - **Opportunity enrichment uses all `Include*` flags** because they do not change quota cost. One call brings maximum available detail.
 - **Customer is intentionally thin.** The detail hangs from opportunity, matching SmartMoving's model: Customer -> Opportunity -> Job. Build the 360 at opportunity grain.
 - **`status` int vs `leadStatus` string are separate systems.** Business classification uses trimmed `leadStatus` joined to `dim_status_map`.
-- **Lead -> `opportunityId`:** `/api/leads` does not include `opportunityId`; dbt builds `int_lead_opportunity_map` using customer email/phone + branch + serviceDate + conversion window until a test proves an exact key.
+- ~~**Lead -> `opportunityId`:** `/api/leads` does not include `opportunityId`; dbt builds `int_lead_opportunity_map` using customer email/phone + branch + serviceDate + conversion window until a test proves an exact key.~~
+  **WRONG, corrected 2026-09-09. Do not build this.** The exact key was there all along:
+  the lead's own `id` **is** the opportunity GUID. Verified on 23,717 byte-identical ids
+  and six live `GET /api/opportunities/{id}` calls, all of which echoed the same id back.
+  There is no `int_lead_opportunity_map`; `/api/leads` is simply an arm of
+  `int_opportunity_observations`, joined on the identifier SmartMoving itself issues.
+
+  The fuzzy match was also measured before being discarded, so the cost of having built
+  it is known: matching report quotes to leads on creation timestamp + salesperson is
+  **99.58% precise**, which sounds acceptable and means roughly 40 opportunities silently
+  attached to the wrong customer. Adding service date and referral source reached 100% on
+  1,330 ground-truth cases, but both fields are mutable in the CRM, so the match would not
+  have been reproducible between builds.
+
+  Believing the premise cost **13,196 opportunities missing from `core`** — almost all of
+  them leads that never converted, and therefore missing from every conversion
+  denominator. See `CLAUDE.md` *Identity resolution* and `AUDIT_PLAN.md` A5.
 - **Optional forensic raw JSON:** keep the raw JSON response before dlt if replay without API calls becomes necessary.
 
 ### 10.2 Multi-Tenant Timezones

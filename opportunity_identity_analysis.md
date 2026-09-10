@@ -121,6 +121,21 @@ all**: one call per unresolved quote.
 
 **That backfill is affordable.** It is 3.6% of one month's quota, once.
 
+> ## ✅ ACTED ON 2026-09-09 — this document's central finding is now in production
+>
+> Section 4b below was written, verified, and then left on the shelf. On 2026-09-09
+> `/api/leads` was finally wired into `int_opportunity_observations` as an arm keyed on
+> that GUID. It recovered **13,196 opportunities** at zero API cost, almost all of them
+> leads that never converted and were therefore missing from the denominator of every
+> conversion rate the sales layer published.
+>
+> The finding was correct here months before it was acted on. If you are reading an
+> analysis in this repo that contradicts a model, check the date and check the model —
+> this file was right and the model was wrong for longer than it should have been.
+>
+> Live references: `CLAUDE.md` *Identity resolution*, `AUDIT_PLAN.md` A5,
+> `DATABASE.md` (`core` section), `crm_sync_contract.md` section 4.
+
 ### 4b. Correction: `/api/leads` DOES return the opportunity GUID
 
 `core/opportunities.sql` states, in a comment that shapes the whole design:

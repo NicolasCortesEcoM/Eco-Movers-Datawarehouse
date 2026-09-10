@@ -37,64 +37,116 @@ commit as the work it describes.
 
 ---
 
-## DONDE ESTAMOS - 2026-08-25
+## DONDE ESTAMOS - 2026-09-10
 
-**Fase 1: SmartMoving -> Postgres.** La ingesta funciona de punta a punta y sin intervencion
-manual. Lo que falta es publicar el resultado para que otros equipos lo consuman.
+**Fase 1: SmartMoving -> Postgres.** La ingesta corre sola de punta a punta. Seis
+contratos publicos estan publicados. Lo que queda es el contrato general de
+oportunidades, cerrar el goteo de quotes sin resolver, y la capa de marketing.
 
-### Que hay en el almacen ahora mismo
+### El almacen ahora mismo
 
 | Tabla | Filas | Que es |
-|---|---|---|
-| `core.opportunities` | 14.998 | Una fila por oportunidad de venta |
-| `core.jobs` | 20.968 | Una fila por trabajo (mudanza) |
-| `core.leads` | 2.866 | Una fila por lead recibido |
-| `core.lines_of_business` | 20.968 | Linea de negocio de cada trabajo |
+|---|---:|---|
+| `core.opportunities` | 71.914 | Una fila por oportunidad. **60 columnas.** |
+| `core.jobs` | 63.576 | Una fila por trabajo. 100 columnas. |
+| `core.lines_of_business` | 63.576 | Linea de negocio de cada trabajo |
+| `core.leads` | 36.932 | Una fila por lead recibido |
+| `core.opportunity_charges` | 10.209 | Cargos estimados y reales |
+| `core.payments` | 3.037 | **Nuevo 2026-09-10.** Todo pago recibido, via reporte |
+| `core.opportunity_payments` | 2.006 | Pagos embebidos en el payload del API |
+| `core.agents` | 68 | Roster de vendedores |
 | `core.branches` | 8 | Sucursales, con su zona horaria |
 
-Cobertura de los campos que mas importan, sobre 14.998 oportunidades:
+⚠️ `core` contiene tambien `workspace_tasks`, `workspace_projects` y
+`workspace_departments` (13.283 filas). **No son del almacen**: otra aplicacion del
+grupo escribe ahi. Se reportan, no se tocan. Ver la seccion D del `AUDIT_PLAN.md`.
 
-| Campo | Cuantas lo tienen |
-|---|---|
-| Fecha de servicio | 13.163 (88%) |
-| Nombre del cliente | 13.163 (88%) |
-| Vendedor asignado | 6.122 (41%) |
-| Importe cotizado | 3.637 (24%) |
-| Importe facturado | 1.434 (10%) |
+Cobertura de los campos que mas importan, sobre 71.914 oportunidades:
 
-Las tres ultimas suben conforme llegan mas generaciones de los reportes: el reporte cubre un
-periodo, no toda la historia.
+| Campo | Cobertura | Nota |
+|---|---|---|
+| Fecha de llegada del lead | 69.803 (97%) | |
+| Vendedor asignado | 69.811 (97%) | era 41% en agosto |
+| Linea de negocio | 100% | ninguna queda sin clasificar |
+| Motivo de perdida | 95,6% | via `dim_status_map` |
+| Canal de marketing | 98,9% | via `dim_referral_source` |
+| **Familia de campana** | **98,9%** | **nuevo:** `referral_campaign_group` |
+| Numero de cotizacion | 58.453 (81%) | el resto espera al drenaje de quotes |
+| Fecha de cancelacion | 1.476 de 6.331 canceladas | ventana del reporte, desde 2026-01-02 |
+
+### Contratos publicados en `serving`
+
+| Vista | Filas | Grano |
+|---|---:|---|
+| `sales_agent_daily_v1` | 12.748 | cohorte: agente x linea x dia de llegada del lead |
+| `lead_source_daily_v1` | 11.181 | cohorte: canal x linea x dia de llegada del lead |
+| `cancellations_daily_v1` | 1.007 | **periodo**: agente x linea x dia de cancelacion |
+| `pipeline_current_v1` | 636 | foto de ahora, una fila por oportunidad viva |
+| `jobs_upcoming_v1` | 409 | trabajos proximos |
+| `leads_today_v1` | 12 | leads de hoy |
 
 ### De donde sale cada dato
 
-Cuatro fuentes, y cada una hace algo que las otras no pueden:
+Cinco fuentes, y cada una hace algo que las otras no pueden:
 
 | Fuente | Coste | Que aporta |
 |---|---|---|
 | **Webhooks** | Gratis | El estado, en segundos |
-| **Reportes programados** | Gratis | Cobertura masiva: dinero, direcciones, vendedor |
-| **Barrido del API** | ~1 llamada / 200 clientes | Identidad: el puente entre GUID y numero de cotizacion |
+| **Reportes programados** | Gratis | Cobertura masiva: dinero, direcciones, vendedor, cancelaciones, pagos |
+| **`GET /api/leads`** | ~1 llamada / 200 leads | **La identidad de todo lead que no convirtio.** Ver abajo |
+| **Barrido del API** | ~1 llamada / 200 clientes | Identidad de lo que si convirtio |
 | **Detalle del API** | 1 llamada por oportunidad | Profundidad, solo cuando un webhook lo justifica |
 
-El detalle esta en [`crm_sync_contract.md`](crm_sync_contract.md), que manda sobre cualquier otro
-documento en estas cuestiones.
+⚠️ **`/api/leads` no es una fuente de leads: es una fuente de OPORTUNIDADES.** El `id`
+del lead **es** el GUID de la oportunidad. Durante meses tres documentos de este repo
+afirmaban lo contrario y eso costo **13.196 oportunidades ausentes de `core`**, casi
+todas leads que nunca convirtieron - es decir, ausentes del denominador de toda tasa de
+conversion. Corregido el 2026-09-09 con cero llamadas al API. La regla vive ahora en
+`CLAUDE.md`, seccion *Identity resolution*, y la evidencia en `AUDIT_PLAN.md` A5.
+
+El detalle esta en [`crm_sync_contract.md`](crm_sync_contract.md), que manda sobre
+cualquier otro documento en estas cuestiones.
 
 ### Como se actualiza (sin tocar nada a mano)
 
 ```
-Llega el correo con el reporte
+Llega el correo con el reporte a un alias *reporting@
         v
-report_ingest lo detecta, descarga y aterriza
+report_ingest lo detecta (barrido Gmail cada 2 min, filtrado por alias)
         v
-Verifica que el numero de filas cuadre
+Aterriza UN reporte por ejecucion, en una sola sentencia
         v
-Reconstruye dbt inmediatamente  <-- anadido 2026-08-25
+Verifica que el numero de filas cuadre con lo que anuncia el correo
+        v
+Manda el correo a la papelera  <-- ANTES del build, a proposito
+        v
+Quedan mas reportes en cola?  SI -> termina aqui, sin reconstruir
+                              NO -> drena 300 quotes/instancia -> dbt build
         v
 core y serving quedan al dia
 ```
 
-Ademas, `dbt_build_reports` corre cada noche a las 03:05 como red de seguridad: recarga las
-semillas, reconstruye todo y poda los reportes viejos.
+Cada paso de ese orden se pago con una caida; las razones estan en
+`deploy/n8n_report_ingest_setup.md` y en `AUDIT_PLAN.md` A2, A6.
+
+Ademas: `dbt_build_reports` corre de noche como red de seguridad, y
+`pipeline_heartbeat` (cron en el droplet, fuera de n8n) pregunta cada 30 minutos
+cuando triunfo por ultima vez cada mecanismo y alerta por silencio. Es lo unico que
+detecto la caida del 2026-09-09.
+
+---
+
+## ESTADO POR FASE - 2026-09-10
+
+| Fase | Estado | Que falta |
+|---|---|---|
+| **Auditoria A1-A6** | ✅ Completa | - |
+| **KPIs de ventas (B0-B4)** | ✅ Completa | `opportunities_v1` sigue pendiente (ver Fase B abajo) |
+| **Fase A - Cancellations y Payments** | ✅ **Completa 2026-09-10** | - |
+| **Fase B - Contrato general** | ⏳ Pendiente | `serving.opportunities_v1` |
+| **Fase C - Marketing y publicidad** | 🔵 En progreso | Jerarquia de campanas hecha; falta mart, seeds de coste y tablas raw de Ads |
+| **Fase D - Reportes nuevos** | ⏳ Pendiente | 13 reportes programables disponibles y sin usar |
+| **Limpieza C4-C8, D** | ⏳ Parcial | C4 cerrado por la Fase A; C5-C8 abiertos |
 
 ---
 
@@ -220,18 +272,133 @@ completa tarda unos 25 segundos.
 
 ---
 
-## LO QUE SIGUE ABIERTO
+## LO QUE SIGUE ABIERTO - actualizado 2026-09-10
 
-1. **Publicar `serving.opportunities_v1`.** Ya existen cinco contratos publicos,
-   incluido `pipeline_current_v1`, pero todavia no existe el contrato general de
-   oportunidades que el proyecto declaro como prioridad principal.
-2. **La tabla de vendedores.** Decidido que la mantiene Nicolas, no el CRM: hay admins que venden
-   (Jesus Carranza, 140 oportunidades) y "vendedores" que no son personas ("Admin team"). Faltan
-   12 vendedores por asignar. Pendiente decidir si se edita como archivo o con un formulario.
-3. **`Booked` con fecha de servicio en solo 30,8%.** Anomalia sin explicar: una oportunidad
-   reservada deberia tener fecha. Merece una revision propia.
-4. **Activar los 6 flujos restantes.** Estan configurados y probados uno a uno, pero inactivos:
-   activarlos empieza a gastar cuota de API de forma automatica.
+Ordenado por lo que desbloquea, no por dificultad. **La accion siguiente es la 1.**
+
+### 1. NEXT ACTION - `serving.opportunities_v1`
+
+El contrato que el proyecto declaro prioridad numero uno desde el principio y que sigue
+sin publicarse. Ahora vale mas que nunca: `core.opportunities` paso de 58.678 a 71.914
+filas, tiene 60 columnas y lleva atribucion de campana, fecha de cancelacion y
+subcategoria de perdida.
+
+Grano `(source_instance_id, external_opportunity_id)`. Requisitos que impone el propio
+repo: entrada en `serving_catalog.md`, `entity_id` y `synced_at`, tests de unicidad en el
+grano y `relationships` de vuelta a `core`, y sufijo de version.
+
+⚠️ Decidir antes de escribir: **si expone las 60 columnas o un subconjunto.** Un contrato
+publico es mas facil de ampliar que de recortar - quitar una columna obliga a v2 con 90
+dias de solapamiento. Empezar estrecho.
+
+### 2. Fase C - marketing y publicidad (en progreso)
+
+Hecho: `dim_referral_source.campaign_group`, 178 fuentes -> 59 familias, y
+`core.opportunities.referral_campaign_group` al 98,9%.
+
+Falta, en orden:
+
+1. **`marts.fct_campaign_daily`**, grano `(entity, campaign_group, campaign, linea, dia)`.
+   Deja sumar por familia o por campana individual sin cambiar de tabla.
+2. **`dim_ad_campaign_map`** - seed. Nombre de campana de la plataforma -> campana
+   nuestra. **Este es el punto difícil, no el coste:** Google Ads emite
+   `[Search] Moving - Snohomish - Exact` y el CRM dice `Google Ads Snohomish`. No
+   coinciden y no van a coincidir. Misma clase de tabla que `dim_lob_branch`.
+3. **`raw_google_ads`, `raw_meta_ads`, `raw_bing_ads`** con coste diario por campana.
+   Fase 2 del roadmap, asi que cada una necesita su cliente con presupuesto y su entrada
+   en el contrato de sync.
+4. **CPL, CPA, spend y CER** encima de eso.
+
+**REGLA DE REPARTO DEL COSTE, definida por Nicolas el 2026-09-10 y no negociable:** el
+coste se reparte **por lead, no por la linea de negocio nominal de la campana**. Si
+`Google Ads King County` gasto $100 en un periodo y trajo 4 leads - 2 Local y 2 Long
+Distance - entonces $50 van a Local y $50 a Long Distance, aunque la campana se considere
+"de Local". El reparto es proporcional a los leads que cada linea recibio desde ese
+source, sumando **ambas instancias**.
+
+**Comercial queda fuera de ese reparto.** Se mide por rendimiento de sus campanas propias
+(`Bing Ads Commercial`, `Eco Commercial (Google Ads)`), no por linea de negocio.
+
+⚠️ El seed ya guarda `pct_ld`, `pct_local` y `pct_commercial` por fuente, y una nota que
+dice *"Meta Ads: 56% LD - no asignar todo el spend a Local"*. Esos porcentajes son un
+historico; la regla de arriba manda sobre ellos.
+
+### 3. Fase D - los 13 reportes programables sin usar
+
+Disponibles en `smartmoving_scheduble_reports/` y ya con forma conocida. Entran por el
+mismo carril y **cuestan cero cuota**: se programan en la UI de SmartMoving hacia un
+alias `*reporting@`, se anaden a `REPORTS` en el nodo `Resolve Report Metadata`, y el
+resto del flujo ya existe.
+
+Por valor:
+
+| Reporte | Para que |
+|---|---|
+| `sales-person-activity-details` | Alimenta directo los KPIs de ventas ya construidos |
+| `outstanding-balances` | Cuentas por cobrar - exactitud del ingreso |
+| `refunds` | Ingreso neto real |
+| `affiliates` | Marketing: 72 de las 178 fuentes son afiliados |
+| `storage-accounts` + `storage-jobs-report` | Si almacenaje va a ser linea propia. Ya hay 326 pagos de storage en `core.payments` sin contexto |
+| `opportunities-by-move-date` | Grano alternativo, util para forecast |
+| `crew-ratings`, `customer-service-tickets` | Calidad operativa |
+
+### 4. Siguiente fase de cancelaciones (documentada, no implementada)
+
+Pedida explicitamente el 2026-09-10 y deliberadamente no construida todavia. Los datos ya
+estan; falta el modelado. Detalle completo en `AUDIT_PLAN.md`.
+
+- **Por ZIP de origen.** El ZIP vive en `core.jobs.origin_zip` y `core.leads.origin_zip`,
+  no en `core.opportunities`. ⚠️ Una tasa por ZIP necesita **tambien los reservados de ese
+  ZIP**: sin denominador, un ZIP con 2 cancelaciones de 2 trabajos se ve igual que uno con
+  2 de 200.
+- **Por motivo.** Siete motivos limpios ya en `cancellation_reason`. No necesita ninguna
+  fuente nueva.
+
+### 5. El goteo de quotes sin resolver
+
+13.009 quotes del reporte Lead Status sin GUID. **Ya se drena solo**: 300 por instancia
+por rafaga dentro de `report_ingest`, unas 3.600 llamadas/dia, ~4 dias para el backlog y
+despues ~500/mes de mantenimiento.
+
+⚠️ **No es un backfill, es un mecanismo permanente.** Cada mes entran ~500 leads que el
+barrido nunca vera porque no convierten. Si alguien lo apaga, el hueco vuelve a crecer al
+mismo ritmo.
+
+Nota: esto ya **no** afecta al conteo de leads - eso lo cerro el brazo de `/api/leads`.
+Lo que anade el drenaje es el enriquecimiento: numero de cotizacion, ingreso estimado,
+tiempo a primer contacto y subcategoria de perdida.
+
+### 6. Los seeds que solo Nicolas puede completar
+
+- **`dim_agent`**: 34 de 65 nombres del CRM no estan en el roster.
+- **`dim_agent_assignment`**: construido para 2026, asi que `is_within_assignment` sale
+  `false` en el 42% de los leads historicos por falta de ventanas de validez, no porque el
+  routing este mal. **Extender las fechas hacia 2023 vale tanto como completar los
+  nombres.** Hasta entonces, no segmentar por esa columna.
+- **`dim_lob_branch`**: hay un cambio sin commitear que pasa `Long Distance Team` de
+  `long_distance` a `local` y **contradice la nota de su propia fila**. Afecta a 1.169
+  jobs. Decidir y actualizar la nota, o revertir.
+
+### 7. Deuda tecnica abierta (C5-C8)
+
+| # | Que | Donde |
+|---|---|---|
+| C5 | El join del reporte Booked esta duplicado entre `int_opportunity_observations` y el CTE `bkd_extra`. Es el unico reporte sin su `int_report_*_latest`; los otros tres ya lo tienen | ambos ficheros |
+| C6 | `--max-pages` no se propaga a `--job jobs` ni a los dims: truncan en silencio a 50 paginas | `pipeline/sm_pipeline/source.py` |
+| C7 | `--ids` y `--quotes` juntos emiten dos recursos con el mismo nombre. Nada lo rechaza | `run.py` |
+| C8 | El cron de `dbt_build_reports` esta documentado de cuatro formas distintas | varios |
+| - | 8 fuentes declaradas sin ningun modelo que las lea (`opportunities_enriched__*`) | `_smartmoving__sources.yml` |
+| - | El heartbeat repite en vez de escalar: 14 alertas identicas en 6,5 h es como se silencia un canal | `scripts/pipeline_heartbeat.py` |
+
+### 8. A2 - la causa raiz que sigue sin cerrar
+
+`report_ingest` se cayo 24 h el 2026-09-08 por memoria. **Los sintomas estan
+arreglados** - un correo por ejecucion, aterrizaje en una sentencia, limpieza antes del
+build, cola filtrada por alias, correos no procesables archivados, 4 GB de swap - y el
+flujo lleva estable desde entonces.
+
+Lo que no esta demostrado es que no vuelva a pasar bajo una rafaga historica grande. La
+proxima carga masiva de reportes es la prueba real.
 
 ---
 
@@ -241,8 +408,15 @@ Enrich leads and opportunities with **addresses, emails, names, estimates**, and
 scheduled report workbooks carry. Raw stores payloads **exactly as received**; all typing and business
 logic lives in dbt.
 
-**Leads and opportunities are separate, independent records.** No lead -> opportunity join is built in
-this phase. Note that the *lost-leads* report keys on `Quote #`, so despite its name it enriches
+⚠️ **CORRECTED 2026-09-09: a lead and an opportunity are the SAME record.** This section
+used to say they were separate and that no lead -> opportunity join would be built. The
+lead's `id` from `GET /api/leads` **is** the opportunity GUID - 23,717 byte-identical ids
+plus six live `GET /api/opportunities/{id}` confirmations. `/api/leads` is now an arm of
+`int_opportunity_observations`. See `CLAUDE.md` *Identity resolution* and `AUDIT_PLAN.md`
+A5. The fuzzy email/phone/date match this phase deferred was never needed and must not be
+built.
+
+Note that the *lost-leads* report keys on `Quote #`, so despite its name it enriches
 **opportunities**, not leads.
 
 **Refresh cadence:** defined in [`crm_sync_contract.md`](crm_sync_contract.md) section 6. Webhooks carry near-real-time status at zero quota cost.
@@ -257,6 +431,8 @@ and Premium per-job calls. These are all reachable later; none is required for t
    same 28 fields as a list row - **never call it in a loop.** Name, email, phone, and both origin and
    destination street/city/state/zip already land in `raw_smartmoving.leads`. What remains is *modeling*,
    not extraction. Leads carry no money and no `quoteNumber`; that is an API limit, not a pipeline gap.
+   **What they DO carry is the opportunity GUID, in the `id` field** - which is why the
+   modeling that remained turned out to be worth 13,196 opportunities.
 2. **`opportunities_enriched` and its 10 child tables are already in raw and completely unmodeled.**
    Estimates, charges, payments, job addresses, contacts, and the custom `leadStatus` are sitting in
    Postgres today with zero dbt models reading them. This is the largest available win at **zero API cost**.

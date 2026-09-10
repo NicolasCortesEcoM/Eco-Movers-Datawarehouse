@@ -23,8 +23,20 @@ SmartMoving can be read four ways, and they are not interchangeable.
 | **API sweep** (`/api/customers`) | ~1 call / 200 customers | The service-date window | Minutes | **Identity.** The GUID-to-quote crosswalk. |
 | **API detail** (`/api/opportunities/{id}`) | 1 call **per opportunity** | Only what you ask for | Minutes | **Depth on the few.** Charges, payments, addresses. |
 
-**The API is two mechanisms, not one.** The sweep is nearly free and belongs in every
-run; the detail call is expensive and must be triggered, never scheduled broadly.
+| **API leads** (`/api/leads`) | ~1 call / 200 leads | Every lead, converted or not | Daily | **Identity of what never converted.** See below. |
+| **Quote drain** (`/api/opportunities/quote/{n}`) | 1 call **per quote** | Report quotes with no GUID | Per report burst | **The bridge of last resort.** Budgeted, never swept. |
+
+**The API is four mechanisms, not one.** The sweep and the leads poll are nearly free and
+belong in every run; the detail call and the quote drain are one call each and must be
+triggered or budgeted, never scheduled broadly.
+
+⚠️ **`/api/leads` is an OPPORTUNITY source, not just a lead source.** The lead's `id` is
+the opportunity GUID. This matters more than it sounds: every other API path reaches an
+opportunity **through its jobs** — the sweep window is a service-date window and service
+dates live on jobs — so a lead that never converted was invisible to all of them. Adding
+this arm on 2026-09-09 recovered **13,196 opportunities**, overwhelmingly bad leads and
+leads still in progress, at zero API cost. They had been missing from the denominator of
+every conversion rate. See `AUDIT_PLAN.md` A5.
 
 Measured 2026-08-25 across the whole call log: **4,821 of 4,960 calls (97%) were
 detail calls.** The sweep has cost 97 calls in total, ever.
