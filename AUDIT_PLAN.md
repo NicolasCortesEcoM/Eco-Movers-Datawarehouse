@@ -139,6 +139,29 @@ nothing evaluates it.
 checks four mechanisms (reports, webhooks, dlt extraction, dbt build) and asks when each
 last *succeeded*, not whether anything threw.
 
+**✅ Proven by a real incident, 2026-09-09.** During the `report_ingest` out-of-memory
+outage it did exactly its job: `reports` flipped to `is_silent` at **06:05 PT** — the
+first check after the 8 h threshold elapsed — and posted the Slack alert on all 14
+subsequent runs until ingestion recovered at 12:35 PT. Nothing else in the project
+noticed, because a process killed for memory throws no error for `errorWorkflow` to
+catch. That is precisely the failure class this was built for, and the only alerting
+path that saw it.
+
+Two residual weaknesses, both worth a follow-up rather than a rewrite:
+
+- **8 hours is the floor for the reports threshold, not a choice.** SmartMoving sends at
+  03, 11, 13, 15, 18 and 21 PT, so the widest legitimate gap is the 03:00→11:00 overnight
+  window. Detecting faster requires a schedule-aware threshold (tight by day, loose
+  overnight) instead of one constant.
+- **It repeats rather than escalates.** 14 identical Slack messages in 6.5 hours is how
+  an alert channel gets muted. It needs to alert on the transition, then remind at a
+  decreasing rate.
+
+**Also done 2026-09-09: 4 GB of swap on the droplet** (`/swapfile`, in `/etc/fstab`,
+`vm.swappiness=10`). The box has 8 GB of RAM and had none, which is why Node was killed
+outright instead of degrading. Swap is a shock absorber, not a fix — the real fix was
+bounding the batch — but with zero swap there is no margin at all.
+
 **Verified both ways**, because a silence detector that has never fired is not a
 detector: with real thresholds all four report alive; with thresholds forced to four
 minutes all four flag `SILENT`, the alert message formats, exit code is 1, and the rows
