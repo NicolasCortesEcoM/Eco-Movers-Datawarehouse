@@ -116,6 +116,15 @@ bkd_extra as (
     order by x.external_opportunity_id, r.source_instance_id, r.report_generated_at desc
 ),
 
+-- Cancellation Details fields that no other source has. Same reasoning as
+-- bkd_extra: one source, one winner per opportunity, no resolution to do.
+-- ⚠️ The report window starts 2026-01-02, so cancelled_date is null for the ~4,850
+-- cancellations older than that. A null date is NOT "not cancelled" - is_cancelled
+-- comes from the status integer and covers all history.
+cxl as (
+    select * from {{ ref('int_report_cancellation_latest') }}
+),
+
 -- THE MARKETING CHANNEL of each opportunity, from the dim_referral_source seed.
 --
 -- Seeded, documented and tested since the start, and read by nothing until now. It
@@ -324,7 +333,14 @@ resolved as (
             ("enr.move_coordinator_name", "enr.observed_at"),
             ("rpt.move_coordinator_name", "rpt.observed_at")
         ]) }}                                                              as move_coordinator_name,
-        {{ pick_latest([("enr.cancellation_reason", "enr.observed_at")]) }} as cancellation_reason,
+        -- Two sources, so this one IS a freshness race. The API carries a reason on
+        -- 219 of 6,331 cancelled opportunities; the Cancellation Details report
+        -- carries one on 1,476, in a clean seven-value vocabulary. Ranked by recency
+        -- so a fresher API answer still wins where an opportunity has both.
+        {{ pick_latest([
+            ("enr.cancellation_reason", "enr.observed_at"),
+            ("cxl.cancellation_reason", "cxl.observed_at")
+        ]) }}                                               as cancellation_reason,
         -- coalesce, not pick_latest, and the API first. A creation instant is an
         -- immutable fact, so "newest observation wins" is the wrong rule for it - a
         -- report that arrives daily would outrank the API's own answer every day
@@ -343,6 +359,8 @@ resolved as (
         -- opportunity-level realised total, All Jobs is the only per-job breakdown.
         bkd_extra.invoiced_amount                           as invoiced_amount,
         bkd_extra.booked_date_local                         as booked_date_local,
+        cxl.cancelled_date                                  as cancelled_date_local,
+        cxl.cancelled_amount                                as cancelled_amount,
 
         -- A deletion marker only counts if nothing newer has been observed; a
         -- reappearance therefore un-deletes the opportunity on its own.
@@ -370,6 +388,7 @@ resolved as (
     left join rpt on rpt.opportunity_key = b.opportunity_key
     left join bkd on bkd.opportunity_key = b.opportunity_key
     left join bkd_extra on bkd_extra.opportunity_key = b.opportunity_key
+    left join cxl       on cxl.opportunity_key       = b.opportunity_key
     left join agent_from_jobs ajo on ajo.opportunity_key = b.opportunity_key
     left join job_service_date jsd on jsd.opportunity_key = b.opportunity_key
     left join {{ ref('int_report_lost_leads_latest') }} lost

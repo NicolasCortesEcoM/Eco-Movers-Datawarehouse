@@ -211,3 +211,64 @@ the reliability of a coin flip.
 | `created_date_local`, `age_days` | date / int | How long the opportunity has been sitting. |
 | `estimated_final_total` | numeric | The quote. Zero on many rows - see the money notes in the other two sales views. |
 | `synced_at` | timestamptz | Data freshness. |
+
+---
+
+## `serving.cancellations_daily_v1`
+
+| Field | Value |
+|---|---|
+| **Business area** | Sales / Operations |
+| **Contents** | Cancellations counted on the day they happened, per agent and line of business, with the revenue that walked. |
+| **Grain** | `(entity_id, agent_name, line_of_business, cancelled_date)`. |
+| **Source systems** | SmartMoving Cancellation Details report -> `core.opportunities` -> `marts.fct_cancellations_daily`. |
+| **Freshness** | Governed by the **Scheduled reports** row of [`crm_sync_contract.md`](crm_sync_contract.md) section 8. |
+| **Owner** | Reporting Manager / data-platform team. |
+| **Version** | v1. |
+| **RLS** | Filtered by `entity_id`. |
+
+WARNING: **this view publishes no rate, and that is deliberate.** A cancellation rate
+needs a denominator - the deals that could have cancelled - and on a calendar grain that
+set is unknowable, because the deals cancelled today were booked across many earlier
+months. Any denominator built from this table is wrong. The rate lives in
+`serving.sales_agent_daily_v1.cancellation_pct`, keyed on the day the lead ARRIVED,
+where the denominator is real.
+
+**The two views count the same cancellation on two different dates. Never sum them.**
+
+| Question | Which view |
+|---|---|
+| "Who has the worst cancellation rate?" | `sales_agent_daily_v1.cancellation_pct` |
+| "How well does March's intake hold up?" | `sales_agent_daily_v1` (cohort) |
+| "How much did we lose in July?" | `cancellations_daily_v1` (period) |
+| "Are cancellations trending up?" | `cancellations_daily_v1` (period) |
+
+The rate formula is `cancelled / (booked + cancelled)`, not `cancelled / booked`. A
+cancellation REPLACES the booked status upstream - status 20 sets `is_cancelled` and
+clears `is_booked` - so adding the cancellations back is what reconstructs everything
+that was ever won.
+
+WARNING: **coverage starts 2026-01-02.** `cancelled_date` comes from the Cancellation
+Details report, whose window begins there, so this view holds 1,476 of the 6,331
+cancellations in `core`. The cohort view counts all 6,331, because the cancelled flag
+comes from the status integer rather than from the report. A disagreement between the
+two totals is this, not a bug.
+
+Calibration, measured 2026-09-10: 1,476 cancellations across 2026, **$2.79M of cancelled
+value**, running 100-230 per month. `avg_days_booked_before_cancelling` is populated only
+where the Booked report also covers the deal, which today means recent months.
+
+| Column | Type | Notes |
+|---|---|---|
+| `cancellation_day_key` | text | Grain key. |
+| `entity_id` | text | RLS key. |
+| `agent_name`, `is_sales_agent`, `role` | text / bool | Canonical roster name, raw CRM name if unrostered, else `unassigned`. |
+| `line_of_business` | text | `local`, `long_distance`, `commercial`, `unassigned`. |
+| `cancelled_date` | date | The day the cancellation happened. |
+| `cancellations` | int | Count. Always >= 1. |
+| `cancelled_value` | numeric | What the jobs were worth when they died, per the CRM. |
+| `invoiced_value_at_cancellation` | numeric | What had actually been billed. A different claim. |
+| `avg_days_booked_before_cancelling` | numeric | Days survived between booking and cancelling. |
+| `cancellations_with_booked_date` | int | How much of the row the average above covers. |
+| `oldest_lead_cancelled`, `newest_lead_cancelled` | date | The span of lead dates behind the row. |
+| `synced_at` | timestamptz | Freshness. |

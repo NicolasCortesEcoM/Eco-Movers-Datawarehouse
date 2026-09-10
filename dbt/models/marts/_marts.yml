@@ -188,3 +188,46 @@ models:
         data_tests: [not_null]
       - name: synced_at
         data_tests: [not_null]
+
+  - name: fct_cancellations_daily
+    description: >
+      Cancellations counted on the day they HAPPENED. Grain:
+      (entity_id, agent_name, line_of_business, cancelled_date) - a PERIOD row, and
+      deliberately not a cohort one. The leads behind a row arrived across many
+      earlier months; oldest_lead_cancelled and newest_lead_cancelled show the spread.
+
+      The companion is fct_agent_leads_daily.cancellation_pct, which is keyed on the
+      day the lead ARRIVED and is where a cancellation RATE is answerable, because
+      that is the only grain whose denominator - the deals that could have cancelled -
+      is knowable. No rate is published here for that reason. The same cancellation
+      appears in both models on two different dates; summing them double counts.
+
+      Coverage starts 2026-01-02, the first day of the Cancellation Details report
+      window, so this model holds the 1,476 cancellations with a known date out of the
+      6,331 in core. The cohort view counts all 6,331 because the cancelled flag comes
+      from the status integer, not from the report. Excludes prior-tenant rows via
+      core.opportunities.is_in_scope.
+    columns:
+      - name: cancellation_day_key
+        description: Grain key. Readable concatenation, not a hash.
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: agent_name
+        description: >
+          Canonical roster name, or the raw CRM name when unrostered, or 'unassigned'.
+          Never dropped - a cancellation with no owner is still a loss.
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests: [not_null]
+      - name: cancelled_date
+        data_tests: [not_null]
+      - name: cancellations
+        description: Count of deals cancelled on this date. Always >= 1.
+        data_tests: [not_null]
+      - name: cancelled_value
+        description: >
+          What the jobs were worth when they died, as stated on the cancellation.
+          Distinct from invoiced_value_at_cancellation, which is what was billed.
+      - name: synced_at
+        data_tests: [not_null]

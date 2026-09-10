@@ -257,3 +257,42 @@ models:
       - name: is_known
         description: false means the name needs adding to dbt/seeds/dim_agent.csv.
         data_tests: [not_null]
+
+  - name: payments
+    description: >
+      Every payment the business has received, from the Payments scheduled report.
+      Grain: one row per (source_instance_id, row position in the newest export).
+
+      NOT a replacement for opportunity_payments and not merged with it. That model
+      holds payments embedded in the API's enriched opportunity payload - 1,965 rows,
+      only the opportunities a detail call reached, but with a real GUID and ordinal.
+      This one covers every payment in the report window at zero quota and carries what
+      the API payload lacks: date, method, card confirmation, terminal, and payments
+      made against a job or a storage account rather than an opportunity. There is no
+      shared payment identifier to merge on, so merging them would either double count
+      or invent a match.
+
+      A SNAPSHOT, NOT A LEDGER. It is the newest export taken whole, because the report
+      carries no stable per-payment key - its row key is the row's position in the
+      file. A payment that falls out of the report window disappears from here. Do not
+      treat it as a financial system of record and do not diff builds to find refunds.
+    columns:
+      - name: payment_key
+        description: Grain key - instance plus the row's position in the newest export.
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: payment_target
+        description: What the payment is against.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['opportunity', 'job', 'storage_account', 'unattached']
+      - name: external_opportunity_id
+        description: >
+          Null where the quote has not been resolved to a GUID yet. Unattached
+          payments are kept, never dropped - the money exists either way.
+      - name: payment_amount
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]

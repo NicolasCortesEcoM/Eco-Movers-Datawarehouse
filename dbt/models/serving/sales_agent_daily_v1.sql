@@ -43,6 +43,13 @@ select
     open_leads,
     conversion_pct,
 
+    -- Cancellations among the deals this cohort WON, over booked + cancelled. A
+    -- cancellation replaces the booked status upstream, so adding it back is what
+    -- reconstructs "ever booked" - the only honest denominator. Null when nothing was
+    -- ever booked. For cancellations counted on the day they happened, and for the
+    -- money that walked, use serving.cancellations_daily_v1.
+    cancellation_pct,
+
     -- Leads whose line of business is inferred from the branch because the lead has
     -- not converted to a job yet. Non-zero only on recent cohorts; it is the caveat
     -- to attach to any split by line on the last few days.

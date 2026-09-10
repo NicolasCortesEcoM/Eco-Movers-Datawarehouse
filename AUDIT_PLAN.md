@@ -128,6 +128,70 @@ rather than inference.
 
 
 
+
+### ✅ Fase A — Cancellations y Payments conectados (2026-09-10)
+
+Los dos reportes aterrizaban y estaban tipados en `staging` desde 2026-08, y **ningun
+modelo aguas abajo los leia**: 240.793 filas en `raw` sin consumidor. Cerrado.
+
+**Cancellations.** `int_report_cancellation_latest` (patron `int_report_*_latest`, no
+brazo de observacion: una sola fuente, nada que reconciliar) y `core.opportunities`
+gana `cancelled_date_local` y `cancelled_amount`. El motivo de cancelacion pasa de
+**219 a 1.476** registros (3,5% -> 23,3%) en siete categorias limpias, y **$2.793.977**
+de ingreso cancelado se vuelve medible por primera vez.
+
+**Dos vistas, dos preguntas distintas.** Es el error mas facil de cometer aqui:
+
+| Vista | Grano | Responde |
+|---|---|---|
+| `sales_agent_daily_v1.cancellation_pct` | dia en que **llego el lead** (cohorte) | "de lo que gano este dia, cuanto se cayo" |
+| `serving.cancellations_daily_v1` | dia en que **se cancelo** (periodo) | "cuanto perdimos en julio" |
+
+La misma cancelacion aparece en ambas, en fechas distintas. **Sumarlas duplica.**
+
+La formula de la tasa es `cancelaciones / (reservados + cancelaciones)`, no sobre
+reservados solos: una cancelacion REEMPLAZA el estado booked (el status 20 pone
+`is_cancelled` y quita `is_booked`), asi que devolver las cancelaciones al denominador
+es lo que reconstruye "todo lo que alguna vez se gano". La vista de periodo
+deliberadamente **no publica tasa**: en un grano de calendario el denominador no es
+conocible, porque lo cancelado hoy se reservo a lo largo de meses anteriores.
+
+⚠️ Cobertura desde 2026-01-02 (ventana del reporte): 1.476 de las 6.331 canceladas de
+`core` tienen fecha. La vista de cohorte cuenta las 6.331 porque el flag viene del
+entero de estado. Que los totales no coincidan es esto, no un fallo.
+
+**Payments.** `int_report_payments_latest` + `core.payments`: 3.021 pagos, **$5,05M**,
+ventana 2026-06-12 -> 2026-09-09. El 100% de los 2.695 pagos de oportunidad enlazan a su
+GUID, y aparecen **326 pagos contra cuentas de almacenaje** que no tenian ninguna
+representacion en el almacen.
+
+No se fusiona con `core.opportunity_payments` (1.973 filas, via API) y es deliberado: no
+existe un identificador de pago compartido sobre el que unir - la API no emite id de pago
+y el reporte no trae GUID - asi que cualquier union duplicaria o inventaria una
+correspondencia. Dos tablas con alcances claramente distintos son mejores que una con una
+llave fabricada. La del reporte cubre todo a coste cero de cuota y trae fecha, metodo,
+codigo de confirmacion y pagos contra job o almacenaje; la de la API trae GUID y ordinal.
+
+`dbt build`: PASS=347, ERROR=0.
+
+### ⏳ Siguiente fase — reportes de cancelaciones por area y por motivo
+
+Pedidos explicitamente y **deliberadamente no implementados todavia**. Los datos ya
+estan en su sitio; falta el modelado.
+
+1. **Cancelaciones por ZIP de origen.** Donde se generan las cancelaciones. El ZIP vive
+   hoy en `core.jobs.origin_zip` y en `core.leads.origin_zip`, no en
+   `core.opportunities`, asi que el mart tendra que resolver cual usar cuando una
+   oportunidad tiene varios jobs. Grano propuesto:
+   `(entity_id, origin_zip, line_of_business, cancelled_date)`. Ojo con el denominador:
+   una tasa por ZIP necesita tambien los reservados de ese ZIP, no solo las
+   cancelaciones - si no, un ZIP con 2 cancelaciones de 2 trabajos se vera igual que uno
+   con 2 de 200.
+2. **Subdivision por motivo.** Siete motivos limpios, ya en `core.opportunities`
+   .`cancellation_reason`. Grano `(entity_id, cancellation_reason, line_of_business,
+   cancelled_date)` con su porcentaje sobre el total del periodo. Barato: no necesita
+   ninguna fuente nueva.
+
 ### ✅ A6 — The keyless report's row key was not stable, and it silently sextupled payments
 
 Found 2026-09-09, minutes after the quote drain went live: `report_ingest` began failing

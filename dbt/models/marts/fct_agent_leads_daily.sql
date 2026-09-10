@@ -199,6 +199,27 @@ select
          then round(100.0 * a.booked_leads / a.valid_leads, 1)
     end                                                   as conversion_pct,
 
+    -- CANCELLATION RATE, over the deals that were EVER BOOKED.
+    --
+    -- The denominator is booked + cancelled, not booked alone, and not valid leads.
+    -- In this warehouse a cancellation REPLACES the booked status - status 20 sets
+    -- is_cancelled and clears is_booked - so `booked_leads` is what is booked and
+    -- still standing. Adding the cancellations back reconstructs everything that was
+    -- ever won, which is the only honest denominator for "how much of what we won did
+    -- we lose again".
+    --
+    -- Measured against the LEAD COHORT, like conversion_pct: these are cancellations
+    -- among the deals born on this date, whenever the cancellation itself happened.
+    -- That answers "how well does this day's intake hold up". For "how many
+    -- cancellations landed in October", which is a different question with a different
+    -- denominator, use fct_cancellations_daily.
+    --
+    -- Null, not zero, when nothing was ever booked - a zero would average into a
+    -- report as a real 0% cancellation rate rather than as no data.
+    case when (a.booked_leads + a.cancelled_leads) > 0
+         then round(100.0 * a.cancelled_leads / (a.booked_leads + a.cancelled_leads), 1)
+    end                                                   as cancellation_pct,
+
     -- Over the deals that actually have a figure, not over all booked deals: a
     -- missing invoice is "not billed yet", and dividing by it would report a
     -- shrinking deal size every time a new booking lands. Null, not zero, with no
