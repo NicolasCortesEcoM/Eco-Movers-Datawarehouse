@@ -1,16 +1,22 @@
 {
   "_comment": [
     "Paste-ready node JSON for the n8n workflow `report_ingest` (id 3NRvDchKPT5RK4tn).",
-    "State as of 2026-09-09, after the out-of-memory fix and the rebuild-batching change.",
-    "Only the nodes on the ingestion path are here; the error/alert branch and the sticky",
-    "notes live in n8n.",
+    "State as of 2026-09-09. Only the nodes on the ingestion path are here; the",
+    "error/alert branch and the sticky notes live in n8n.",
     "",
-    "TWO INVARIANTS, and both were paid for:",
-    "  1. ONE report email per execution. `Find Unprocessed Reports` is limit 1. Raising it",
-    "     reintroduces the crash loop of 2026-09-08 - see AUDIT_PLAN.md A2.",
-    "  2. dbt rebuilds ONCE PER BURST, not once per report. `Any Reports Left?` asks whether",
-    "     the inbox still holds a report; if it does this run skips the rebuild and the last",
-    "     run of the burst pays for it. That is what makes a 2-minute sweep affordable."
+    "THREE INVARIANTS, and every one of them was paid for with an outage:",
+    "  1. ONE report email per execution (`Find Unprocessed Reports` is limit 1). Raising it",
+    "     reintroduces the out-of-memory crash loop of 2026-09-08 - see AUDIT_PLAN.md A2.",
+    "  2. The search is filtered to the REPORTING ALIASES, server-side at Gmail. A report a",
+    "     person pulled by hand lands in their own mailbox, is not for the warehouse, and",
+    "     must never cost a download.",
+    "  3. Anything that still fails classification is ARCHIVED out of the inbox. Because the",
+    "     sweep takes one newest-first email, an email that stays put blocks every older",
+    "     report behind it - which is exactly what an all-jobs report addressed to",
+    "     nicolas@ecomovers.com did on 2026-09-09, silently, until it was found by hand.",
+    "",
+    "  Plus: dbt rebuilds ONCE PER BURST. `Any Reports Left?` asks whether the inbox still",
+    "  holds a report; if it does, this run skips the rebuild and the last run pays for it."
   ],
   "meta": {
     "instanceId": "report_ingest_patch"
@@ -44,7 +50,7 @@
         "limit": 1,
         "simple": false,
         "filters": {
-          "q": "from:no-reply@smartmoving.com subject:\"Report is Ready\" in:inbox newer_than:7d",
+          "q": "from:no-reply@smartmoving.com subject:\"Report is Ready\" in:inbox newer_than:7d {to:reporting@ecomoversmoving.com to:ld.reporting@ecomoversmoving.com to:local.reporting@ecomoversmoving.com to:reporting@ecomovers.com to:ld.reporting@ecomovers.com to:local.reporting@ecomovers.com}",
           "readStatus": "both"
         },
         "options": {
@@ -60,7 +66,7 @@
         192
       ],
       "webhookId": "1bf60ec6-0c00-46b8-b29f-2c32246fdf2a",
-      "notes": "Every report email still in the inbox. Trashing on success is what makes the inbox the queue.",
+      "notes": "Every report email still in the inbox AND addressed to a reporting alias. The alias filter runs server-side at Gmail, so a hand-pulled report sent to a person's own address never costs a download. Trashing on success is what makes the inbox the queue.",
       "credentials": {
         "gmailOAuth2": {
           "id": "LRuQ7N5goNwmVT7Q",
@@ -294,7 +300,7 @@
         "limit": 1,
         "simple": true,
         "filters": {
-          "q": "from:no-reply@smartmoving.com subject:\"Report is Ready\" in:inbox newer_than:7d",
+          "q": "from:no-reply@smartmoving.com subject:\"Report is Ready\" in:inbox newer_than:7d {to:reporting@ecomoversmoving.com to:ld.reporting@ecomoversmoving.com to:local.reporting@ecomoversmoving.com to:reporting@ecomovers.com to:ld.reporting@ecomovers.com to:local.reporting@ecomovers.com}",
           "readStatus": "both"
         }
       },
@@ -377,6 +383,57 @@
         2016,
         -96
       ]
+    },
+    {
+      "name": "Find Unusable Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        336
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "simple": true,
+        "filters": {
+          "q": "=rfc822msgid:{{ $json.rfc822_msgid }}",
+          "readStatus": "both"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LRuQ7N5goNwmVT7Q",
+          "name": "Gmail account - Nicolas"
+        }
+      },
+      "notes": "Resolves the RFC822 Message-ID to a Gmail message id so the next node can take it out of the inbox."
+    },
+    {
+      "name": "Archive Out Of Inbox",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        336
+      ],
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "INBOX"
+        ]
+      },
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LRuQ7N5goNwmVT7Q",
+          "name": "Gmail account - Nicolas"
+        }
+      },
+      "notes": "Removes INBOX only - the message stays in All Mail, fully recoverable. NOT a delete. The inbox is the queue, so an email that cannot be ingested has to leave it or it blocks every older report behind it."
     }
   ],
   "connections": {
@@ -551,6 +608,17 @@
         [
           {
             "node": "Assert Rebuild Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Unusable Email": {
+      "main": [
+        [
+          {
+            "node": "Archive Out Of Inbox",
             "type": "main",
             "index": 0
           }

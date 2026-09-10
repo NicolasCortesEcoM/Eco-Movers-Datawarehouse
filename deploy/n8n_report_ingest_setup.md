@@ -9,6 +9,40 @@ after an out-of-memory crash loop. A real Lead Status email landed 4,801 rows ag
 `IMPLEMENTATION_STATUS.md` for the full post-run database audit. The paste-ready node
 JSON is in [`n8n_report_ingest_nodes.json`](n8n_report_ingest_nodes.json).
 
+## ⚠️ The queue is filtered to the reporting aliases, and blockers are archived
+
+Two rules, and the second exists because the first is not enough.
+
+**1. The Gmail search filters on the recipient alias**, server-side:
+
+```
+from:no-reply@smartmoving.com subject:"Report is Ready" in:inbox newer_than:7d
+{to:reporting@ecomoversmoving.com to:ld.reporting@ecomoversmoving.com
+ to:local.reporting@ecomoversmoving.com to:reporting@ecomovers.com
+ to:ld.reporting@ecomovers.com to:local.reporting@ecomovers.com}
+```
+
+Gmail's `{...}` is OR. A report someone pulled by hand from the SmartMoving UI arrives
+at their own address, is not for the warehouse, and now never costs a download - Gmail
+excludes it before n8n sees it. This is also the cheapest possible filter: the work
+happens at Google, not in a Code node.
+
+**2. Anything that still fails classification is archived out of the inbox**
+(`removeLabels: [INBOX]` - the message stays in All Mail, fully recoverable, NOT
+deleted).
+
+That second rule is not defensive programming, it is a bug fix. Because the sweep takes
+exactly ONE newest-first email, an email it cannot ingest and does not remove is picked
+up again on the next run, forever, and **every older report queues behind it**. On
+2026-09-09 an All Jobs report addressed to `nicolas@ecomovers.com` did precisely that:
+the sweep matched it every 2 minutes, `Resolve Report Metadata` returned
+`is_valid: false, is_noise: true`, the filter dropped it, and the 03:10 PT batch behind
+it never landed. Nothing errored and nothing alerted - the executions were green and
+took 0.7 s, which reads exactly like "no work to do".
+
+⚠️ The unbounded design did not have this failure mode; the one-email-per-run design
+does. Never take one email per run without also guaranteeing it leaves the queue.
+
 ## ⚠️ The dbt rebuild runs once per BURST, not once per report
 
 `Any Reports Left?` re-runs the sweep search after the email is trashed. If the inbox
