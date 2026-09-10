@@ -5,11 +5,25 @@
 -- actually reported a value for that field, the most recently observed one wins.
 -- See dbt/macros/pick_latest.sql for why this is per-field and not per-row.
 --
--- SEPARATE FROM LEADS BY DESIGN. There is no join to core.leads and no
--- lead->opportunity map. /api/leads does not return an opportunityId, and the
--- fuzzy email/phone/branch/date match that sync strategy 10.1 sketches is
--- deliberately out of scope. Note the lost-leads REPORT keys on Quote #, so
--- despite its name it enriches opportunities, not leads - do not "fix" that.
+-- LEADS ARE OPPORTUNITIES. This header used to say the opposite - "there is no
+-- lead->opportunity map, /api/leads does not return an opportunityId" - and that
+-- premise was simply wrong. The lead's own `id` IS the opportunity GUID: 23,717 of
+-- 36,895 lead ids are byte-identical to an existing external_opportunity_id, and six
+-- lead ids that were NOT in this table were put to GET /api/opportunities/{id} on
+-- 2026-09-09 and all six came back 200 with the same id echoed. See the `api_leads`
+-- arm in int_opportunity_observations for the full evidence.
+--
+-- The cost of believing otherwise was 13,196 missing opportunities - overwhelmingly
+-- bad leads and leads still in progress, because every API opportunity path reaches
+-- an opportunity through its JOBS and those never had one. They were not merely
+-- absent: they were absent from the DENOMINATOR, so every conversion rate in the
+-- sales marts was overstated.
+--
+-- No fuzzy matching is involved and none is needed. The join is on the identifier
+-- SmartMoving itself issued.
+--
+-- Note the lost-leads REPORT keys on Quote #, so despite its name it enriches
+-- opportunities, not leads - do not "fix" that.
 --
 -- Status: `status_code` (the int) is authoritative and drives every is_* flag via
 -- the dim_opportunity_status seed. `pipeline_status` is the CRM's pipeline label -
@@ -31,6 +45,7 @@ enr as (select * from latest where source = 'api_enrichment'),
 whk as (select * from latest where source = 'api_webhook'),
 swp as (select * from latest where source = 'api_sweep'),
 del as (select * from latest where source = 'api_deletion'),
+lds as (select * from latest where source = 'api_leads'),
 rpt as (select * from latest where source = 'report_lead_status'),
 bkd as (select * from latest where source = 'report_booked_opps'),
 
@@ -154,10 +169,17 @@ resolved as (
         -- The authoritative outcome. All three API sources report the same coding
         -- (verified identical across 657 opportunities), so this is a freshness
         -- race, not a reconciliation.
+        --
+        -- `api_leads` is the fourth, and it is the same enum: dim_opportunity_status
+        -- resolves 0/1/30/50 identically for a lead and an opportunity. It is listed
+        -- last so a tie goes to the opportunity endpoints, and it cannot go stale in
+        -- a damaging direction: /api/leads stops returning a lead the moment it
+        -- converts, so it can never overwrite Booked with an older In Progress.
         {{ pick_latest([
             ("enr.status_code", "enr.observed_at"),
             ("whk.status_code", "whk.observed_at"),
-            ("swp.status_code", "swp.observed_at")
+            ("swp.status_code", "swp.observed_at"),
+            ("lds.status_code", "lds.observed_at")
         ]) }}                                               as status_code,
 
         -- The report's Status string and the API's leadStatus share this column
@@ -223,17 +245,20 @@ resolved as (
         {{ pick_latest([
             ("bkd.customer_name", "bkd.observed_at"),
             ("enr.customer_name", "enr.observed_at"),
-            ("swp.customer_name", "swp.observed_at")
+            ("swp.customer_name", "swp.observed_at"),
+            ("lds.customer_name", "lds.observed_at")
         ]) }}                                               as customer_name,
         {{ pick_latest([
             ("bkd.customer_email", "bkd.observed_at"),
             ("enr.customer_email", "enr.observed_at"),
-            ("swp.customer_email", "swp.observed_at")
+            ("swp.customer_email", "swp.observed_at"),
+            ("lds.customer_email", "lds.observed_at")
         ]) }}                                               as customer_email,
         {{ pick_latest([
             ("bkd.customer_phone", "bkd.observed_at"),
             ("enr.customer_phone", "enr.observed_at"),
-            ("swp.customer_phone", "swp.observed_at")
+            ("swp.customer_phone", "swp.observed_at"),
+            ("lds.customer_phone", "lds.observed_at")
         ]) }}                                               as customer_phone,
         {{ pick_latest([("swp.customer_address", "swp.observed_at")]) }}
                                                             as customer_address,
@@ -241,7 +266,8 @@ resolved as (
         {{ pick_latest([
             ("enr.branch_name", "enr.observed_at"),
             ("rpt.branch_name", "rpt.observed_at"),
-            ("ajo.branch_name",  "ajo.observed_at")
+            ("ajo.branch_name",  "ajo.observed_at"),
+            ("lds.branch_name",  "lds.observed_at")
         ]) }}                                                              as branch_name,
         {{ pick_latest([("enr.estimated_subtotal", "enr.observed_at")]) }}  as estimated_subtotal,
         {{ pick_latest([("enr.estimated_tax", "enr.observed_at")]) }}       as estimated_tax,
@@ -259,11 +285,15 @@ resolved as (
         {{ pick_latest([
             ("enr.referral_source", "enr.observed_at"),
             ("rpt.referral_source", "rpt.observed_at"),
-            ("ajo.referral_source",  "ajo.observed_at")
+            ("ajo.referral_source",  "ajo.observed_at"),
+            ("lds.referral_source",  "lds.observed_at")
         ]) }}                                                              as referral_source,
         {{ pick_latest([("enr.affiliate_name", "enr.observed_at")]) }}      as affiliate_name,
         {{ pick_latest([("enr.tariff_name", "enr.observed_at")]) }}         as tariff_name,
-        {{ pick_latest([("enr.move_size_name", "enr.observed_at")]) }}      as move_size_name,
+        {{ pick_latest([
+            ("enr.move_size_name", "enr.observed_at"),
+            ("lds.move_size_name", "lds.observed_at")
+        ]) }}                                                              as move_size_name,
         {{ pick_latest([
             ("enr.volume", "enr.observed_at"),
             ("rpt.volume", "rpt.observed_at")
@@ -275,7 +305,8 @@ resolved as (
         {{ pick_latest([
             ("enr.sales_assignee_name", "enr.observed_at"),
             ("rpt.sales_assignee_name", "rpt.observed_at"),
-            ("ajo.sales_person",        "ajo.observed_at")
+            ("ajo.sales_person",        "ajo.observed_at"),
+            ("lds.sales_assignee_name", "lds.observed_at")
         ]) }}                                                              as sales_assignee_name,
         {{ pick_latest([
             ("ajo.estimator_name", "ajo.observed_at"),
@@ -293,7 +324,8 @@ resolved as (
         -- report that arrives daily would outrank the API's own answer every day
         -- purely by being newer. The two agree to the minute anyway; the ordering is
         -- about which source is authoritative, not which is fresher.
-        coalesce(enr.created_at_utc, rpt.created_at_utc)    as created_at_utc,
+        coalesce(enr.created_at_utc, lds.created_at_utc, rpt.created_at_utc)
+                                                    as created_at_utc,
 
         -- REALISED revenue, and the only column in the warehouse that carries it.
         -- Read straight off the Booked Opportunities report rather than through
@@ -327,6 +359,7 @@ resolved as (
     left join enr on enr.opportunity_key = b.opportunity_key
     left join whk on whk.opportunity_key = b.opportunity_key
     left join swp on swp.opportunity_key = b.opportunity_key
+    left join lds on lds.opportunity_key = b.opportunity_key
     left join del on del.opportunity_key = b.opportunity_key
     left join rpt on rpt.opportunity_key = b.opportunity_key
     left join bkd on bkd.opportunity_key = b.opportunity_key

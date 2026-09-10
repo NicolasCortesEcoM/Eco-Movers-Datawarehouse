@@ -126,6 +126,53 @@ nothing about absence, so the safe failure mode is to do nothing; real deletions
 come through the `opportunity-deleted` webhook's 404 path, which is direct evidence
 rather than inference.
 
+
+### ✅ A5 — 13,196 opportunities were missing from `core`, and they were the ones that never converted
+
+Found 2026-09-09 chasing a single lead: Ana Vasquez showed 13 leads for 09-07 in
+`serving.sales_agent_daily_v1` and 14 in the CRM. The missing one, quote 138511, was in
+`raw` with the right date and the right agent, and had a row in `core.opportunities`
+that was **empty** - no quote, no agent, no lead date, only a status. The mart filters
+on `created_date_local`, so it vanished.
+
+**Root cause, measured.** `core.opportunities` is keyed on the SmartMoving GUID, and the
+report arm inner-joins the quote crosswalk to get one. The crosswalk is built from the
+API only, and every API opportunity path reaches an opportunity **through its jobs** -
+the sweep window is a service-date window and service dates live on jobs. So a lead that
+never converted was invisible to all of them: 98.4% of opportunities present in core have
+a job, against 5.5% of the absent ones. By status: **88% of bad leads, 72% of in-progress
+leads and 39% of lost leads were missing**, against 0% of closed, completed and cancelled.
+
+That is the worst possible shape for the error. The absent rows were almost entirely
+leads that did NOT convert, so they were missing from the conversion denominator and
+every rate in the sales layer read high.
+
+**The fix cost zero API calls.** The premise the architecture rested on - *"/api/leads
+does not return an opportunityId"*, written into `core/opportunities.sql` and the sync
+strategy - is false. **The lead's `id` IS the opportunity GUID:** 23,717 of 36,895 lead
+ids are byte-identical to an existing `external_opportunity_id`, GUIDs do not collide by
+accident, and six lead ids absent from core were put to `GET /api/opportunities/{id}` -
+all six returned 200, echoed the same id, and carried a quoteNumber. The rows were
+already extracted and already carried the real identifier; nothing was joining them.
+
+`/api/leads` is now an arm of `int_opportunity_observations` like any other source.
+
+| | Before | After |
+|---|---:|---:|
+| `core.opportunities` | 58,678 | **71,874** |
+| Leads in the sales mart | 53,910 | 66,929 |
+| Booked | 26,644 | 26,639 |
+
+Booked did not move, which is the point: the correction is entirely in the denominator.
+Ana on 2026-09-07 now reads 10 local + 4 long distance = **14**, matching the CRM.
+
+**The alternative was rejected on the numbers.** Matching report quotes to leads on
+timestamp + salesperson measured 99.58% precise against known GUIDs - which sounds fine
+and means roughly 40 opportunities silently attached to the wrong customer across the
+backlog. Adding service date and referral source reached 100% on 1,330 ground-truth cases
+but both fields are mutable in the CRM, so the match would not be reproducible between
+builds. Rule 7 exists to prevent exactly this class of guess, and no guess was needed.
+
 ### ✅ A4 — Nothing detected an n8n execution that *dies*
 Every alerting mechanism in the project lives *inside* an execution: a node throws and
 `errorWorkflow` catches it. An execution killed by the OOM reaper, a container restart

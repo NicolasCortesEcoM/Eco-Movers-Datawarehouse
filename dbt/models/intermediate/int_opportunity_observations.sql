@@ -68,6 +68,85 @@ with enrichment as (
     from {{ ref('stg_smartmoving__opportunities_enriched') }}
 ),
 
+-- GET /api/leads. The source this layer spent a year without, on a premise that
+-- turned out to be false.
+--
+-- THE LEAD ID *IS* THE OPPORTUNITY ID. CLAUDE.md and this project's sync strategy
+-- both state that "/api/leads does not return an opportunityId", and concluded that
+-- leads and opportunities could only ever be joined by a fuzzy customer match - which
+-- was then, correctly, ruled out of scope. The premise is wrong. The lead's own `id`
+-- IS the opportunity's GUID:
+--
+--   * 23,717 of 36,895 lead ids are byte-identical to an existing
+--     core.opportunities.external_opportunity_id. GUIDs do not collide by accident.
+--   * Six lead ids that were NOT in core.opportunities were put to
+--     GET /api/opportunities/{id} on 2026-09-09. All six returned 200, all six echoed
+--     back the same id, and all six carried a quoteNumber.
+--   * Zero lead ids appear under both instances, so the composite key is still sound.
+--
+-- WHY THIS MATTERS MORE THAN IT LOOKS. The API's opportunity paths reach an
+-- opportunity through its JOBS - the sweep window is a service-date window, and
+-- service dates live on jobs. A lead that never converted has no job, so no API
+-- opportunity path has ever seen it: measured 2026-09-09, 98.4% of opportunities
+-- present in core have a job and only 5.5% of the absent ones do. That is why 88% of
+-- bad leads and 72% of in-progress leads were missing from core.opportunities
+-- entirely, which inflated every conversion rate in the sales marts - the denominator
+-- was quietly dropping the leads that did not convert.
+--
+-- This arm closes that hole with ZERO API calls and ZERO inference: the rows were
+-- already extracted and already carry the real identifier. The alternative on the
+-- table - matching report quotes to leads on timestamp and salesperson - measured
+-- 99.6% precise, which sounds fine and means roughly 40 opportunities silently
+-- attached to the wrong customer. Rule 7 exists to prevent exactly that.
+--
+-- Status: `status` on a lead is the SAME enum as an opportunity's status_code -
+-- dim_opportunity_status resolves 0/1/30/50 identically for both, which is how
+-- core.leads already labels them. It is fed straight in.
+--
+-- Freshness is self-limiting: /api/leads only ever returns non-converted leads (the
+-- only statuses ever observed are 0, 1, 30 and 50 - never Booked or Completed), so
+-- once a lead converts it stops being returned, its observed_at freezes, and the
+-- richer API sources outrank it from then on without any special-casing here.
+leads as (
+    select
+        source_instance_id || ':' || external_lead_id as opportunity_key,
+        entity_id,
+        source_instance_id,
+        external_lead_id                as external_opportunity_id,
+        'api_leads'                     as source,
+        4                               as source_priority,
+        synced_at                       as observed_at,
+
+        lead_status_code                as status_code,
+        null::text                      as quote_number,
+        null::text                      as pipeline_status,
+        null::date                      as service_date,
+        null::bigint                    as opportunity_type_code,
+        null::bigint                    as service_type_id,
+        null::text                      as external_customer_id,
+        customer_name,
+        customer_email,
+        customer_phone,
+        null::text                      as customer_address,
+        branch_name,
+        null::numeric                   as estimated_subtotal,
+        null::numeric                   as estimated_tax,
+        null::numeric                   as estimated_final_total,
+        referral_source,
+        null::text                      as affiliate_name,
+        null::text                      as tariff_name,
+        move_size                       as move_size_name,
+        null::numeric                   as volume,
+        null::numeric                   as weight,
+        sales_person                    as sales_assignee_name,
+        null::text                      as estimator_name,
+        null::text                      as move_coordinator_name,
+        null::text                      as cancellation_reason,
+        created_at_utc,
+        null::boolean                   as is_deleted
+    from {{ ref('stg_smartmoving__leads') }}
+),
+
 -- Zero-API status feed. Knows the status int and nothing else, but knows it
 -- within seconds of the change.
 webhooks as (
@@ -291,6 +370,7 @@ deletions as (
 {% endif %}
 
 select * from enrichment
+union all select * from leads
 union all select * from webhooks
 union all select * from sweep
 union all select * from report_lead_status
