@@ -127,6 +127,42 @@ come through the `opportunity-deleted` webhook's 404 path, which is direct evide
 rather than inference.
 
 
+
+### ✅ A6 — The keyless report's row key was not stable, and it silently sextupled payments
+
+Found 2026-09-09, minutes after the quote drain went live: `report_ingest` began failing
+every two minutes with *"Row count mismatch for payments / local: SmartMoving reported
+2518 records, 5036 landed"*, which blocked the queue behind it exactly the way A2 did.
+
+`report_payments` is the one report with no natural key, so its `row_key` was the row's
+position plus a hash of the row's contents. The comment in the node asserted that
+re-ingesting the same email yields the same rows in the same order and therefore the
+same keys. **The position was stable; the hash was not.** A re-ingest produced different
+keys, `ON CONFLICT DO NOTHING` never matched, and the whole generation was inserted
+again. Thirteen generations had landed between two and **six** times over — 72,297
+duplicate rows — and none of it raised anything, because the assertion only fires on the
+generation currently being ingested.
+
+**Fixed:** the key is now the position alone. The hash was not just unstable, it was
+unnecessary — `report_generated_at` is already part of the primary key, so rows are
+never compared across generations.
+
+**Cleaned:** 72,297 duplicate rows removed, keeping the earliest landing of each
+generation; then 2,518 legacy-keyed rows removed from the one generation that had since
+re-landed under the new scheme. Every payments generation now matches the count
+SmartMoving stated. `sql/38_dedupe_payments_row_keys.sql` holds the re-runnable form.
+
+A transitional node, **Purge Legacy Row Keys**, sits between landing and verification: a
+generation that landed under the old scheme and re-lands under the new one would carry
+both and double, so it drops the legacy copy wherever the position-keyed copy exists. It
+never removes a generation's only rows, and it retires when
+`row_key ~ '^__row[0-9]{6}__'` returns zero.
+
+⚠️ **The lesson is about the assertion, not the key.** The row-count check compares one
+generation at a time, so it cannot see a generation that was duplicated on a previous
+run — it only failed once the *same* generation was re-ingested. Six-fold duplication sat
+in `raw` for two days in silence.
+
 ### ✅ A5 — 13,196 opportunities were missing from `core`, and they were the ones that never converted
 
 Found 2026-09-09 chasing a single lead: Ana Vasquez showed 13 leads for 09-07 in

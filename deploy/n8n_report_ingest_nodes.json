@@ -137,7 +137,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// ONE report per execution. `Find Unprocessed Reports` is capped at a single email,\n// so the metadata is unambiguous and no paired-item lookup is needed anywhere in\n// this graph. That is deliberate, not a shortcut: the only reason this workflow ever\n// raised \"Paired item data for item from node 'Download Report File' is unavailable\"\n// is that when n8n recovers a CRASHED run it replaces every node's output with a stub\n// that carries no pairedItem. Reading .first() removes the dependency entirely, so a\n// recovered or retried run behaves like a fresh one.\n//\n// This node returns a SINGLE item holding the whole report rather than one item per\n// row. n8n retains the input and output of every node run for the life of the\n// execution, so one item per row meant the report was held in memory five or six\n// times over. A 60-email backlog of ~200,000 rows is what exhausted the heap on\n// 2026-09-08 and put the workflow in a crash loop.\nconst meta = $('Resolve Report Metadata').first().json;\nconst rowKeyField = meta.row_key_field;\n\nconst payload = $input.all().map((item, i) => {\n  const row = { ...item.json };\n\n  let rowKey = rowKeyField ? String(row[rowKeyField] ?? '').trim() : '';\n\n  if (!rowKey) {\n    // NO NATURAL KEY - the payments report is the case this exists for.\n    //\n    // A hash of the row alone is NOT enough. SmartMoving sent 531 payment rows and\n    // 530 landed: two rows were byte-identical, hashed to the same key, and\n    // ON CONFLICT DO NOTHING dropped one. That failed the row-count assertion on\n    // every run, which blocked the dbt rebuild and the mailbox cleanup behind it.\n    //\n    // Arguing that identical rows \"are the same observation\" was wrong on both\n    // counts: raw must be faithful to what the source sent (CLAUDE.md rule 1), and\n    // deciding whether two payments are duplicates is dbt's job, not the landing\n    // step's. Two customers paying the same amount on the same day against the same\n    // quote is a real thing.\n    //\n    // The position makes the key unique WITHOUT breaking idempotency: re-ingesting\n    // the same email yields the same rows in the same order, so the same keys, so\n    // ON CONFLICT still no-ops. The hash stays in the key so a row that moved\n    // position between generations is still recognisable.\n    let h = 5381;\n    const s = JSON.stringify(row);\n    for (let k = 0; k < s.length; k++) h = ((h * 33) ^ s.charCodeAt(k)) >>> 0;\n    rowKey = '__row' + String(i).padStart(6, '0') + '__' + h.toString(36);\n  }\n\n  return {\n    source_instance_id: meta.source_instance_id,\n    entity_id: meta.entity_id,\n    report_generated_at: meta.report_generated_at,\n    row_key: rowKey,\n    row_data: row,\n    _source_email: meta.message_id,\n  };\n});\n\nreturn [{\n  json: {\n    target_table: meta.target_table,\n    report_type: meta.report_type,\n    source_instance_id: meta.source_instance_id,\n    report_generated_at: meta.report_generated_at,\n    row_count: payload.length,\n    // Serialised here so the Postgres node passes it as one bind parameter.\n    rows: JSON.stringify(payload),\n  },\n}];\n"
+        "jsCode": "// ONE report per execution. `Find Unprocessed Reports` is capped at a single email,\n// so the metadata is unambiguous and no paired-item lookup is needed anywhere in\n// this graph. That is deliberate, not a shortcut: the only reason this workflow ever\n// raised \"Paired item data for item from node 'Download Report File' is unavailable\"\n// is that when n8n recovers a CRASHED run it replaces every node's output with a stub\n// that carries no pairedItem. Reading .first() removes the dependency entirely, so a\n// recovered or retried run behaves like a fresh one.\n//\n// This node returns a SINGLE item holding the whole report rather than one item per\n// row. n8n retains the input and output of every node run for the life of the\n// execution, so one item per row meant the report was held in memory five or six\n// times over. A 60-email backlog of ~200,000 rows is what exhausted the heap on\n// 2026-09-08 and put the workflow in a crash loop.\nconst meta = $('Resolve Report Metadata').first().json;\nconst rowKeyField = meta.row_key_field;\n\nconst payload = $input.all().map((item, i) => {\n  const row = { ...item.json };\n\n  let rowKey = rowKeyField ? String(row[rowKeyField] ?? '').trim() : '';\n\n  if (!rowKey) {\n    // NO NATURAL KEY - the payments report is the case this exists for.\n    //\n    // A hash of the row alone is NOT enough. SmartMoving sent 531 payment rows and\n    // 530 landed: two rows were byte-identical, hashed to the same key, and\n    // ON CONFLICT DO NOTHING dropped one. That failed the row-count assertion on\n    // every run, which blocked the dbt rebuild and the mailbox cleanup behind it.\n    //\n    // Arguing that identical rows \"are the same observation\" was wrong on both\n    // counts: raw must be faithful to what the source sent (CLAUDE.md rule 1), and\n    // deciding whether two payments are duplicates is dbt's job, not the landing\n    // step's. Two customers paying the same amount on the same day against the same\n    // quote is a real thing.\n    //\n    // THE KEY IS THE ROW'S POSITION, AND NOTHING ELSE. It used to be position plus a\n    // hash of the row's contents. That hash was NOT stable across re-ingests of the\n    // same file, so ON CONFLICT never matched and a re-ingest inserted a whole second\n    // copy - 13 payments generations had landed up to SIX times over, and the\n    // row-count assertion then failed forever and blocked the queue behind it. The\n    // hash was also unnecessary: report_generated_at is already in the primary key,\n    // so rows are never compared across generations.\n    rowKey = '__row' + String(i).padStart(6, '0');\n  }\n\n  return {\n    source_instance_id: meta.source_instance_id,\n    entity_id: meta.entity_id,\n    report_generated_at: meta.report_generated_at,\n    row_key: rowKey,\n    row_data: row,\n    _source_email: meta.message_id,\n  };\n});\n\nreturn [{\n  json: {\n    target_table: meta.target_table,\n    report_type: meta.report_type,\n    source_instance_id: meta.source_instance_id,\n    report_generated_at: meta.report_generated_at,\n    row_count: payload.length,\n    // Serialised here so the Postgres node passes it as one bind parameter.\n    rows: JSON.stringify(payload),\n  },\n}];\n"
       },
       "id": "8b9be1a3-e500-412e-8dab-18466152e4d5",
       "name": "Build Landing Rows",
@@ -171,6 +171,31 @@
           "name": "Datawarehouse Postgres"
         }
       }
+    },
+    {
+      "name": "Purge Legacy Row Keys",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1408,
+        -240
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- TRANSITIONAL. Drops pre-2026-09-09 content-hash row keys once the same generation\n-- exists under the deterministic position-only key. Never removes a generation's only\n-- rows. Retire it when this returns 0:\n--   SELECT count(*) FROM raw_smartmoving.report_payments WHERE row_key ~ '^__row[0-9]{6}__';\nwith dup_gens as (\n  select source_instance_id si, report_generated_at g\n  from raw_smartmoving.report_payments\n  group by 1, 2\n  having count(*) filter (where row_key ~ '^__row[0-9]{6}__') > 0\n     and count(*) filter (where row_key ~ '^__row[0-9]{6}$')  > 0\n)\ndelete from raw_smartmoving.report_payments p\nusing dup_gens b\nwhere p.source_instance_id = b.si\n  and p.report_generated_at = b.g\n  and p.row_key ~ '^__row[0-9]{6}__';",
+        "options": {
+          "queryBatching": "single"
+        }
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "postgres": {
+          "id": "V1zOLBFlGPXLCEWH",
+          "name": "Datawarehouse Postgres"
+        }
+      },
+      "notes": "Transitional: drops legacy content-hash row keys once the position-keyed copy exists. No-op otherwise."
     },
     {
       "parameters": {
@@ -531,7 +556,7 @@
       "main": [
         [
           {
-            "node": "Collect Reports To Verify",
+            "node": "Purge Legacy Row Keys",
             "type": "main",
             "index": 0
           }
@@ -654,6 +679,17 @@
         [
           {
             "node": "Rebuild dbt now",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Purge Legacy Row Keys": {
+      "main": [
+        [
+          {
+            "node": "Collect Reports To Verify",
             "type": "main",
             "index": 0
           }
