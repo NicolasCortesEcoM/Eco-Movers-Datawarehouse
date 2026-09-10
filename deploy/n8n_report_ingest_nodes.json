@@ -1,12 +1,16 @@
 {
   "_comment": [
     "Paste-ready node JSON for the n8n workflow `report_ingest` (id 3NRvDchKPT5RK4tn).",
-    "State as of 2026-09-09, after the out-of-memory fix. Only the nodes on the ingestion",
-    "path are here; the error/alert branch and the sticky notes live in n8n.",
+    "State as of 2026-09-09, after the out-of-memory fix and the rebuild-batching change.",
+    "Only the nodes on the ingestion path are here; the error/alert branch and the sticky",
+    "notes live in n8n.",
     "",
-    "THE INVARIANT: one report email per execution. `Find Unprocessed Reports` is capped at",
-    "limit 1 and the sweep runs every 5 minutes. Raising that limit reintroduces the crash",
-    "loop of 2026-09-08 - see AUDIT_PLAN.md A2 and crm_sync_contract.md section 11."
+    "TWO INVARIANTS, and both were paid for:",
+    "  1. ONE report email per execution. `Find Unprocessed Reports` is limit 1. Raising it",
+    "     reintroduces the crash loop of 2026-09-08 - see AUDIT_PLAN.md A2.",
+    "  2. dbt rebuilds ONCE PER BURST, not once per report. `Any Reports Left?` asks whether",
+    "     the inbox still holds a report; if it does this run skips the rebuild and the last",
+    "     run of the burst pays for it. That is what makes a 2-minute sweep affordable."
   ],
   "meta": {
     "instanceId": "report_ingest_patch"
@@ -18,20 +22,20 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "*/5 * * * *"
+              "expression": "*/2 * * * *"
             }
           ]
         }
       },
       "id": "76975196-9e06-4312-a3bf-56d9cf357bbb",
-      "name": "Sweep every 5 min",
+      "name": "Sweep every 2 min",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.4,
       "position": [
         -320,
         192
       ],
-      "notes": "Every 5 minutes. Throughput comes from frequency, not from batch size - Find Unprocessed Reports takes exactly one email per run."
+      "notes": "Every 2 minutes. A run that finds nothing costs ~0.7s and one that lands a report without rebuilding dbt costs ~15s, so frequency is cheap - it is the dbt rebuild that is expensive, and that now runs once per burst."
     },
     {
       "parameters": {
@@ -277,6 +281,67 @@
       }
     },
     {
+      "name": "Any Reports Left?",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2720,
+        -96
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "simple": true,
+        "filters": {
+          "q": "from:no-reply@smartmoving.com subject:\"Report is Ready\" in:inbox newer_than:7d",
+          "readStatus": "both"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LRuQ7N5goNwmVT7Q",
+          "name": "Gmail account - Nicolas"
+        }
+      },
+      "notes": "Is another report still queued? The inbox IS the queue, so one hit means more work is pending and this run should not pay for a dbt rebuild."
+    },
+    {
+      "name": "Inbox Drained?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2896,
+        -96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "drained",
+              "leftValue": "={{ !$json.id }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "TRUE = nothing left, so rebuild dbt now. FALSE = more reports queued, skip the rebuild and let the last run of the burst pay for it once."
+    },
+    {
       "parameters": {
         "command": "out=$(flock -w 900 /tmp/dw-dbt.lock -c 'cd /home/datawarehouse_user/datawarehouse/dbt && set -a && . /home/datawarehouse_user/datawarehouse/.env && set +a && /home/datawarehouse_user/datawarehouse/venv/bin/dbt build --profiles-dir . --target dev --no-use-colors' 2>&1); rc=$?; echo \"$out\" | tail -40; exit $rc",
         "cwd": "/home/datawarehouse_user/datawarehouse"
@@ -315,7 +380,7 @@
     }
   ],
   "connections": {
-    "Sweep every 5 min": {
+    "Sweep every 2 min": {
       "main": [
         [
           {
@@ -451,11 +516,34 @@
       "main": [
         [
           {
-            "node": "Rebuild dbt now",
+            "node": "Any Reports Left?",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Any Reports Left?": {
+      "main": [
+        [
+          {
+            "node": "Inbox Drained?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inbox Drained?": {
+      "main": [
+        [
+          {
+            "node": "Rebuild dbt now",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     },
     "Rebuild dbt now": {

@@ -9,6 +9,20 @@ after an out-of-memory crash loop. A real Lead Status email landed 4,801 rows ag
 `IMPLEMENTATION_STATUS.md` for the full post-run database audit. The paste-ready node
 JSON is in [`n8n_report_ingest_nodes.json`](n8n_report_ingest_nodes.json).
 
+## ⚠️ The dbt rebuild runs once per BURST, not once per report
+
+`Any Reports Left?` re-runs the sweep search after the email is trashed. If the inbox
+still holds a report, this execution skips `Rebuild dbt now` and the last run of the
+burst pays for it once. Measured 2026-09-09: landing a report takes ~2 seconds and the
+dbt rebuild ~3 minutes, so a burst of six reports used to cost six full rebuilds and
+took 30 minutes to land. It now costs one.
+
+That is what makes the 2-minute sweep affordable: a run that finds nothing costs ~0.7 s,
+and one that lands a report without rebuilding costs ~15 s.
+
+The nightly `dbt_build_reports` at 03:30 remains the backstop, so a skipped rebuild is
+never a missed rebuild.
+
 ## ⚠️ ONE report email per execution. Do not raise the limit.
 
 `Find Unprocessed Reports` is `limit: 1`, and the sweep runs `*/5 * * * *`. Throughput

@@ -213,7 +213,7 @@ which is the best possible time to pay for it.
 
 | Workflow | When | What it does |
 |---|---|---|
-| `report_ingest` | **every 5 min** (`*/5 * * * *`, Gmail sweep) | Lands **one** report email per execution, verifies its row count, trashes the email, then rebuilds dbt. The IMAP trigger is disabled: it had not fired a single execution in weeks, and it is unbounded - it delivers however many emails are waiting, which is what exhausted the heap on 2026-09-08. One report per run bounds memory to a single xlsx and removes every paired-item lookup from the graph. |
+| `report_ingest` | **every 2 min** (`*/2 * * * *`, Gmail sweep) | Lands **one** report email per execution, verifies its row count, trashes the email, then rebuilds dbt **only if no other report is still queued** - so a burst of six reports costs one rebuild, not six. A run that finds nothing costs ~0.7 s; one that lands a report without rebuilding, ~15 s. The IMAP trigger is disabled: it had not fired a single execution in weeks, and it is unbounded - it delivers however many emails are waiting, which is what exhausted the heap on 2026-09-08. One report per run bounds memory to a single xlsx and removes every paired-item lookup from the graph. |
 | SmartMoving native report sends | **03:00, 11:00, 13:00, 15:00, 18:00, 21:00** | Configured in the SmartMoving UI. Five report types can send themselves: Lead Status, Booked, Lost Leads, Cancellations and Payments. **All Jobs is excluded because SmartMoving does not allow it to be scheduled.** |
 | `opps_sweep` | 06:30, 10:30, 13:30, 16:30, 20:30 | Sweep `[-180, +60]`, both instances |
 | `leads_poll` | aligned with the sweep | Leads have no webhook; polling is their only path |
