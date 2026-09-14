@@ -272,3 +272,61 @@ where the Booked report also covers the deal, which today means recent months.
 | `cancellations_with_booked_date` | int | How much of the row the average above covers. |
 | `oldest_lead_cancelled`, `newest_lead_cancelled` | date | The span of lead dates behind the row. |
 | `synced_at` | timestamptz | Freshness. |
+
+---
+
+## `serving.opportunities_v1`
+
+| Field | Value |
+|---|---|
+| **Business area** | Sales (the general contract) |
+| **Contents** | One row per opportunity: identity, outcome, dates, money, attribution. |
+| **Grain** | `(source_instance_id, external_opportunity_id)` - one row per opportunity. |
+| **Source systems** | SmartMoving API + all six scheduled reports -> `core.opportunities`, joined to `core.agents` and `int_opportunity_line`. |
+| **Freshness** | Governed by the **Opportunity status** and **Scheduled reports** rows of [`crm_sync_contract.md`](crm_sync_contract.md) section 8 - the status flags move at webhook speed, the report-sourced dates and money at report cadence. |
+| **Owner** | Reporting Manager / data-platform team. |
+| **Version** | v1. |
+| **RLS** | Filtered by `entity_id`. |
+
+**The contract this project declared its first priority and shipped last** - every column
+had to be settled first, and the row set itself was short by 13,196 opportunities until
+2026-09-09. Published 2026-09-14 with 68,231 rows.
+
+WARNING: **deliberately narrow.** `core.opportunities` has 60 columns; this exposes 39. A
+public contract is cheap to widen and expensive to narrow - removing a column means a v2
+and 90 days of running both. The internal status codes, the estimate breakdown, the
+address, affiliate and tariff fields and the raw referral string stay in `core`, which
+`app_read` can also read under the "unstable" label. Ask for a column: it is a one-line
+additive change.
+
+WARNING: **two kinds of row are excluded, on purpose.** Deleted opportunities (the CRM
+removed them; the deletion ledger is in `core`) and prior-tenant rows
+(`is_in_scope = false` - another company's data that a sweep to 2023 pulled in alongside
+ours). A public contract must not carry the second kind at all.
+
+WARNING: **read the flags, not the dates, for outcome.** `cancelled_date` comes from a
+report whose window starts 2026-01-02, so it is null on ~77% of cancelled rows.
+`is_cancelled` comes from the platform status integer and is always right. The same holds
+for `booked_date` against `is_booked`.
+
+`quote_number` is null on ~4% of rows and falling: those are report quotes the API has not
+resolved yet, drained at ~3,600/day. The opportunity is real and countable; only the quote
+linkage is pending.
+
+| Column | Type | Notes |
+|---|---|---|
+| `opportunity_key` | text | Grain key, `instance:guid`. |
+| `entity_id` | text | RLS key. |
+| `external_opportunity_id`, `quote_number` | text | The GUID and the human-readable number. |
+| `customer_name`, `customer_email`, `customer_phone`, `branch_name` | text | Who and where. |
+| `agent_name`, `agent_is_sales_agent` | text / bool | Canonical roster name; shared accounts are flagged, not dropped. |
+| `line_of_business`, `line_is_provisional` | text / bool | `local`, `long_distance`, `commercial`, `unassigned`. Provisional = from the branch, no job yet. |
+| `referral_source`, `referral_campaign_group`, `referral_channel_group`, `referral_is_paid` | text / bool | Campaign, its family, its channel. Three levels. |
+| `status_label`, `status_category`, `status_subcategory` | text | Display, category, and the lost/cancelled subreason. |
+| `is_valid_lead`, `is_open`, `is_booked`, `is_completed`, `is_lost`, `is_bad_lead`, `is_cancelled` | bool | The outcome. Authoritative. |
+| `lost_reason`, `cancellation_reason` | text | Why, in the CRM's words. |
+| `lead_received_date`, `booked_date`, `service_date`, `cancelled_date` | date | See the warning above. |
+| `time_to_first_contact_minutes` | numeric | From the Lead Status report. |
+| `estimated_final_total`, `invoiced_amount`, `cancelled_amount` | numeric | The quote, what was billed, what walked. Three claims. |
+| `move_size_name` | text | |
+| `synced_at` | timestamptz | Freshness. |

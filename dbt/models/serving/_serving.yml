@@ -152,3 +152,40 @@ models:
         data_tests: [not_null]
       - name: synced_at
         data_tests: [not_null]
+
+  - name: opportunities_v1
+    description: >
+      PUBLIC CONTRACT. One row per opportunity with identity, outcome, dates, money and
+      attribution. Deliberately narrow - 39 of core's 60 columns - because a public
+      contract is cheap to widen and expensive to narrow. Excludes deleted rows and
+      prior-tenant rows (is_in_scope = false); the latter are another company's data
+      and must not appear in a public contract. A null cancelled_date does not mean
+      not cancelled - read is_cancelled. A null quote_number is a pending crosswalk,
+      not a missing opportunity.
+    columns:
+      - name: opportunity_key
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('opportunities')
+              field: opportunity_key
+      - name: entity_id
+        data_tests: [not_null]
+      - name: external_opportunity_id
+        data_tests: [not_null]
+      - name: agent_name
+        description: Canonical roster name, or the CRM spelling if unrostered. Null where the CRM assigned no one.
+      - name: line_of_business
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['local', 'long_distance', 'commercial', 'unassigned']
+      - name: status_category
+        data_tests: [not_null]
+      - name: is_booked
+        data_tests: [not_null]
+      - name: is_cancelled
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]
