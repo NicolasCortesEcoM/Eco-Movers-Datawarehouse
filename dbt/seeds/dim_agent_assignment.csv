@@ -1,35 +1,76 @@
 agent_name,line_of_business,valid_from,valid_to,notes
-Graydon Foxx,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Graydon Foxx,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Kirk Bussell,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Kirk Bussell,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Ana Vasquez,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Ana Vasquez,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Ricardo Salvador Arellano,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Ricardo Salvador Arellano,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Aileen Monzon Paz,local,2024-04-01,2025-10-04,"DRAFT 2026-09-14 - derived from data (40 leads on this line, 2024-04-11..2025-10-04). Confirm."
+Alejandro Machado,commercial,2025-12-01,9999-12-31,"DRAFT 2026-09-14 - derived from data (5 leads on this line, 2025-12-13..2026-09-11). Confirm."
+Alejandro Machado,local,2024-01-01,9999-12-31,
+Alex Cuc,local,2024-11-01,2024-12-12,"DRAFT 2026-09-14 - derived from data (142 leads on this line, 2024-11-06..2024-12-12). Confirm."
+Ana Hall,local,2024-01-01,9999-12-31,
+Ana Hall,long_distance,2026-02-01,2026-06-23,"DRAFT 2026-09-14 - derived from data (7 leads on this line, 2026-02-17..2026-06-23). Confirm."
+Ana Vasquez,local,2023-01-01,9999-12-31,Confirmed by Nicolas. valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Ana Vasquez,long_distance,2023-01-01,9999-12-31,Confirmed by Nicolas. valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Brandon King,local,2023-01-01,2023-10-09,"DRAFT 2026-09-14 - derived from data (546 leads on this line, 2023-01-03..2023-10-09). Confirm."
+Brett Morrow,local,2024-01-01,2026-05-18,Confirmed by Nicolas. Period closed at his last lead; adjust if the real leaving date differs.
+Brett Morrow,long_distance,2024-01-01,2026-05-18,Confirmed by Nicolas. Period closed at his last lead; adjust if the real leaving date differs.
+Caleb Pettit,local,2024-02-01,2024-04-04,"DRAFT 2026-09-14 - derived from data (39 leads on this line, 2024-02-27..2024-04-04). Confirm."
+Candie Epley,local,2023-01-01,2023-01-06,"DRAFT 2026-09-14 - derived from data (2 leads on this line, 2023-01-02..2023-01-06). Confirm."
+Carlos Davila,local,2023-06-01,2023-08-05,"DRAFT 2026-09-14 - derived from data (70 leads on this line, 2023-06-30..2023-08-05). Confirm."
+Celina Meynard,commercial,2026-01-01,2026-01-21,"DRAFT 2026-09-14 - derived from data (1 leads on this line, 2026-01-21..2026-01-21). Confirm."
+Celina Meynard,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
+Charley Bowling,local,2023-03-01,2023-05-16,"DRAFT 2026-09-14 - derived from data (105 leads on this line, 2023-03-08..2023-05-16). Confirm."
+Charlotte Roszel,local,2023-01-01,2024-05-02,"DRAFT 2026-09-14 - derived from data (2472 leads on this line, 2023-01-02..2024-05-02). Confirm."
+Cindy Greene,local,2023-03-01,2024-06-03,"DRAFT 2026-09-14 - derived from data (2629 leads on this line, 2023-03-02..2024-06-03). Confirm."
+Daniela Vasquez,local,2024-01-01,9999-12-31,
+Danni Bradlee,local,2023-01-01,2025-07-31,"DRAFT 2026-09-14 - derived from data (4099 leads on this line, 2023-01-01..2025-07-31). Confirm."
+Dayrl Thomas,local,2023-01-01,2023-02-17,"DRAFT 2026-09-14 - derived from data (259 leads on this line, 2023-01-01..2023-02-17). Confirm."
 Dean Savage,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
 Dean Savage,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
 Devin Thompson,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
 Devin Thompson,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
-Jesus Carranza,local,2024-01-01,9999-12-31,Confirmed by Nicolas 2026-08-26.
-Jesus Carranza,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas 2026-08-26.
-Brett Morrow,local,2024-01-01,2026-05-18,Confirmed by Nicolas. Period closed at his last lead; adjust if the real leaving date differs.
-Brett Morrow,long_distance,2024-01-01,2026-05-18,Confirmed by Nicolas. Period closed at his last lead; adjust if the real leaving date differs.
-Jonathan Baldelomar,local,2024-01-01,9999-12-31,
-Jose Garcia,local,2024-01-01,9999-12-31,
-Kim Kate Rabara,local,2024-01-01,9999-12-31,
+Diego Rojo,local,2023-05-01,2026-04-28,"DRAFT 2026-09-14 - derived from data (158 leads on this line, 2023-05-18..2026-04-28). Confirm."
 Eduardo Velez Arteaga,local,2024-01-01,9999-12-31,
-Maximo Lopez,local,2024-01-01,9999-12-31,
-Daniela Vasquez,local,2024-01-01,9999-12-31,
-Victor Gorostiaga,local,2024-01-01,9999-12-31,
-Steven Mullen,local,2024-01-01,9999-12-31,
-Junior Aikman,local,2024-01-01,9999-12-31,
+Eric Lara,long_distance,2025-11-01,2025-11-05,"DRAFT 2026-09-14 - derived from data (1 leads on this line, 2025-11-05..2025-11-05). Confirm."
+Evan Jess,local,2025-03-01,2025-06-17,"DRAFT 2026-09-14 - derived from data (76 leads on this line, 2025-03-24..2025-06-17). Confirm."
+Evan Jess,long_distance,2025-03-01,2025-06-17,"DRAFT 2026-09-14 - derived from data (98 leads on this line, 2025-03-24..2025-06-17). Confirm."
+Frank Rivera,local,2025-03-01,2025-08-21,"DRAFT 2026-09-14 - derived from data (696 leads on this line, 2025-03-10..2025-08-21). Confirm."
+Gabriel Rattray,local,2024-06-01,2024-12-01,"DRAFT 2026-09-14 - derived from data (1206 leads on this line, 2024-06-03..2024-12-01). Confirm."
+Glenda Thomas,local,2022-12-01,2024-05-29,"DRAFT 2026-09-14 - derived from data (3068 leads on this line, 2022-12-31..2024-05-29). Confirm."
 Gonzalo Cortez,local,2024-01-01,9999-12-31,
-Michelle Morales,local,2024-01-01,9999-12-31,
-Grant Korzetz,local,2024-01-01,9999-12-31,
-Alejandro Machado,local,2024-01-01,9999-12-31,
-Ana Hall,local,2024-01-01,9999-12-31,
-Paulina Trubko,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
+Grant Korzetz,local,2023-01-01,9999-12-31,valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Grant Korzetz,long_distance,2023-01-01,9999-12-31,"DRAFT 2026-09-14 - derived from data (29 leads on this line, 2023-01-02..2026-09-11). Confirm."
+Graydon Foxx,local,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Graydon Foxx,long_distance,2024-01-01,9999-12-31,Confirmed by Nicolas.
+Gregory Diaz,local,2023-07-01,2023-08-25,"DRAFT 2026-09-14 - derived from data (224 leads on this line, 2023-07-03..2023-08-25). Confirm."
+Jay Giraldo,local,2025-05-01,2025-05-08,"DRAFT 2026-09-14 - derived from data (1 leads on this line, 2025-05-08..2025-05-08). Confirm."
+Jesse Lanouette,local,2023-09-01,2023-09-29,"DRAFT 2026-09-14 - derived from data (6 leads on this line, 2023-09-05..2023-09-29). Confirm."
+Jesus Carranza,commercial,2023-01-01,9999-12-31,"DRAFT 2026-09-14 - derived from data (138 leads on this line, 2023-01-01..2026-09-11). Confirm."
+Jesus Carranza,local,2023-01-01,9999-12-31,Confirmed by Nicolas 2026-08-26. valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Jesus Carranza,long_distance,2023-01-01,9999-12-31,Confirmed by Nicolas 2026-08-26. valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Jonathan Baldelomar,local,2024-01-01,9999-12-31,
+Jordan Pope,local,2023-11-01,2024-04-30,"DRAFT 2026-09-14 - derived from data (20 leads on this line, 2023-11-09..2024-04-30). Confirm."
+Jose Garcia,local,2023-04-01,9999-12-31,valid_from extended 2024-01-01->2023-04-01 from data 2026-09-14.
+Juan Rovero,local,2024-04-01,2024-04-02,"DRAFT 2026-09-14 - derived from data (4 leads on this line, 2024-04-01..2024-04-02). Confirm."
 Julio Fernandez,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
-Celina Meynard,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
+Junior Aikman,local,2024-01-01,9999-12-31,
+Kim Kate Rabara,local,2024-01-01,9999-12-31,
+Kimberly Hoag,local,2023-01-01,2024-03-19,"DRAFT 2026-09-14 - derived from data (6 leads on this line, 2023-01-08..2024-03-19). Confirm."
+Kirk Bussell,commercial,2023-01-01,9999-12-31,"DRAFT 2026-09-14 - derived from data (62 leads on this line, 2023-01-02..2026-09-11). Confirm."
+Kirk Bussell,local,2023-01-01,9999-12-31,Confirmed by Nicolas. valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Kirk Bussell,long_distance,2023-01-01,9999-12-31,Confirmed by Nicolas. valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Krystal Green,local,2025-04-01,2025-08-28,"DRAFT 2026-09-14 - derived from data (449 leads on this line, 2025-04-14..2025-08-28). Confirm."
+Lesly Tecun,local,2025-02-01,2025-06-15,"DRAFT 2026-09-14 - derived from data (699 leads on this line, 2025-02-19..2025-06-15). Confirm."
 Maria Naranjo,local,2024-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM.
+Maria Naranjo,long_distance,2025-09-01,2026-02-23,"DRAFT 2026-09-14 - derived from data (30 leads on this line, 2025-09-06..2026-02-23). Confirm."
+Maximo Lopez,local,2024-01-01,9999-12-31,
+Michelle Morales,local,2024-01-01,9999-12-31,
+Nicole Arias,local,2023-12-01,2024-01-07,"DRAFT 2026-09-14 - derived from data (59 leads on this line, 2023-12-04..2024-01-07). Confirm."
+Pablo Esteban,local,2023-03-01,2025-01-16,"DRAFT 2026-09-14 - derived from data (1697 leads on this line, 2023-03-26..2025-01-16). Confirm."
+Paiton Crow,local,2023-01-01,2023-08-18,"DRAFT 2026-09-14 - derived from data (1136 leads on this line, 2023-01-01..2023-08-18). Confirm."
+Paulina Trubko,local,2023-01-01,9999-12-31,DERIVED FROM DATA - CONFIRM. valid_from extended 2024-01-01->2023-01-01 from data 2026-09-14.
+Ricardo Salvador Arellano,local,2023-04-01,9999-12-31,Confirmed by Nicolas. valid_from extended 2024-01-01->2023-04-01 from data 2026-09-14.
+Ricardo Salvador Arellano,long_distance,2023-04-01,9999-12-31,Confirmed by Nicolas. valid_from extended 2024-01-01->2023-04-01 from data 2026-09-14.
+Roger,local,2024-05-01,2024-07-13,"DRAFT 2026-09-14 - derived from data (36 leads on this line, 2024-05-03..2024-07-13). Confirm."
+Steven Mullen,commercial,2025-05-01,9999-12-31,"DRAFT 2026-09-14 - derived from data (349 leads on this line, 2025-05-28..2026-09-11). Confirm."
+Steven Mullen,local,2024-01-01,9999-12-31,
+Trevor Jamison,local,2023-01-01,2023-06-27,"DRAFT 2026-09-14 - derived from data (890 leads on this line, 2023-01-03..2023-06-27). Confirm."
+Victor Gorostiaga,local,2024-01-01,9999-12-31,
+Victor Mercado,local,2025-03-01,2026-07-02,"DRAFT 2026-09-14 - derived from data (41 leads on this line, 2025-03-11..2026-07-02). Confirm."
+Victor Mercado,long_distance,2025-03-01,2026-07-02,"DRAFT 2026-09-14 - derived from data (69 leads on this line, 2025-03-11..2026-07-02). Confirm."
