@@ -231,3 +231,36 @@ models:
           Distinct from invoiced_value_at_cancellation, which is what was billed.
       - name: synced_at
         data_tests: [not_null]
+
+  - name: fct_campaign_daily
+    description: >
+      Lead outcomes per marketing campaign at two levels - the individual campaign and
+      the family it rolls up to - on a cohort grain
+      (entity_id, campaign_group, campaign, line_of_business, lead_received_date).
+      The table marketing spend attaches to, because cost arrives per campaign.
+
+      Built for the per-lead cost split. campaign_day_leads_total is what the campaign
+      produced across all lines that day, so a row takes leads_received divided by
+      campaign_day_leads_total of the campaign spend, and the shares sum back to the
+      spend exactly. Commercial campaigns are measured by their campaign row, not by
+      line, as a reporting choice - nothing here special-cases them.
+    columns:
+      - name: campaign_day_key
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: campaign_group
+        data_tests: [not_null]
+      - name: campaign
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests: [not_null]
+      - name: lead_received_date
+        data_tests: [not_null]
+      - name: leads_received
+        data_tests: [not_null]
+      - name: campaign_day_leads_total
+        description: The campaign leads across all lines that day. Never less than leads_received.
+        data_tests: [not_null]
+      - name: synced_at
+        data_tests: [not_null]

@@ -129,6 +129,28 @@ rather than inference.
 
 
 
+
+### ✅ Fase B — `serving.opportunities_v1` publicado (2026-09-14)
+
+68.231 filas, 39 de las 60 columnas de `core`. Estrecho a proposito: un contrato
+publico es barato de ampliar y caro de recortar. Excluye borradas y `is_in_scope=false`
+(datos de otra empresa no pueden aparecer en un contrato publico). Catalogado.
+
+### 🔵 Fase C — marketing: mart de campanas listo, falta el gasto (2026-09-14)
+
+`marts.fct_campaign_daily` en dos niveles (campana individual y familia), con
+`campaign_day_leads_total` y `line_share_pct` en cada fila para que la atribucion de
+coste por lead sea una multiplicacion. Reconcilia exacto con `fct_lead_source_daily`
+(67.677 = 67.677). Lo que queda - `dim_ad_campaign_map` (Nicolas), tablas raw de Ads,
+CPL/CPA/CER - esta detallado en `IMPLEMENTATION_STATUS.md`.
+
+### ✅ Seeds de agentes, borrador completo (2026-09-14)
+
+`dim_agent` 31 -> 65 (los 34 nombres que faltaban: vendedores historicos 2023-2025,
+un alias y dos cuentas compartidas). `dim_agent_assignment` 34 -> 75, con 11 ventanas
+confirmadas extendidas hacia atras y 41 nuevas. **`is_within_assignment` pasa del 58% al
+99,3%.** Todo lo derivado lleva la marca DRAFT y la evidencia; Nicolas lo corrige.
+
 ### ✅ Fase A — Cancellations y Payments conectados (2026-09-10)
 
 Los dos reportes aterrizaban y estaban tipados en `staging` desde 2026-08, y **ningun

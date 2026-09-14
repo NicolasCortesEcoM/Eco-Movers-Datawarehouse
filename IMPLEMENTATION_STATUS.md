@@ -143,8 +143,8 @@ detecto la caida del 2026-09-09.
 | **Auditoria A1-A6** | ✅ Completa | - |
 | **KPIs de ventas (B0-B4)** | ✅ Completa | `opportunities_v1` sigue pendiente (ver Fase B abajo) |
 | **Fase A - Cancellations y Payments** | ✅ **Completa 2026-09-10** | - |
-| **Fase B - Contrato general** | ⏳ Pendiente | `serving.opportunities_v1` |
-| **Fase C - Marketing y publicidad** | 🔵 En progreso | Jerarquia de campanas hecha; falta mart, seeds de coste y tablas raw de Ads |
+| **Fase B - Contrato general** | ✅ **Completa 2026-09-14** | `serving.opportunities_v1` publicado, 68.231 filas |
+| **Fase C - Marketing y publicidad** | 🔵 En progreso | Jerarquia y mart hechos; falta `dim_ad_campaign_map` (Nicolas), tablas raw de Ads, CPL/CPA/CER |
 | **Fase D - Reportes nuevos** | ⏳ Pendiente | 13 reportes programables disponibles y sin usar |
 | **Limpieza C4-C8, D** | ⏳ Parcial | C4 cerrado por la Fase A; C5-C8 abiertos |
 
@@ -276,38 +276,52 @@ completa tarda unos 25 segundos.
 
 Ordenado por lo que desbloquea, no por dificultad. **La accion siguiente es la 1.**
 
-### 1. NEXT ACTION - `serving.opportunities_v1`
+### 1. ✅ HECHO 2026-09-14 - `serving.opportunities_v1`
 
-El contrato que el proyecto declaro prioridad numero uno desde el principio y que sigue
-sin publicarse. Ahora vale mas que nunca: `core.opportunities` paso de 58.678 a 71.914
-filas, tiene 60 columnas y lleva atribucion de campana, fecha de cancelacion y
-subcategoria de perdida.
+Publicado, estrecho a proposito: 39 de las 60 columnas de `core`. 68.231 filas
+(excluye borradas y `is_in_scope = false`). Catalogado con la advertencia de que el
+resultado se lee de los flags, no de las fechas. Ampliar es un cambio aditivo de una
+linea; recortar obligaria a v2.
 
-Grano `(source_instance_id, external_opportunity_id)`. Requisitos que impone el propio
-repo: entrada en `serving_catalog.md`, `entity_id` y `synced_at`, tests de unicidad en el
-grano y `relationships` de vuelta a `core`, y sufijo de version.
+### 2. NEXT ACTION - Fase C, lo que queda
 
-⚠️ Decidir antes de escribir: **si expone las 60 columnas o un subconjunto.** Un contrato
-publico es mas facil de ampliar que de recortar - quitar una columna obliga a v2 con 90
-dias de solapamiento. Empezar estrecho.
+Hecho:
+- `dim_referral_source.campaign_group`: 178 fuentes -> 59 familias.
+- `core.opportunities.referral_campaign_group` al 98,9%.
+- **`marts.fct_campaign_daily`** (2026-09-14): grano
+  `(entity, campaign_group, campaign, linea, dia)`, 15.500+ filas, reconcilia exacto con
+  `fct_lead_source_daily`. Lleva `campaign_day_leads_total` y `line_share_pct` en cada
+  fila, de modo que cuando llegue el gasto la atribucion es
+  `gasto x leads_received / campaign_day_leads_total` y suma de vuelta al gasto exacto.
+  Verificado: Google Ads King, agosto 2026, 159 Local / 8 LD -> 95,2% / 4,8%.
 
-### 2. Fase C - marketing y publicidad (en progreso)
+Falta, en orden - **y el paso 1 es de Nicolas**:
 
-Hecho: `dim_referral_source.campaign_group`, 178 fuentes -> 59 familias, y
-`core.opportunities.referral_campaign_group` al 98,9%.
+1. **`dim_ad_campaign_map`** - seed. Nicolas lo construye con los nombres reales de las
+   plataformas. Forma requerida:
 
-Falta, en orden:
+   | columna | que es | ejemplo |
+   |---|---|---|
+   | `platform` | `google_ads`, `meta_ads`, `bing_ads` | `google_ads` |
+   | `platform_campaign_name` | el nombre EXACTO que emite la plataforma | *(el que salga del export)* |
+   | `platform_campaign_id` | el id de la plataforma, si lo hay - mas estable que el nombre | |
+   | `campaign` | nuestra campana, = `dim_referral_source.source_clean` | `Google Ads — Snohomish` |
+   | `valid_from`, `valid_to` | por si una campana de plataforma cambia de destino | |
+   | `notes` | | |
 
-1. **`marts.fct_campaign_daily`**, grano `(entity, campaign_group, campaign, linea, dia)`.
-   Deja sumar por familia o por campana individual sin cambiar de tabla.
-2. **`dim_ad_campaign_map`** - seed. Nombre de campana de la plataforma -> campana
-   nuestra. **Este es el punto difícil, no el coste:** Google Ads emite
-   `[Search] Moving - Snohomish - Exact` y el CRM dice `Google Ads Snohomish`. No
-   coinciden y no van a coincidir. Misma clase de tabla que `dim_lob_branch`.
-3. **`raw_google_ads`, `raw_meta_ads`, `raw_bing_ads`** con coste diario por campana.
-   Fase 2 del roadmap, asi que cada una necesita su cliente con presupuesto y su entrada
-   en el contrato de sync.
-4. **CPL, CPA, spend y CER** encima de eso.
+   ⚠️ **Este es el punto dificil de toda la fase, no el coste.** Los nombres no van a
+   coincidir solos, y una campana de plataforma que no este en el seed dejara su gasto
+   sin atribuir - visible, nunca perdido, pero sin atribuir. Preferir el id de plataforma
+   al nombre cuando exista: los nombres se renombran, los ids no.
+
+2. **`raw_google_ads`, `raw_meta_ads`, `raw_bing_ads`** con coste diario por campana.
+   Fase 2 del roadmap: cada una necesita su cliente con presupuesto bajo `pipeline/`,
+   su recurso dlt con PK compuesta, y su fila en `crm_sync_contract.md`. Seguir el orden
+   de "Adding a new source" de `CLAUDE.md` al pie de la letra.
+3. **`marts.fct_campaign_spend_daily`**: el join de coste sobre `fct_campaign_daily` via
+   el seed, aplicando la regla de reparto. De ahi salen **CPL** (gasto / leads), **CPA**
+   (gasto / booked), **spend** por familia y linea, y **CER**.
+4. Vista `serving.campaign_daily_v1` cuando haya un consumidor.
 
 **REGLA DE REPARTO DEL COSTE, definida por Nicolas el 2026-09-10 y no negociable:** el
 coste se reparte **por lead, no por la linea de negocio nominal de la campana**. Si
