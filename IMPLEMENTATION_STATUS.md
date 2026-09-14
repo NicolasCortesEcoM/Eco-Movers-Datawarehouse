@@ -295,6 +295,10 @@ Hecho:
   `gasto x leads_received / campaign_day_leads_total` y suma de vuelta al gasto exacto.
   Verificado: Google Ads King, agosto 2026, 159 Local / 8 LD -> 95,2% / 4,8%.
 
+**Guia completa de integracion en [`marketing_ads_integration_guide.md`](marketing_ads_integration_guide.md)**:
+credenciales por plataforma, la consulta exacta, el cliente y el recurso dlt como copia
+del patron SmartMoving, el carril de correo para plataformas sin API, y el checklist.
+
 Falta, en orden - **y el paso 1 es de Nicolas**:
 
 1. **`dim_ad_campaign_map`** - seed. Nicolas lo construye con los nombres reales de las
