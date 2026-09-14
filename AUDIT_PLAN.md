@@ -42,7 +42,7 @@ quality. Phone activity is out of scope (it needs RingCentral).
 
 | | Done | In progress | Pending | Blocked |
 |---|---:|---:|---:|---:|
-| A — critical defects | 4 | 0 | 0 | 0 |
+| A — critical defects | 7 | 0 | 0 | 0 |
 | B — KPI layer | 5 | 0 | 1 | 0 |
 | C — modelling defects | 7 | 0 | 1 | 0 |
 | D — redundancy cleanup | 1 | 0 | 0 | 0 |
@@ -213,6 +213,46 @@ estan en su sitio; falta el modelado.
    .`cancellation_reason`. Grano `(entity_id, cancellation_reason, line_of_business,
    cancelled_date)` con su porcentaje sobre el total del periodo. Barato: no necesita
    ninguna fuente nueva.
+
+### ✅ A7 — A repeated Quote # inside one Lead Status file blocked the queue for two days
+
+Found 2026-09-14. From 2026-09-12 22:00 UTC every sweep of `report_ingest` failed on the
+same email — a `local` Lead Status generated 2026-09-12 20:04 UTC — with *"SmartMoving
+reported 4499 records, 4498 landed"*: **1,262 consecutive error executions**, one Slack
+alert each. Two rows in that export carried the same `Quote #` (134862, a Closed
+opportunity the CRM listed twice), so the second one collided on the landing PK and
+`ON CONFLICT DO NOTHING` dropped it.
+
+What it did and did not break, measured against `raw`:
+
+- **Landing kept working.** The sweep takes the newest inbox email first, so every
+  report that arrived after the stuck one was ingested on its next sweep and trashed.
+  All 09-13 and 09-14 generations are in `raw` with the right counts.
+- **No dbt rebuild came out of this flow for two days.** `Inbox Drained?` was never
+  true while the stuck email sat there, so `core` and `serving` were refreshed only by
+  the 03:30 nightly build. Intraday freshness was lost, not data.
+- **The quote drain stopped for the same reason** — it hangs off the same branch.
+
+**Fixed** in `Build Landing Rows`: a natural key that repeats inside one file is suffixed
+with its position (`134862#000600`), so every row lands and the count matches.
+Position is stable across re-ingests, so idempotency holds. dbt joins on the `Quote #`
+inside `row_data`, never on `row_key`, so nothing downstream sees the suffix. Published
+in n8n at 20:05 UTC; the stuck email passed on the next sweep (4,499 = 4,499), the
+queue drained, and the drain + rebuild ran once at the end of the burst.
+
+⚠️ **This is the third time the same failure shape has occurred** (A2, A6, A7): one email
+that cannot pass `Assert Row Count Matches` re-fails every two minutes, floods Slack
+with identical alerts, and holds back every rebuild behind it. The individual causes
+were all different; the mechanism that turns one bad file into a two-day outage is the
+same. It is documented as an open item in `deploy/n8n_report_ingest_setup.md` under
+*Known limitations* — a persistent mismatch should be quarantined (logged to
+`report_ingest_errors`, archived out of the inbox) after a bounded number of attempts,
+so the rest of the queue and the rebuild proceed while someone looks at the one file.
+
+Also seen while draining, harmless but worth knowing: the All Jobs email generated
+2026-09-14 20:02:27 UTC was picked up twice, fifteen minutes apart, and the second pass
+was a full no-op (4,998 = 4,998, one `_source_email`). Two deliveries of the same report
+share a `Date` header, so the landing PK absorbs them.
 
 ### ✅ A6 — The keyless report's row key was not stable, and it silently sextupled payments
 

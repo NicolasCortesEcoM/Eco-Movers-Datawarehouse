@@ -414,6 +414,17 @@ flujo lleva estable desde entonces.
 Lo que no esta demostrado es que no vuelva a pasar bajo una rafaga historica grande. La
 proxima carga masiva de reportes es la prueba real.
 
+**2026-09-14 - segunda caida del mismo carril, distinta causa.** Desde el 2026-09-12
+22:00 UTC `report_ingest` fallo en cada barrido (1.262 ejecuciones en error) sobre el
+mismo correo: un Lead Status de `local` anunciaba 4.499 filas y aterrizaban 4.498,
+porque dos filas compartian `Quote #` y `ON CONFLICT DO NOTHING` descartaba una. El
+correo nunca salia del inbox, asi que bloqueaba todo reporte mas antiguo y ningun
+rebuild de dbt salio de este flujo en dos dias (solo el nocturno). Arreglado en
+`Build Landing Rows`: una clave natural repetida dentro del mismo fichero se sufija con
+su posicion (`<quote>#000123`), de modo que toda fila aterriza y el conteo cuadra. dbt
+une por el `Quote #` de `row_data`, nunca por `row_key`, asi que nada aguas abajo lo
+ve. Publicado en n8n y en `deploy/n8n_report_ingest_nodes.json`.
+
 ---
 
 ## Current Workstream - Scope

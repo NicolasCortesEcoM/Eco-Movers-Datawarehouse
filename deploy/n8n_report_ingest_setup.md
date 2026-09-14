@@ -139,19 +139,35 @@ check against silent truncation.
 
 ## Flow
 
+Current graph (2026-09-14). The IMAP trigger is still in the workflow but disabled.
+
 ```
-Report Mailbox (IMAP)
-  -> Resolve Report Metadata            (Code)
-  -> Recognised Report?                 (IF)
-       true  -> Download Report File    (HTTP Request)   <-- NEW
-             -> Extract Report Rows     (Extract from File)
-             -> Build Landing Rows      (Code)
-             -> Land Report Rows        (Postgres)
-             -> Verify Landed Row Count (Postgres)       <-- NEW
-             -> Assert Row Count Matches (Code)          <-- NEW
-       false -> Log Ingest Error        (Postgres)
-             -> Alert Unrecognised Report (HTTP Request)
+Sweep every 2 min (Schedule)
+  -> Find Unprocessed Reports          (Gmail getAll, limit 1, alias-filtered, in:inbox)
+  -> Shape Gmail Like IMAP             (Code)
+  -> Resolve Report Metadata           (Code)
+  -> Recognised Report?                (IF is_valid)
+       true  -> Download Report File   (HTTP Request)
+             -> Extract Report Rows    (Extract from File)
+             -> Build Landing Rows     (Code, one item per report)
+             -> Land Report Rows       (Postgres, one INSERT ... ON CONFLICT DO NOTHING)
+             -> Purge Legacy Row Keys  (Postgres, transitional, see AUDIT_PLAN A6)
+             -> Collect Reports To Verify
+             -> Verify Landed Row Count (Postgres)
+             -> Assert Row Count Matches (Code, throws on mismatch)
+             -> Collect Emails To Clean -> Find Email In Gmail -> Move Email To Trash
+             -> Any Reports Left?      (Gmail getAll, limit 1)
+             -> Inbox Drained?         (IF)
+                  true  -> Drain Quote Backlog (SSH, flock, 300/instance)
+                        -> Rebuild dbt now     (SSH, flock)
+                        -> Assert Rebuild Succeeded
+                  false -> end (the last run of the burst pays for the tail)
+       false -> Drop Hand-Pulled Report Noise (Filter) -> Log Ingest Error -> Alert Unrecognised Report
+             -> Find Unusable Email -> Archive Out Of Inbox
 ```
+
+The sections below describe the three nodes added on 2026-08-07 and are kept for the
+field-by-field settings; the surrounding graph has moved on as drawn above.
 
 ---
 
@@ -269,6 +285,21 @@ return [{
 
 ## Known limitations
 
+- **One unpassable email stalls the whole tail of the flow.** Seen three times
+  (AUDIT_PLAN A2, A6, A7). `Assert Row Count Matches` throws, the email stays in the
+  inbox, the next sweep picks the same email again, and for as long as that lasts:
+  every sweep alerts Slack with the same message, `Inbox Drained?` is never true, so
+  neither the quote drain nor the dbt rebuild runs — even though every *other* report
+  keeps landing correctly (the sweep is newest-first). Landing is not at risk; freshness
+  of `core`/`serving` is. The fix that is NOT yet built: after N consecutive failures on
+  the same `rfc822_msgid`, quarantine it — log to `report_ingest_errors`, archive out of
+  the inbox — and let the burst finish. Until then, the signal to look for is
+  *the same row-count alert repeating every 2 minutes*.
+- **Row keys can carry a `#<position>` suffix** (since 2026-09-14). A natural key that
+  repeats inside one file — SmartMoving does emit the same `Quote #` twice in a Lead
+  Status export — is disambiguated by position so both rows land and the count matches.
+  Nothing in dbt joins on `row_key`; the reports join on the `Quote #` inside
+  `row_data`.
 - ~~One email per execution is assumed by the verification step.~~ **FIXED
   2026-08-13, and it was not the unlikely edge case it was written up as.** When all
   eight scheduled reports send together they arrive together: seven reports were
@@ -281,11 +312,11 @@ return [{
   `Build Landing Rows` is pairing-aware. Only the row-count *check* was skipped. So a
   truncated report would have landed short with nothing failing and no alert - the
   exact failure the check exists to catch.
-- **The test alias `reporting@ecomoversmoving.com` maps to `local`.** Remove it from
-  `Resolve Report Metadata` once the per-instance aliases are live in SmartMoving.
-- **Email cleanup is deliberately not implemented.** `postProcessAction: read` plus
-  the `UNSEEN` filter already prevents reprocessing. The email holds the only pointer
-  to the download URL (valid 30 days), so deleting it before the row count is
-  verified would destroy the ability to retry. If inbox hygiene is wanted later, use
-  the Gmail node to archive or label *after* `Assert Row Count Matches` - not before,
-  and prefer archiving over permanent deletion.
+- ~~The test alias `reporting@ecomoversmoving.com` maps to `local`.~~ **Not a test alias.**
+  Confirmed by Nicolas 2026-08-25: `local` reports are scheduled to `reporting@` and
+  `ld` reports to `ld.reporting@`. That is the live production mapping, and both
+  company domains are accepted.
+- ~~Email cleanup is deliberately not implemented.~~ **Superseded.** A processed email is
+  moved to Trash (per message, never per thread) right after `Assert Row Count Matches`
+  and BEFORE the dbt rebuild; an unusable one is archived out of the inbox. The inbox is
+  the queue, so both steps are load-bearing.

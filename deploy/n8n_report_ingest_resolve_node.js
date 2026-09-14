@@ -82,8 +82,24 @@ const recipients = [...new Set([
   ...addresses(j.cc),
 ])];
 
-const alias = recipients.find(a => INSTANCE_BY_ALIAS[a]) || null;
-const instance = alias ? INSTANCE_BY_ALIAS[alias] : null;
+// Mailbox name decides the instance; the domain only has to be one of ours.
+// (This lookup used to reference INSTANCE_BY_ALIAS, a map renamed on 2026-08-25 -
+// the committed file would have thrown a ReferenceError if pasted. The live node
+// already carried this version; the file now matches it.)
+let alias = null;
+let instance = null;
+for (const addr of recipients) {
+  const at = addr.lastIndexOf('@');
+  if (at < 0) continue;
+  const mailbox = addr.slice(0, at);
+  const domain = addr.slice(at + 1);
+  if (!COMPANY_DOMAINS.includes(domain)) continue;
+  if (INSTANCE_BY_MAILBOX[mailbox]) {
+    alias = addr;
+    instance = INSTANCE_BY_MAILBOX[mailbox];
+    break;
+  }
+}
 
 // NOISE vs ERROR. Both reach here because both pass the IMAP `FROM smartmoving`
 // filter, but they are not the same thing and must not share an alert path:
