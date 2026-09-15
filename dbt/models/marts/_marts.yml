@@ -314,3 +314,64 @@ models:
         data_tests: [not_null, unique]
       - name: unmapped_spend
         data_tests: [not_null]
+
+  - name: int_cancellation_detail
+    description: >
+      One row per cancelled, in-scope opportunity with everything to cut a cancellation
+      by: origin/destination geography of the primary job, reason, timing (lead to
+      cancel, booking to cancel, cancel to move, late flag = within 48 h of the move),
+      value, deposit paid, crew/truck/hours estimates, mileage band, and whether the
+      customer booked again later. The base of both cancellation marts.
+    columns:
+      - name: opportunity_key
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('opportunities')
+              field: opportunity_key
+      - name: entity_id
+        data_tests: [not_null]
+      - name: cancellation_reason
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['local', 'long_distance', 'commercial', 'unassigned']
+
+  - name: fct_cancellations_by_zip
+    description: >
+      Cancellations by origin ZIP WITH the denominator, on a cohort grain (entity, line,
+      state, city, ZIP, month the lead arrived). cancellation_pct = cancellations /
+      (booked + cancellations). Sum numerators and denominators to roll up; never
+      average the row rates. Reasons as columns; late cancellations, deposits at risk
+      and win-backs per ZIP. Filter booked_or_cancelled >= 20 before ranking by rate.
+    columns:
+      - name: zip_month_key
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: origin_zip
+        data_tests: [not_null]
+      - name: booked_or_cancelled
+        data_tests: [not_null]
+      - name: cancellations
+        data_tests: [not_null]
+
+  - name: fct_cancellation_reasons_monthly
+    description: >
+      Why customers cancel, by month the cancellation happened (period grain), line and
+      reason. share_of_month_pct sums to 100 within (entity, line, month). Each reason
+      carries how late it happens, what it costs, deposits held, win-backs, average
+      mileage and estimated crew/hours. Reason coverage starts 2026-01-02 (the report's
+      window); earlier cancellations have no date and are not here.
+    columns:
+      - name: reason_month_key
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: cancellation_reason
+        data_tests: [not_null]
+      - name: cancellations
+        data_tests: [not_null]

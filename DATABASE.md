@@ -256,6 +256,9 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `mart_unmatched_report_rows`       | view  | Report rows that could not be crosswalked — a review queue. Its count oscillates; see the Lead Status note under `raw_smartmoving` |
 | `int_ad_spend_daily`               | view  | Every ad platform's spend per platform campaign per day, mapped to a CRM source by ID via `dim_ad_campaign_map` (or null). The one union point for platforms |
 | `fct_campaign_spend_daily`         | table | Ad spend split per lead across lines of business, with CPL / CPA / CER. Spend on a day with no lead sits on line `unassigned`, `has_leads = false` — 63% of it today, so aggregate by month, never average daily CPLs |
+| `int_cancellation_detail`          | view  | One row per cancellation with geography, reason, timing, late flag, value, deposit, win-back. Base of the two marts below; open it when a number needs a face |
+| `fct_cancellations_by_zip`         | table | Cancellations by origin ZIP WITH the denominator (booked + cancelled), cohort by lead month, reasons as columns. Sum numerators and denominators to roll up; filter `booked_or_cancelled >= 20` before ranking |
+| `fct_cancellation_reasons_monthly` | table | Why customers cancel, by month it happened (period grain); share of month, how late, what it cost. Reason coverage from 2026-01-02 |
 | `mart_unmapped_ad_spend`           | view  | Platform campaigns with no seed row — the review queue for `dim_ad_campaign_map`, sorted by money. Attributed + unmapped = raw, tested on every build |
 
 **When a field goes through the observation layer, and when it does not:** only where

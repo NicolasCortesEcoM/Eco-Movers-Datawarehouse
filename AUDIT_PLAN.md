@@ -144,6 +144,12 @@ coste por lead sea una multiplicacion. Reconcilia exacto con `fct_lead_source_da
 (67.677 = 67.677). Lo que queda - `dim_ad_campaign_map` (Nicolas), tablas raw de Ads,
 CPL/CPA/CER - esta detallado en `IMPLEMENTATION_STATUS.md`.
 
+### ✅ Cancelaciones por ZIP y por motivo (2026-09-15)
+
+Los dos reportes pedidos el 2026-09-10 y aplazados: `int_cancellation_detail`,
+`fct_cancellations_by_zip` (con denominador) y `fct_cancellation_reasons_monthly`,
+reconciliados contra `core`. Detalle y primera lectura en `IMPLEMENTATION_STATUS.md` §4.3.
+
 ### ✅ Fase C — CPL/CPA/CER publicados (2026-09-14, noche)
 
 `dim_ad_campaign_map` (1 fila, el resto es de Nicolas), `int_ad_spend_daily`,

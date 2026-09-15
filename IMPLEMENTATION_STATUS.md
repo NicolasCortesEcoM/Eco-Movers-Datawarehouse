@@ -77,7 +77,7 @@ that can see a job that never ran.
 |---|---|---|
 | Audit A1-A8 (2026-09) | done | A2 root cause not proven under a large historical burst (see §5) |
 | Sales KPIs B0-B4 | done 2026-09-14 | - |
-| Phase A - Cancellations and Payments in core | done 2026-09-10 | ZIP and reason marts, documented not built (§4.3) |
+| Phase A - Cancellations and Payments in core | done 2026-09-10; ZIP and reason marts done 2026-09-15 | serving views when a consumer exists |
 | Phase B - `serving.opportunities_v1` | done 2026-09-14 | - |
 | **Phase C - Marketing** | **in progress** | 3 more Google Ads accounts (blocked: no access yet), Meta and Bing credentials |
 | Phase D - 13 unused schedulable reports | pending | see §4.2 |
@@ -169,11 +169,18 @@ Zero quota: schedule in the SmartMoving UI to a `*reporting@` alias, add the rep
 `storage-accounts` + `storage-jobs-report` (326 storage payments in `core.payments` have
 no context), `opportunities-by-move-date`, `crew-ratings`, `customer-service-tickets`.
 
-### 4.3 Cancellations, next slice (documented, not built - by request)
+### 4.3 Cancellations by ZIP and by reason - done 2026-09-15
 
-By origin ZIP (ZIP lives on `core.jobs` / `core.leads`, not on opportunities; a rate
-needs the booked count of the same ZIP as denominator) and by reason (seven clean
-reasons already on `cancellation_reason`). No new source needed.
+`int_cancellation_detail` (one row per cancellation: geography of the primary job,
+reason, lead/booking/move timing, late flag = within 48 h of the move, value, deposit,
+crew/hours estimates, mileage band, win-back), `fct_cancellations_by_zip` (cohort by
+lead month, WITH denominator, reasons as columns) and `fct_cancellation_reasons_monthly`
+(period grain, share of month, timing, cost). Reconciliation test against core. First
+reading, 2026: local cancels 20.8% of what it wins, LD 14.6%, commercial 1.3%; 24% of
+cancellations happen within 48 h of the move; 55% "no longer needed", 29% "another
+mover", 9% price; win-back 2%. Open: no cancellation has a payment on record (deposits
+not taken, or refunds leave the report - the Refunds report answers it). Serving views
+when a consumer needs them; the marts are readable from Metabase now.
 
 ### 4.4 The quote drain
 
@@ -264,6 +271,5 @@ local.
 | 2 | Meta Business System User token | Nicolas | - |
 | 3 | Intuit Developer app + QuickBooks admin consent (Phase E prerequisites) | Nicolas | - |
 | 4 | Phase D: schedule `sales-person-activity-details`, `outstanding-balances`, `refunds`, `affiliates` | Nicolas (UI) + Claude (wire) | - |
-| 5 | Cancellations by ZIP and by reason (§4.3) | Claude | decision to build |
 | 6 | `report_ingest` quarantine after N failures (§4.6) | Claude | - |
 | 7 | Open the PR `warehouse-audit-and-sales-kpis` -> `main` | Nicolas | - |
