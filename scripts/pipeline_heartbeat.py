@@ -96,6 +96,16 @@ CHECKS = [
      "Reports are landing but core/serving have not been rebuilt since. report_ingest "
      "is most likely re-failing on one email every 2 minutes (same Slack alert "
      "repeating) - see deploy/n8n_report_ingest_setup.md, Known limitations."),
+
+    # Google Ads (Phase C, live since 2026-09-14). One n8n run a day at 06:00 PT, so a
+    # 30 h threshold tolerates one missed run and fires on the second. _extracted_at is
+    # stamped on every row the run touches, backfill or daily window, so it moves on
+    # every successful load even when Google reports nothing new.
+    ("google_ads", 30.0,
+     "select max(_extracted_at) from raw_google_ads.campaign_daily",
+     "No Google Ads load completed. Check the ads_google_daily workflow in n8n; a "
+     "CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION in its output means the Cloud "
+     "project's API access level was downgraded."),
 ]
 
 

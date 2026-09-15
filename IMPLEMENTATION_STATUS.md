@@ -144,7 +144,7 @@ detecto la caida del 2026-09-09.
 | **KPIs de ventas (B0-B4)** | ✅ Completa | `opportunities_v1` sigue pendiente (ver Fase B abajo) |
 | **Fase A - Cancellations y Payments** | ✅ **Completa 2026-09-10** | - |
 | **Fase B - Contrato general** | ✅ **Completa 2026-09-14** | `serving.opportunities_v1` publicado, 68.231 filas |
-| **Fase C - Marketing y publicidad** | 🔵 En progreso | Jerarquia, mart y **toda la extraccion de Google Ads construida (2026-09-14)**; bloqueada solo por la aprobacion del developer token (Nicolas). Luego: backfill 2023, `dim_ad_campaign_map`, CPL/CPA/CER |
+| **Fase C - Marketing y publicidad** | 🔵 En progreso | **Google Ads EN PRODUCCION desde 2026-09-14**: 413 campaign-days, $39.181, 1 child account, workflow diario y heartbeat. Falta: 3 child accounts (Nicolas), `dim_ad_campaign_map` (Nicolas), `fct_campaign_spend_daily` + CPL/CPA/CER, luego Meta y Bing |
 | **Fase D - Reportes nuevos** | ⏳ Pendiente | 13 reportes programables disponibles y sin usar |
 | **Limpieza C4-C8, D** | ⏳ Parcial | C4 cerrado por la Fase A; C5-C8 abiertos |
 
@@ -299,7 +299,22 @@ Hecho:
 credenciales por plataforma, la consulta exacta, el cliente y el recurso dlt como copia
 del patron SmartMoving, el carril de correo para plataformas sin API, y el checklist.
 
-**Extraccion de Google Ads - construida 2026-09-14, esperando a Google:**
+**Extraccion de Google Ads - EN PRODUCCION desde 2026-09-14:**
+
+- Explorer access concedido al proyecto de Cloud (desde 2026-09-09 el nivel es del
+  proyecto, no del developer token). Manager `NicolasCortesGoogleAds` → child
+  `PNW Moving` (1776272460).
+- Backfill completo: **413 campaign-days, $39.181, 6 campanas, 2024-08-16 → hoy**. No
+  hay datos de 2023: la cuenta no tenia campanas. Hueco mayo 2025 → julio 2026 (la
+  cuenta estuvo parada). Prueba de un dia y doble corrida sin duplicar, superadas;
+  el cuadre al centavo contra la UI (2026-09-13: $37.01) lo confirma Nicolas.
+- `ads_google_daily` publicado; `google_ads` es el sexto mecanismo del heartbeat.
+- Observacion para el mapeo: las campanas de la plataforma se llaman
+  `Movers | Pierce County`, `Movers | King County`, `Movers | Full`, `DM | Movers |
+  Brand`, `PNW Video Campaign`; el CRM dice `Google Ads King`, `Google Ads Snohomish`.
+  No coinciden solas - exactamente lo que `dim_ad_campaign_map` existe para resolver.
+
+*(Lo construido, tal como quedo antes de la aprobacion:)*
 
 - Credenciales: cuenta de servicio GCP + developer token del Manager `2797921560`, en
   `.env` (JSON en base64, decodificado en memoria); el `.json` se elimino del repo y
@@ -321,9 +336,9 @@ del patron SmartMoving, el carril de correo para plataformas sin API, y el check
 
 Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
 
-0. **Solicitar Explorer access para el proyecto de Cloud `ecomovers-datawarehouse`** en
-   `console.cloud.google.com/google/ads-apis/overview` - desde 2026-09-09 el nivel es del
-   proyecto, no del developer token ni del Manager (guia §2.1). Tras la
+0. ~~Solicitar Explorer access~~ **Hecho 2026-09-14.** Ahora: anadir las otras tres child
+   accounts al Manager (aparecen solas) y correr `run_ads.py --platform google_ads --dest
+   postgres --account <id> --from 2023-01-01` una vez por cuenta. Tras la
    aprobacion: `run_ads.py --list-accounts`, prueba de 1 dia cuadrada al centavo contra
    la UI, doble corrida, backfill `--from 2023-01-01`, publicar `ads_google_daily`,
    anadir `google_ads` al heartbeat (umbral 30 h).

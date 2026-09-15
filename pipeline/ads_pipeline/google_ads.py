@@ -208,7 +208,7 @@ class GoogleAds:
                     "account_name": c.descriptive_name,
                     "is_manager": bool(c.manager),
                     "level": int(c.level),
-                    "status": c.status.name,
+                    "status": _enum_name(c, "status"),
                     "currency_code": c.currency_code,
                     "time_zone": c.time_zone,
                     "is_test_account": bool(c.test_account),
@@ -243,6 +243,24 @@ class GoogleAds:
                            "date_to": date_to}, fn)
 
 
+def _enum_name(msg, field: str) -> str:
+    """Enum field as its NAME ('ENABLED'), not its number.
+
+    With the client's default (use_proto_plus=False, what this repo uses) messages
+    are plain protobuf: enum fields come back as ints and the message carries its
+    DESCRIPTOR directly. Resolving through the descriptor gives the name for any
+    enum field without a per-enum lookup table. Raw should hold the name - `2`
+    means nothing to a reader of the table. Falls back to the number rather than
+    ever failing an extraction over a label."""
+    value = getattr(msg, field)
+    if hasattr(value, "name"):
+        return value.name
+    try:
+        enum_type = msg.DESCRIPTOR.fields_by_name[field].enum_type
+        return enum_type.values_by_number[int(value)].name
+    except Exception:  # noqa: BLE001
+        return str(value)
+
 def _digits(s: str) -> str:
     """'customers/123-456-7890' -> '1234567890'. Customer ids are shown with dashes in
     the UI and required without them by the API."""
@@ -263,7 +281,8 @@ def _flatten_campaign_row(row) -> dict:
     not promoted today can be read tomorrow without another API call (ELT rule 1)."""
     from google.protobuf.json_format import MessageToDict
 
-    payload = MessageToDict(row._pb, preserving_proto_field_name=True)
+    # Plain protobuf (client default): the row IS the message, there is no ._pb.
+    payload = MessageToDict(getattr(row, "_pb", row), preserving_proto_field_name=True)
     return {
         "platform": PLATFORM,
         "account_id": str(row.customer.id),
@@ -273,10 +292,10 @@ def _flatten_campaign_row(row) -> dict:
         "date": row.segments.date,  # 'YYYY-MM-DD', account-local day
         "campaign_id": str(row.campaign.id),
         "campaign_name": row.campaign.name,
-        "campaign_status": row.campaign.status.name,
-        "advertising_channel_type": row.campaign.advertising_channel_type.name,
-        "advertising_channel_sub_type": row.campaign.advertising_channel_sub_type.name,
-        "bidding_strategy_type": row.campaign.bidding_strategy_type.name,
+        "campaign_status": _enum_name(row.campaign, "status"),
+        "advertising_channel_type": _enum_name(row.campaign, "advertising_channel_type"),
+        "advertising_channel_sub_type": _enum_name(row.campaign, "advertising_channel_sub_type"),
+        "bidding_strategy_type": _enum_name(row.campaign, "bidding_strategy_type"),
         "cost_micros": int(row.metrics.cost_micros),
         "impressions": int(row.metrics.impressions),
         "clicks": int(row.metrics.clicks),

@@ -144,7 +144,15 @@ coste por lead sea una multiplicacion. Reconcilia exacto con `fct_lead_source_da
 (67.677 = 67.677). Lo que queda - `dim_ad_campaign_map` (Nicolas), tablas raw de Ads,
 CPL/CPA/CER - esta detallado en `IMPLEMENTATION_STATUS.md`.
 
-### 🔵 Fase C — extraccion de Google Ads construida, bloqueada por Google (2026-09-14)
+### ✅ Fase C — Google Ads en produccion (2026-09-14, mismo dia)
+
+Explorer access concedido al proyecto de Cloud al final del dia; primera corrida real,
+un bug de libreria (enums como int en protobuf puro) corregido, prueba de un dia y
+doble corrida superadas, backfill completo (413 campaign-days, $39.181, agosto 2024 →
+hoy), workflow publicado, heartbeat ampliado. Queda para Nicolas: cuadrar $37.01 del
+2026-09-13 contra la UI, anadir las tres child accounts, y `dim_ad_campaign_map`.
+
+### 🔵 (historico) Fase C — extraccion construida, bloqueada por Google (2026-09-14, tarde)
 
 Cliente, recurso dlt, CLI, esquema raw, staging con tests y workflow n8n (inactivo) -
 todo desplegado en el droplet. La cuenta de servicio autentica y ve el Manager

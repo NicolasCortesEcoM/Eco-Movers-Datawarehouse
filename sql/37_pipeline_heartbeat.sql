@@ -31,7 +31,7 @@ GRANT USAGE ON SCHEMA monitoring TO platform_rw;
 
 CREATE TABLE IF NOT EXISTS monitoring.pipeline_heartbeat (
   checked_at    timestamptz NOT NULL DEFAULT now(),
-  mechanism     text        NOT NULL,   -- 'reports' | 'webhooks' | 'dlt_extraction' | 'dbt_build'
+  mechanism     text        NOT NULL,   -- 'reports' | 'webhooks' | 'dlt_extraction' | 'dbt_build' | 'ingest_to_build' | 'google_ads'
   last_success  timestamptz,            -- NULL = never, which is its own alarm
   age_hours     numeric(10,2),
   threshold_hrs numeric(10,2) NOT NULL,

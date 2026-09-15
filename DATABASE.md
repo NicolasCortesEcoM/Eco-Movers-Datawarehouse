@@ -23,7 +23,7 @@ Related documents, each owning something this one does not:
 | Schema                              | Industry term      | Objects                  | What it holds                                                      | Who may read it           |
 | ----------------------------------- | ------------------ | ------------------------ | ------------------------------------------------------------------ | ------------------------- |
 | `raw_smartmoving`                   | Bronze             | 45 tables                | Source payloads exactly as received. No transformation.            | dbt only                  |
-| `raw_google_ads`                    | Bronze             | 2 tables (empty until Google approves the token) | Google Ads cost per (child account, campaign, day) and the manager's account tree. Pre-created by `sql/40_raw_google_ads.sql` in dlt's shape. PK `(platform, account_id, campaign_id, date)`: `account_id` is the CHILD customer id, so the same campaign id under two accounts never collides. | dbt only |
+| `raw_google_ads`                    | Bronze             | 2 tables: 413 campaign-days, 2 accounts (live 2026-09-14) | Google Ads cost per (child account, campaign, day) and the manager's account tree. Pre-created by `sql/40_raw_google_ads.sql` in dlt's shape. PK `(platform, account_id, campaign_id, date)`: `account_id` is the CHILD customer id, so the same campaign id under two accounts never collides. | dbt only |
 | `staging`                           | Silver             | 9 seed tables + 15 views | Renamed, typed, lightly cleaned. **Money becomes `numeric` here.** | dbt only                  |
 | `marts` (the `int_*` half)          | Silver             | 8 objects: 6 views + 2 tables | The observation layer — "source S said this about O at time T". | dbt only                  |
 | `core`                              | Silver (conformed) | 8 tables                 | The canonical business entities, reconciled across sources.        | dbt + read-only apps      |
@@ -387,7 +387,7 @@ soft-delete marker is written. Deletions stay in `opportunity_deletions`.
 Plus, since 2026-09-14, `stg_google_ads__accounts` and `stg_google_ads__campaign_daily`
 over `raw_google_ads` - `cost = cost_micros / 1,000,000` cast to `numeric` here, and the
 day exposed as `spend_date_local` because Google reports by the ACCOUNT's day, not UTC.
-Both build and test on zero rows today.
+Live since 2026-09-14: one child account (PNW Moving), 6 campaigns, $39,181 from 2024-08-16.
 
 The 15 `stg_*` views are one per raw table: rename, type, and **cast money to
 `numeric`**. That cast happens here and nowhere else, so no downstream model has to

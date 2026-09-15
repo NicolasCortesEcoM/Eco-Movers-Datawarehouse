@@ -228,6 +228,11 @@ igual, porque la regla es "toda llamada se registra", no "las caras se registran
 
 ### 2.7 La prueba de que funciona
 
+Ejecutada el 2026-09-14 (resultados en §8). Dos gotchas de la librería v25 que costaron
+la primera corrida y ya están resueltas en el cliente: con `use_proto_plus=False` (el
+default) los mensajes son protobuf puro — los enums llegan como **int** (se resuelven
+por `DESCRIPTOR`) y la fila no tiene `._pb` (`MessageToDict(row)` directo).
+
 1. Una corrida manual de **1 día** con `--budget 2`. Comparar `sum(cost)` de ese día
    contra la cifra que muestra la UI de Google Ads para el mismo día y cuenta. Deben
    coincidir al centavo (misma zona horaria de cuenta).
@@ -415,10 +420,12 @@ Empezar por Google Ads. No pasar al siguiente punto sin cerrar el anterior.
 - [x] `stg_google_ads__accounts` + `stg_google_ads__campaign_daily` con tests; construyen (vacíos) en el droplet.
 - [x] Workflow n8n `ads_google_daily` creado, **inactivo**.
 - [x] Fila en `crm_sync_contract.md` §6.
-- [ ] **NICOLAS — el único bloqueo**: solicitar *Explorer* access para el PROYECTO DE CLOUD `ecomovers-datawarehouse` en `console.cloud.google.com/google/ads-apis/overview` (§2.1). El API Center del Manager ya no decide nada desde 2026-09-09.
-- [ ] Tras la aprobación: `run_ads.py --list-accounts` → ver la child; prueba §2.7 (1 día, cuadre al centavo, doble corrida).
-- [ ] Backfill desde 2023-01-01. Publicar `ads_google_daily`. Añadir `google_ads` al heartbeat.
-- [ ] Añadir las otras tres child accounts al Manager → aparecen solas; backfill de cada una con `--account`.
+- [x] Explorer access concedido al proyecto de Cloud `ecomovers-datawarehouse` *(2026-09-14, Nicolas)*.
+- [x] `--list-accounts`: Manager `NicolasCortesGoogleAds` (2797921560) → child **`PNW Moving` (1776272460)**, `America/Los_Angeles`, USD.
+- [x] Prueba §2.7: 1 día (2026-09-13) → 1 fila, $37.01, doble corrida sin duplicar. **Pendiente de Nicolas: confirmar $37.01 / 2 clics / 33 impresiones contra la UI ese día.**
+- [x] Backfill desde 2023-01-01: **413 campaign-days, $39.181, 6 campañas, 2024-08-16 → hoy**. Nada en 2023 ni en 2024 H1: la cuenta no tenía campañas. Corrida diaria encima del backfill: 413 = 413 llaves, merge verificado en Postgres.
+- [x] `ads_google_daily` publicado (06:00 PT). `google_ads` en el heartbeat, umbral 30 h, verde.
+- [ ] Añadir las otras tres child accounts al Manager → aparecen solas; backfill de cada una con `--account <id> --from 2023-01-01`.
 - [ ] `dim_ad_campaign_map.csv` — **con `(platform, account_id, campaign_id)` reales** (Nicolas). Con los datos ya en raw, `select distinct account_id, account_name, campaign_id, campaign_name from staging.stg_google_ads__campaign_daily` es la lista de partida.
 - [ ] `marts.fct_campaign_spend_daily` + `mart_unmapped_ad_spend`.
 - [ ] Repetir §3 (Meta) y §4 (Bing) sobre el mismo `ads_pipeline/` — cada uno es un
