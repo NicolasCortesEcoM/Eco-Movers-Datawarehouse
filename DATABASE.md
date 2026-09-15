@@ -259,6 +259,12 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `int_cancellation_detail`          | view  | One row per cancellation with geography, reason, timing, late flag, value, deposit, win-back. Base of the two marts below; open it when a number needs a face |
 | `fct_cancellations_by_zip`         | table | Cancellations by origin ZIP WITH the denominator (booked + cancelled), cohort by lead month, reasons as columns. Sum numerators and denominators to roll up; filter `booked_or_cancelled >= 20` before ranking |
 | `fct_cancellation_reasons_monthly` | table | Why customers cancel, by month it happened (period grain); share of month, how late, what it cost. Reason coverage from 2026-01-02 |
+| `int_booking_detail`               | view  | Every booking with its booking date (source on the row, incl. a measured lead-date proxy), cancellation date, lead time and exposure |
+| `fct_booking_survival`             | table | Share of bookings alive N days after booking and the hazard per window - when to call to reconfirm. Sum at_risk / cancelled to roll up |
+| `fct_bookings_by_lead_time`        | table | Cancellation rate by days between booking and move |
+| `int_first_contact_timing`         | table | Business-minute time to first contact per lead (window is a dbt var) with outcome flags |
+| `fct_first_contact_outcomes`       | table | Conversion / cancellation / lost rate by response band and whether the lead arrived in business hours |
+| `int_report_lead_status_latest`    | view  | Newest Lead Status row per opportunity, for Time to Contact |
 | `mart_unmapped_ad_spend`           | view  | Platform campaigns with no seed row — the review queue for `dim_ad_campaign_map`, sorted by money. Attributed + unmapped = raw, tested on every build |
 
 **When a field goes through the observation layer, and when it does not:** only where

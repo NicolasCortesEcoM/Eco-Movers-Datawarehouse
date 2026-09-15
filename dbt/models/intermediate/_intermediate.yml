@@ -142,3 +142,13 @@ models:
           True while the opportunity has no job, so the line is an inference that the
           job will replace on conversion. Exclude or display it when comparing lines.
         data_tests: [not_null]
+
+  - name: int_report_lead_status_latest
+    description: >
+      Newest Lead Status generation per opportunity, for Time to Contact - the one
+      field that report carries for every outcome and no other free source does.
+    columns:
+      - name: opportunity_key
+        data_tests: [not_null, unique]
+      - name: time_to_contact_minutes
+        data_tests: [not_null]

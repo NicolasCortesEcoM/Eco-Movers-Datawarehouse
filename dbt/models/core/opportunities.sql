@@ -253,9 +253,14 @@ resolved as (
         -- int_report_lost_leads_latest for the reasoning.
         lost.lost_reason                                    as lost_reason,
         lost.lost_date                                      as lost_date,
-        -- Minutes between the lead arriving and a first reply. Only populated for
-        -- lost records: this report is the only source that carries it.
-        lost.time_to_first_contact_minutes                  as time_to_first_contact_minutes,
+        -- Minutes between the lead arriving and a first reply. Two report sources
+        -- carry it: Lost Leads (lost records only) and Lead Status (every outcome,
+        -- 99% of leads since 2025). Newest generation wins. Until 2026-09-15 only the
+        -- first was read, so no booked or cancelled lead had the number.
+        {{ pick_latest([
+            ("lost.time_to_first_contact_minutes", "lost.observed_at"),
+            ("ls.time_to_contact_minutes",          "ls.observed_at")
+        ]) }}                                               as time_to_first_contact_minutes,
         {{ pick_latest([("enr.opportunity_type_code", "enr.observed_at")]) }}
                                                             as opportunity_type_code,
         {{ pick_latest([("enr.service_type_id", "enr.observed_at")]) }}
@@ -401,6 +406,8 @@ resolved as (
     left join job_service_date jsd on jsd.opportunity_key = b.opportunity_key
     left join {{ ref('int_report_lost_leads_latest') }} lost
       on lost.opportunity_key = b.opportunity_key
+    left join {{ ref('int_report_lead_status_latest') }} ls
+      on ls.opportunity_key = b.opportunity_key
 )
 
 select

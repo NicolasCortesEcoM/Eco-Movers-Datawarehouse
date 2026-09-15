@@ -375,3 +375,66 @@ models:
         data_tests: [not_null]
       - name: cancellations
         data_tests: [not_null]
+
+  - name: int_first_contact_timing
+    description: >
+      One row per lead with a creation instant and a time-to-first-contact: wall-clock
+      minutes, BUSINESS minutes (only the minutes inside the configurable sales window
+      count - vars business_hours_start/_end/business_days), the response band and the
+      outcome flags. Base of fct_first_contact_outcomes.
+    columns:
+      - name: opportunity_key
+        data_tests: [not_null, unique]
+      - name: business_minutes
+        data_tests: [not_null]
+      - name: response_band
+        data_tests: [not_null]
+
+  - name: fct_first_contact_outcomes
+    description: >
+      Outcomes by how fast the lead was answered, in business minutes: conversion,
+      cancellation (cancelled / (booked + cancelled)) and lost rates per response band,
+      split by whether the lead arrived inside business hours. Cohort by lead month.
+      Read rows with >= 30 leads.
+    columns:
+      - name: contact_outcome_key
+        data_tests: [not_null, unique]
+      - name: leads
+        data_tests: [not_null]
+
+  - name: int_booking_detail
+    description: >
+      Every booking ever won with its booking date (job > Booked report > webhook; the
+      source travels on the row), cancellation date, booking lead time and exposure.
+      Base of the survival and lead-time marts.
+    columns:
+      - name: opportunity_key
+        data_tests: [not_null, unique]
+      - name: booked_date_source
+        data_tests:
+          - accepted_values:
+              values: ['job', 'report', 'webhook', 'lead_proxy']
+
+  - name: fct_booking_survival
+    description: >
+      Share of bookings still alive N days after being booked, and the hazard per
+      window - the "when to call to reconfirm" curve. A booking counts at horizon h
+      only if it had h days before the move and h days have elapsed. Cancellations
+      without a date (pre-2026) are excluded from the curve and counted on the row.
+      Sum at_risk and cancelled_by_horizon to roll up; never average the pcts.
+    columns:
+      - name: survival_key
+        data_tests: [not_null, unique]
+      - name: at_risk
+        data_tests: [not_null]
+
+  - name: fct_bookings_by_lead_time
+    description: >
+      Cancellation rate by how far ahead of the move the booking was made (Nicolas's
+      hypothesis: older bookings cancel more). Complete 2023-2026; cancellations
+      without a date still count.
+    columns:
+      - name: lead_time_month_key
+        data_tests: [not_null, unique]
+      - name: bookings
+        data_tests: [not_null]

@@ -9,6 +9,26 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
 
+# Business rules that are a NUMBER someone may want to change, not a modelling
+# decision. Edit here, rebuild; no SQL changes.
+vars:
+  # Sales business hours, in the lead's branch-local time. A lead that arrives at
+  # 9 pm is not "answered late" when it is called at 8:05 the next morning, so
+  # time-to-first-contact is measured in BUSINESS minutes: only the minutes inside
+  # this window count. Set by Nicolas 2026-09-15: 08:00-17:00. Hours are integers on
+  # the 24 h clock; the window is [start, end).
+  business_hours_start: 8
+  business_hours_end: 17
+  # ISO day numbers that count as business days: 1 = Monday ... 7 = Sunday.
+  # Default: every day. Measured 2026-09-15 on 33,869 leads since 2025: leads that
+  # arrive on Saturday are answered within the hour 64% of the time, on Sunday 61%,
+  # weekdays 70% - the sales team works weekends, so a weekend day that counted as
+  # zero business minutes would call a same-day reply "instant". Drop 6 and/or 7 here
+  # if that ever changes.
+  business_days: [1, 2, 3, 4, 5, 6, 7]
+  # Booking-survival horizons, in days since the booking was made.
+  survival_horizons: [1, 3, 7, 14, 21, 30, 45, 60, 90]
+
 # dbt drops and recreates core/serving tables, which drops their RLS policies.
 # Re-apply them in the same invocation - otherwise app_read can read every
 # entity's rows until someone remembers to run sql/10_apply_rls.sql by hand.

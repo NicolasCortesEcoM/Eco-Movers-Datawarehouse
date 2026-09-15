@@ -182,6 +182,22 @@ mover", 9% price; win-back 2%. Open: no cancellation has a payment on record (de
 not taken, or refunds leave the report - the Refunds report answers it). Serving views
 when a consumer needs them; the marts are readable from Metabase now.
 
+**Booking survival and first-contact speed - done 2026-09-15.**
+`int_booking_detail` (booking date from job > Booked report > webhook > lead date as a
+measured proxy, source on the row) -> `fct_booking_survival` (share alive N days after
+booking, hazard per window; horizons are a var) and `fct_bookings_by_lead_time`
+(cancellation rate by how far ahead the booking was made). `core.opportunities`
+now reads Time to Contact from the Lead Status report (99% of leads since 2025; before,
+only lost leads had it) -> `int_first_contact_timing` (BUSINESS minutes: vars
+`business_hours_start/_end/business_days` in dbt_project.yml, 08:00-17:00, seven days -
+weekend leads are answered within the hour 61-64% of the time) ->
+`fct_first_contact_outcomes` (conversion, cancellation and lost rate by response band).
+First reading, 2026 bookings: 96.5% alive at day 1, 89.5% at day 7, 86.5% at day 14,
+~85% from day 21 on; the hazard peaks in days 7-21 (6.6%/window) - that is when to
+call. Bookings made 60+ days ahead cancel 38% vs 15% for 0-6 days. Speed: the team
+answers in a median 8 business minutes; slow first contact LOSES the lead (lost 43% ->
+55%) rather than producing a cancellation later.
+
 ### 4.4 The quote drain
 
 2,349 Lead Status quotes without a GUID (2026-09-14, all `local`). Drains itself: 300
