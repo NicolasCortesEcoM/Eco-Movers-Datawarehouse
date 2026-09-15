@@ -364,6 +364,37 @@ Seed en `dbt/seeds/dim_ad_campaign_map.csv`:
 | `valid_from`, `valid_to` | por si una campaña de plataforma cambia de destino en el CRM |
 | `notes` | |
 
+**Estado 2026-09-14:** seed creado con **una fila** (`Movers | Pierce County` →
+`PNW Google Ads`, la única que Nicolas confirmó para PNW Moving). Las otras cinco
+campañas de esa cuenta ($30.155) están en `mart_unmapped_ad_spend`. Nota: el CRM
+registró 61 leads de `PNW Google Ads` entre agosto y diciembre de 2024, cuando el único
+gasto era `Movers | Full` — muy probablemente también es `PNW Google Ads`, pero es
+decisión de Nicolas, no del modelo.
+
+**Referencia por NOMBRE, de Nicolas (2026-09-14)** — para rellenar el seed cuando las
+demás cuentas aparezcan y sus ids estén en `stg_google_ads__campaign_daily`. La
+columna derecha es `dim_referral_source.referral_source_raw`, tal cual:
+
+| Campaña de plataforma | CRM (`crm_referral_source`) |
+|---|---|
+| `LocalServicesCampaign:SystemGenerated:…` | Google Guarantee |
+| `DM \| Movers \| King County`, `DM \| Storage \| King County` | Google Ads King |
+| `DM \| Movers \| Pierce County`, `DM \| Storage \| Pierce County` | Google Ads Pierce |
+| `DM \| Movers \| Kitsap County` | Google Ads Kitsap |
+| `DM \| Movers \| Snohomish County` | Google Ads Snohomish |
+| `DM \| Movers \| Thurston County` | Google Ads Thurston |
+| `DM \| Movers \| [Olympia Movers]`, `DM \| Movers \| Video \| All Markets #2`, `EM \| Movers \| Black Friday 2025`, `DM \| Remarketing \| All Markets`, `EM \| Storage \| Video \| All Markets` | Google Ads |
+| `Movers \| Commercial`, `Video \| Commercial`, `Eco Commercial (Google Ads)` | Eco Commercial (Google Ads) |
+| `Movers \| Pierce County` **(cuenta PNW Moving)** | PNW Google Ads |
+| `DM \| Long Distance \| …`, `EM \| Long Distance \| …` (todas las variantes: All Markets, Seattle/Washington/Portland Origination, Increased CPA, Video #2, Healthcare Industry) | Google Ads Long Distance |
+| `Eco Commercial Declare Ads` | Eco Commercial Declare Ads |
+| `Google Ads Declare` | Google Ads Declare |
+| `Microsoft Office_GAds_…`, `NTFS 84_…`, `MacStorage 37_…`, `Homebrew_GAds_…` | Google Ads *(campañas ajenas al negocio; confirmar si deben contar)* |
+| **Bing:** `Movers \| Bing All Markets`, `Brand \| All Markets`, `EM \| Movers \| Black Friday 2025 Bing Ads` | Bing Ads |
+| **Bing:** `Movers \| Bing Commercial` | Bing Ads Commercial |
+| **Meta:** `Facebook` | Facebook |
+| **Otros (sin API por ahora):** Great Guys → Great Guys Moving; Move Buddha; Yelp; Snoball Referral - Customer; `Seattle - Tacoma` → OpenAI Ads | |
+
 Reglas:
 - **Una campaña de plataforma que no esté en el seed deja su gasto sin atribuir.**
   Visible en `marts.mart_unmapped_ad_spend`, nunca perdido, nunca repartido a ciegas.
@@ -426,8 +457,8 @@ Empezar por Google Ads. No pasar al siguiente punto sin cerrar el anterior.
 - [x] Backfill desde 2023-01-01: **413 campaign-days, $39.181, 6 campañas, 2024-08-16 → hoy**. Nada en 2023 ni en 2024 H1: la cuenta no tenía campañas. Corrida diaria encima del backfill: 413 = 413 llaves, merge verificado en Postgres.
 - [x] `ads_google_daily` publicado (06:00 PT). `google_ads` en el heartbeat, umbral 30 h, verde.
 - [ ] Añadir las otras tres child accounts al Manager → aparecen solas; backfill de cada una con `--account <id> --from 2023-01-01`.
-- [ ] `dim_ad_campaign_map.csv` — **con `(platform, account_id, campaign_id)` reales** (Nicolas). Con los datos ya en raw, `select distinct account_id, account_name, campaign_id, campaign_name from staging.stg_google_ads__campaign_daily` es la lista de partida.
-- [ ] `marts.fct_campaign_spend_daily` + `mart_unmapped_ad_spend`.
+- [x] `dim_ad_campaign_map.csv` creado, 1 fila (PNW Google Ads). **Nicolas**: las 5 campañas restantes de PNW Moving están en `marts.mart_unmapped_ad_spend` con su gasto; una fila de CSV cada una.
+- [x] `marts.int_ad_spend_daily` → `fct_campaign_spend_daily` (CPL, CPA, CER) + `mart_unmapped_ad_spend`; `tests/assert_ad_spend_reconciles.sql` prueba atribuido + sin mapear = raw en cada build.
 - [ ] Repetir §3 (Meta) y §4 (Bing) sobre el mismo `ads_pipeline/` — cada uno es un
       cliente y un recurso más, no una arquitectura más.
 

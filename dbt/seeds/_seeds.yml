@@ -257,3 +257,46 @@ seeds:
         tests:
           - not_null
           - accepted_values: {values: ['local', 'long_distance', 'commercial']}
+
+  - name: dim_ad_campaign_map
+    description: >
+      Which CRM referral source each AD-PLATFORM campaign feeds. The join that turns
+      spend into CPL/CPA/CER, and the hard part of Phase C: platform names
+      (`Movers | Pierce County`) and CRM names (`PNW Google Ads`) never match on their
+      own, and the guide forbids guessing. Keyed on the platform's campaign ID plus the
+      account it lives in - names get renamed, IDs do not. A platform campaign with no
+      row here leaves its spend in marts.mart_unmapped_ad_spend: visible, never lost,
+      never split blindly. Several platform campaigns may point at one CRM source (Search
+      + Video for the same market); spend sums. Nicolas owns the rows; the name-based
+      reference he supplied lives in marketing_ads_integration_guide.md section 6.
+    columns:
+      - name: platform
+        description: google_ads / meta_ads / bing_ads - matches raw_<platform>.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads', 'meta_ads', 'bing_ads']
+      - name: account_id
+        description: The CHILD account the campaign lives in, never a naked campaign id.
+        data_tests: [not_null]
+      - name: platform_campaign_id
+        description: The platform's own campaign id. THE KEY, with platform and account.
+        data_tests: [not_null]
+      - name: platform_campaign_name
+        description: Only so the CSV can be read while editing; never joined on.
+      - name: crm_referral_source
+        description: >
+          = dim_referral_source.referral_source_raw, the CRM's own string. NOT
+          source_clean, which is empty or rewritten for several sources; the mart
+          derives the display label with the same rule fct_campaign_daily uses.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_referral_source')
+              field: referral_source_raw
+      - name: valid_from
+        description: First day the mapping applies (a platform campaign can change target).
+        data_tests: [not_null]
+      - name: valid_to
+        description: Last day, 9999-12-31 while current.
+        data_tests: [not_null]

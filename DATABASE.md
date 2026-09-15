@@ -27,7 +27,7 @@ Related documents, each owning something this one does not:
 | `staging`                           | Silver             | 9 seed tables + 15 views | Renamed, typed, lightly cleaned. **Money becomes `numeric` here.** | dbt only                  |
 | `marts` (the `int_*` half)          | Silver             | 8 objects: 6 views + 2 tables | The observation layer — "source S said this about O at time T". | dbt only                  |
 | `core`                              | Silver (conformed) | 8 tables                 | The canonical business entities, reconciled across sources.        | dbt + read-only apps      |
-| `marts` (the `fct_*`/`mart_*` half) | Gold (internal)    | 4 objects: 3 tables + 1 view | Analytical models. May change whenever an analyst needs it.     | analysts, BI              |
+| `marts` (the `fct_*`/`mart_*` half) | Gold (internal)    | 6 objects: 4 tables + 2 views (+ `int_ad_spend_daily` on the int side; `fct_campaign_spend_daily` and `mart_unmapped_ad_spend` added 2026-09-14) | Analytical models. May change whenever an analyst needs it.     | analysts, BI              |
 | `serving`                           | Gold (contract)    | 5 tables                 | Versioned, documented, stable.                                     | other teams' applications |
 
 The existing names are kept rather than renamed to Bronze/Silver/Gold: renaming
@@ -254,6 +254,9 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `fct_cancellations_daily`          | table | Cancellations on the day they **happened** — 1,007 rows. The PERIOD view. Publishes no rate, deliberately: on a calendar grain the denominator is unknowable |
 | `fct_pipeline_current`             | table | Current unresolved opportunities, separating committed from speculative work; snapshot, not history |
 | `mart_unmatched_report_rows`       | view  | Report rows that could not be crosswalked — a review queue. Its count oscillates; see the Lead Status note under `raw_smartmoving` |
+| `int_ad_spend_daily`               | view  | Every ad platform's spend per platform campaign per day, mapped to a CRM source by ID via `dim_ad_campaign_map` (or null). The one union point for platforms |
+| `fct_campaign_spend_daily`         | table | Ad spend split per lead across lines of business, with CPL / CPA / CER. Spend on a day with no lead sits on line `unassigned`, `has_leads = false` — 63% of it today, so aggregate by month, never average daily CPLs |
+| `mart_unmapped_ad_spend`           | view  | Platform campaigns with no seed row — the review queue for `dim_ad_campaign_map`, sorted by money. Attributed + unmapped = raw, tested on every build |
 
 **When a field goes through the observation layer, and when it does not:** only where
 two sources can disagree. Fields with exactly one source join straight in — that is why

@@ -264,3 +264,53 @@ models:
         data_tests: [not_null]
       - name: synced_at
         data_tests: [not_null]
+
+  - name: int_ad_spend_daily
+    description: >
+      Every ad platform's spend, one row per platform campaign per day, with the CRM
+      source it maps to via dim_ad_campaign_map (by id, within validity dates) or null.
+      The single place spend is unioned and mapped, so fct_campaign_spend_daily and
+      mart_unmapped_ad_spend are exact complements.
+    columns:
+      - name: spend_key
+        data_tests: [not_null, unique]
+      - name: platform
+        data_tests: [not_null]
+      - name: spend
+        data_tests: [not_null]
+
+  - name: fct_campaign_spend_daily
+    description: >
+      Ad spend attributed to CRM campaigns and lines of business by the per-lead rule
+      (spend x leads_received / campaign_day_leads_total), with the leads and revenue it
+      bought. Source of cost_per_lead, cost_per_acquisition and cost_efficiency_ratio.
+      Spend on a day with no lead from the campaign lands whole on line 'unassigned'
+      with has_leads = false. Grain (entity_id, campaign, line_of_business, spend_date).
+      Reconciles to raw with mart_unmapped_ad_spend (tests/assert_ad_spend_reconciles).
+    columns:
+      - name: campaign_spend_day_key
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: campaign
+        data_tests: [not_null]
+      - name: line_of_business
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['local', 'long_distance', 'commercial', 'unassigned']
+      - name: spend_date
+        data_tests: [not_null]
+      - name: spend
+        data_tests: [not_null]
+
+  - name: mart_unmapped_ad_spend
+    description: >
+      Platform campaigns with spend and no row in dim_ad_campaign_map - the review
+      queue, sorted by money. Every dollar here is absent from fct_campaign_spend_daily
+      until Nicolas adds one CSV row per campaign id.
+    columns:
+      - name: unmapped_key
+        data_tests: [not_null, unique]
+      - name: unmapped_spend
+        data_tests: [not_null]

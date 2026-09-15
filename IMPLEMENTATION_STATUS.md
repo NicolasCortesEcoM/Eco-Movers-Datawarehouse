@@ -144,7 +144,7 @@ detecto la caida del 2026-09-09.
 | **KPIs de ventas (B0-B4)** | ✅ Completa | `opportunities_v1` sigue pendiente (ver Fase B abajo) |
 | **Fase A - Cancellations y Payments** | ✅ **Completa 2026-09-10** | - |
 | **Fase B - Contrato general** | ✅ **Completa 2026-09-14** | `serving.opportunities_v1` publicado, 68.231 filas |
-| **Fase C - Marketing y publicidad** | 🔵 En progreso | **Google Ads EN PRODUCCION desde 2026-09-14**: 413 campaign-days, $39.181, 1 child account, workflow diario y heartbeat. Falta: 3 child accounts (Nicolas), `dim_ad_campaign_map` (Nicolas), `fct_campaign_spend_daily` + CPL/CPA/CER, luego Meta y Bing |
+| **Fase C - Marketing y publicidad** | 🔵 En progreso | **Google Ads en produccion y CPL/CPA/CER publicados en `marts.fct_campaign_spend_daily` (2026-09-14)**. $9.026 atribuidos, $30.155 en la cola `mart_unmapped_ad_spend`. Falta (Nicolas): mapear 5 campanas de PNW Moving, anadir 3 child accounts. Luego Meta y Bing |
 | **Fase D - Reportes nuevos** | ⏳ Pendiente | 13 reportes programables disponibles y sin usar |
 | **Limpieza C4-C8, D** | ⏳ Parcial | C4 cerrado por la Fase A; C5-C8 abiertos |
 
@@ -364,9 +364,22 @@ Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
    Fase 2 del roadmap: cada una necesita su cliente con presupuesto bajo `pipeline/`,
    su recurso dlt con PK compuesta, y su fila en `crm_sync_contract.md`. Seguir el orden
    de "Adding a new source" de `CLAUDE.md` al pie de la letra.
-3. **`marts.fct_campaign_spend_daily`**: el join de coste sobre `fct_campaign_daily` via
-   el seed, aplicando la regla de reparto. De ahi salen **CPL** (gasto / leads), **CPA**
-   (gasto / booked), **spend** por familia y linea, y **CER**.
+3. ~~`marts.fct_campaign_spend_daily`~~ **Hecho 2026-09-14.** `int_ad_spend_daily` (union
+   de plataformas + mapeo por id con vigencia) → `fct_campaign_spend_daily` (reparto por
+   lead; `cost_per_lead`, `cost_per_valid_lead`, `cost_per_acquisition`,
+   `cost_efficiency_ratio`) + `mart_unmapped_ad_spend` (la cola). Test de
+   reconciliacion al centavo en cada build.
+
+   **Dos hallazgos del primer calculo real (PNW Google Ads, $9.026):**
+   - **El 63% del gasto atribuido ($5.655) cae en dias sin ningun lead** de esa campana
+     en el CRM. Es una campana de ~3-18 leads/mes contra 30 dias de gasto: a grano
+     diario el CPL es ruido. Esas filas van a `line_of_business = 'unassigned'`,
+     `has_leads = false`, y NO se pierden - pero el consumidor debe agregar por mes
+     (`sum(spend) / sum(leads)`), nunca promediar CPLs diarios.
+   - **CPL real, agosto 2026: $1.999 / 3 leads = $666.** Septiembre: $1.183 / 3. En
+     2025 el mismo campo daba $60-70. O el CRM no esta atribuyendo los leads a
+     `PNW Google Ads` desde 2026, o la campana se ha deteriorado 10x. Es la primera
+     pregunta que este mart permite hacer y merece respuesta de marketing.
 4. Vista `serving.campaign_daily_v1` cuando haya un consumidor.
 
 **REGLA DE REPARTO DEL COSTE, definida por Nicolas el 2026-09-10 y no negociable:** el

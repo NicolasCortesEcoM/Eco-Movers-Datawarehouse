@@ -47,6 +47,19 @@ seeds:
         source_instance_id: text
         branch_name: text
         timezone: text
+    # Platform ids are IDENTIFIERS, never numbers: a Google campaign id overflows
+    # int4, and an account id with a leading zero would lose it. Text on both sides
+    # of the join to raw_<platform>, which lands them as text too.
+    dim_ad_campaign_map:
+      +column_types:
+        platform: text
+        account_id: text
+        platform_campaign_id: text
+        platform_campaign_name: text
+        crm_referral_source: text
+        valid_from: date
+        valid_to: date
+        notes: text
     # The is_* flags are written as 0/1 in the CSVs (they came from spreadsheets).
     # Load them as real booleans so `where is_booked` just works - forcing every
     # consumer to remember `= 1` is exactly the kind of papercut that makes a

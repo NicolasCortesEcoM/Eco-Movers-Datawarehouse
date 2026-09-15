@@ -144,6 +144,15 @@ coste por lead sea una multiplicacion. Reconcilia exacto con `fct_lead_source_da
 (67.677 = 67.677). Lo que queda - `dim_ad_campaign_map` (Nicolas), tablas raw de Ads,
 CPL/CPA/CER - esta detallado en `IMPLEMENTATION_STATUS.md`.
 
+### ✅ Fase C — CPL/CPA/CER publicados (2026-09-14, noche)
+
+`dim_ad_campaign_map` (1 fila, el resto es de Nicolas), `int_ad_spend_daily`,
+`fct_campaign_spend_daily` con el reparto por lead, `mart_unmapped_ad_spend` como cola,
+y un test que exige atribuido + sin mapear = raw. Reconcilia: $9.025,74 + $30.155,33 =
+$39.181,07 sobre $39.181,12 (redondeo, dentro de tolerancia). Hallazgos en
+`IMPLEMENTATION_STATUS.md` §2 punto 3: el 63% del gasto atribuido cae en dias sin lead
+(agregar por mes, no por dia) y el CPL de PNW Google Ads en 2026 es ~10x el de 2025.
+
 ### ✅ Fase C — Google Ads en produccion (2026-09-14, mismo dia)
 
 Explorer access concedido al proyecto de Cloud al final del dia; primera corrida real,
