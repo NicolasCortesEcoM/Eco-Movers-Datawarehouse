@@ -225,6 +225,26 @@ estan en su sitio; falta el modelado.
    cancelled_date)` con su porcentaje sobre el total del periodo. Barato: no necesita
    ninguna fuente nueva.
 
+### ✅ A8 — `report_bot` lost the `ld` All Jobs report on a blank sign-in page
+
+Found 2026-09-14 while checking the 1 PM burst: eleven reports landed, the twelfth —
+All Jobs for `ld` — never arrived, because `report_bot_all_jobs` had failed for `ld` at
+10:00 and 13:00 PT (and on 09-12 and 09-13 at the same hours) with *"waiting for
+locator('#emailAddress')"*. The failure screenshot is a blank white page: the Angular
+app never painted on that cold load. `local`, tried seconds later in a fresh context,
+signed in normally, and the 02:50 PT full-year run of the same day succeeded — so this
+is a stalled first load, not credentials or a moved selector.
+
+`login()` did one `goto` and one 30-second wait; `open_report()` already retried three
+times, `login()` did not. **Fixed:** the sign-in navigation now reloads up to three
+times before failing (`pipeline/report_bot/smartmoving.py`). Deployed to the droplet
+and the `ld` request re-run by hand at 13:37 PT — signed in on the first attempt,
+report queued.
+
+⚠️ The `report_bot_all_jobs` alert fired each time and was correct. The gap is that
+nothing re-requests a report whose *request* failed: the next scheduled run does, three
+hours later, so a single failed run costs one All Jobs window for that instance.
+
 ### ✅ A7 — A repeated Quote # inside one Lead Status file blocked the queue for two days
 
 Found 2026-09-14. From 2026-09-12 22:00 UTC every sweep of `report_ingest` failed on the
@@ -259,6 +279,12 @@ same. It is documented as an open item in `deploy/n8n_report_ingest_setup.md` un
 *Known limitations* — a persistent mismatch should be quarantined (logged to
 `report_ingest_errors`, archived out of the inbox) after a bounded number of attempts,
 so the rest of the queue and the rebuild proceed while someone looks at the one file.
+
+**What now detects it:** `scripts/pipeline_heartbeat.py` gained an `ingest_to_build`
+check (threshold 3 h) — reports landing while `core.opportunities.synced_at` stays
+older than the newest landing. The two existing checks could not see this stall:
+`reports` watches `_ingested_at`, which kept advancing, and `dbt_build` allows 30 h,
+which the nightly build satisfied. Deployed to the droplet 2026-09-14.
 
 Also seen while draining, harmless but worth knowing: the All Jobs email generated
 2026-09-14 20:02:27 UTC was picked up twice, fifteen minutes apart, and the second pass

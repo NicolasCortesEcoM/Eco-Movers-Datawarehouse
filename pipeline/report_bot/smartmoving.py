@@ -132,9 +132,27 @@ def login(page, instance: Instance) -> None:
     that something might print.
     """
     log.info("[%s] logging in as %s", instance.id, _mask_email(instance.username))
-    page.goto(instance.base_url, wait_until="domcontentloaded")
 
-    page.wait_for_selector(LOGIN_EMAIL_SEL, timeout=30_000)
+    # The sign-in form is rendered by the Angular app, and on the droplet that app
+    # sometimes never paints on the first load: the failure screenshots from
+    # 2026-09-12..14 (ld, 10:00 and 13:00 PT) are a blank white page after 30 s,
+    # while `local`, tried seconds later in a fresh context, signed in normally. A
+    # cold load that stalls is a reload away from working, so try the navigation up
+    # to three times before calling it a failure - the same shape open_report uses.
+    for attempt in range(1, 4):
+        page.goto(instance.base_url, wait_until="domcontentloaded")
+        try:
+            page.wait_for_selector(LOGIN_EMAIL_SEL, timeout=30_000)
+            break
+        except Exception:
+            if attempt == 3:
+                raise
+            log.warning(
+                "[%s] sign-in form did not render (blank page?) - reloading (%d/3)",
+                instance.id, attempt,
+            )
+            page.wait_for_timeout(5_000)
+
     page.fill(LOGIN_EMAIL_SEL, instance.username)
     page.fill(LOGIN_PASS_SEL, instance.password)
     page.click(LOGIN_SUBMIT_SEL)

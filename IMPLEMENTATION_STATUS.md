@@ -13,7 +13,7 @@ Leads is modelled through `core.opportunities`; five serving contracts are publi
 The quote-backfill drain is now scheduled inside `report_ingest` (once per burst, 300
 per instance, before the dbt build). The main open items are
 `serving.opportunities_v1` and modelling the landed Cancellations and Payments reports.
-**Last updated:** 2026-09-09.
+**Last updated:** 2026-09-14.
 
 ⚠️ **2026-09-09 — two corrections that changed the numbers, both recorded in
 [`AUDIT_PLAN.md`](AUDIT_PLAN.md):**
@@ -399,7 +399,7 @@ estan; falta el modelado. Detalle completo en `AUDIT_PLAN.md`.
 
 ### 5. El goteo de quotes sin resolver
 
-13.009 quotes del reporte Lead Status sin GUID. **Ya se drena solo**: 300 por instancia
+**2.349 quotes** del reporte Lead Status sin GUID (medido 2026-09-14 tras el drenaje; todas en `local`, `ld` esta al 100%). **Ya se drena solo**: 300 por instancia
 por rafaga dentro de `report_ingest`, unas 3.600 llamadas/dia, ~4 dias para el backlog y
 despues ~500/mes de mantenimiento.
 

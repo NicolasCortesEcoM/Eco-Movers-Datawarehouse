@@ -74,6 +74,28 @@ CHECKS = [
     ("dbt_build", 30.0,
      "select max(synced_at) from core.opportunities",
      "core.opportunities has not been rebuilt. Check dbt_build_reports."),
+
+    # The check the 2026-09-12..14 stall needed and did not have (AUDIT_PLAN A7): for
+    # two days every report LANDED (so `reports` stayed green) and the nightly build
+    # ran (so `dbt_build` stayed under 30 h), while report_ingest's own rebuild - the
+    # one that gives core/serving their intraday freshness - never fired because one
+    # email could not pass the row-count assertion. "Last success" here is the last
+    # moment the build was at least as new as the newest landed report: if it is,
+    # the mechanism is alive right now; if not, it has been silent since that build.
+    ("ingest_to_build", 3.0, """
+        with b as (select max(synced_at) built from core.opportunities),
+             i as (select max(t) ingested from (
+                 select max(_ingested_at) t from raw_smartmoving.report_lead_status
+                 union all select max(_ingested_at) from raw_smartmoving.report_all_jobs
+                 union all select max(_ingested_at) from raw_smartmoving.report_booked_opportunities
+                 union all select max(_ingested_at) from raw_smartmoving.report_lost_leads
+                 union all select max(_ingested_at) from raw_smartmoving.report_cancellations
+                 union all select max(_ingested_at) from raw_smartmoving.report_payments) x)
+        select case when b.built >= i.ingested then now() else b.built end
+        from b, i""",
+     "Reports are landing but core/serving have not been rebuilt since. report_ingest "
+     "is most likely re-failing on one email every 2 minutes (same Slack alert "
+     "repeating) - see deploy/n8n_report_ingest_setup.md, Known limitations."),
 ]
 
 

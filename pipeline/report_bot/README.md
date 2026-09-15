@@ -143,6 +143,17 @@ what it does without having to reason about what time it will run.
   never included in an error message.
 - **The browser is always closed**, including on an exception, so a crashed run
   cannot leave Chromium resident on the droplet.
+- **A blank sign-in page is retried, not failed.** On the droplet the SmartMoving
+  app sometimes never paints on a cold load - the screenshot is pure white and
+  `#emailAddress` never appears. Seen for `ld` at 10:00 and 13:00 PT on three
+  consecutive days (2026-09-12..14) while `local`, seconds later, signed in fine.
+  `login()` now reloads up to three times before raising, the same way
+  `open_report()` already did. Three blank loads in a row is a real outage and is
+  still reported as one.
+- **A failed request is not re-requested until the next scheduled run.** The alert
+  fires and is correct, but that instance's All Jobs window is simply missed for
+  those three hours. Re-run by hand with
+  `python -m pipeline.report_bot.run --instance <id> --report all_jobs --window recent`.
 
 ---
 
