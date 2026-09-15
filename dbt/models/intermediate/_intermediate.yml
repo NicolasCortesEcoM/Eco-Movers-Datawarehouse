@@ -150,5 +150,3 @@ models:
     columns:
       - name: opportunity_key
         data_tests: [not_null, unique]
-      - name: time_to_contact_minutes
-        data_tests: [not_null]

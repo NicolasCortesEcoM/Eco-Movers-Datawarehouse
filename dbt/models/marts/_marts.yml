@@ -413,7 +413,7 @@ models:
       - name: booked_date_source
         data_tests:
           - accepted_values:
-              values: ['job', 'report', 'webhook', 'lead_proxy']
+              values: ['job', 'report', 'webhook', 'quote_sent', 'lead_proxy']
 
   - name: fct_booking_survival
     description: >

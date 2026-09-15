@@ -7,19 +7,22 @@
 --   job         core.jobs.job_booked_date_local (All Jobs report). Complete for
 --               2023-2025 bookings, but SmartMoving blanks it on cancelled jobs in the
 --               current-year report, so 2026 cancellations mostly lack it.
---   report      core.opportunities.booked_date_local (Booked report). Only while the
---               opportunity is still booked - a cancellation leaves the report.
+--   report      the Booked report - ANY generation ever landed, not only the latest,
+--               so an opportunity that was booked when a report ran keeps its date
+--               after it cancels and leaves the report. Landing since 2026-09-05;
+--               grows forward at no cost.
 --   webhook     first opportunity-status webhook that showed a booked status, since
 --               2026-07-22. Complete for anything booked after that date.
---   lead_proxy  the day the LEAD arrived. Measured 2026-09-15 on 6,362 bookings with
---               a real booking date: median gap lead -> booking is 0 days, p75 is 2.
---               Used only when nothing else exists, which in practice means 2026
---               cancellations (999 of 1,452 had no other source). It overstates
---               days-booked-to-cancel by at most a couple of days; without it the
---               2026 survival curve dropped two thirds of its cancellations and read
---               95% where the truth is lower.
--- Priority job > report > webhook > lead_proxy; the source travels on every row, so a
--- consumer can exclude the proxy rows and see how much they move the number.
+--   quote_sent  the day the quote went out (Lead Status report). Measured 2026-09-15
+--               on 6,105 bookings with a real booking date: the booking is made the
+--               SAME day the quote is sent - median 0 days, p75 0. Nicolas's proxy.
+--   lead_proxy  the day the lead arrived (median 0, p75 2). Last resort.
+-- Verified 2026-09-15: the 999 cancellations that reached the proxies were ALL
+-- cancelled between 2026-02 and 2026-07 - before webhooks and before the Booked
+-- report - and SmartMoving blanks `Booked at Utc` in All Jobs once a job is
+-- cancelled (checked in the raw rows). So the gap is a closed historical window,
+-- not an ongoing one. Priority job > report > webhook > quote_sent > lead_proxy; the
+-- source travels on every row so a consumer can exclude proxies and see the effect.
 --
 -- EXPOSURE. A booking can cancel from the day it is booked until the move happens.
 -- `exposure_days` = days from booking to the earlier of the service date and the
@@ -41,7 +44,6 @@ with won as (
         o.external_opportunity_id,
         o.created_date_local                                as lead_received_date,
         o.service_date,
-        o.booked_date_local                                 as report_booked_date,
         o.cancelled_date_local                              as cancelled_date,
         o.is_cancelled,
         o.estimated_final_total,
@@ -64,6 +66,27 @@ job_booked as (
     group by 1, 2
 ),
 
+-- Any generation of the Booked report that ever listed the quote, earliest booked date.
+report_booked_any as (
+    select
+        r.source_instance_id,
+        x.external_opportunity_id,
+        min(r.booked_date_local)                            as report_booked_date
+    from {{ ref('stg_smartmoving__report_booked_opportunities') }} r
+    join {{ ref('int_opportunity_quote_crosswalk') }} x
+      on  x.source_instance_id = r.source_instance_id
+      and x.quote_number       = r.quote_number
+    where r.booked_date_local is not null
+    group by 1, 2
+),
+
+quote_sent as (
+    select opportunity_key,
+           (quote_sent_at_utc at time zone 'America/Los_Angeles')::date as quote_sent_date
+    from {{ ref('int_report_lead_status_latest') }}
+    where quote_sent_at_utc is not null
+),
+
 webhook_booked as (
     select
         s.source_instance_id,
@@ -83,18 +106,24 @@ resolved as (
     select
         w.*,
         coalesce(l.line_of_business, 'unassigned')          as line_of_business,
-        coalesce(jb.job_booked_date, w.report_booked_date, wb.webhook_booked_date,
-                 w.lead_received_date)                        as booked_date,
+        coalesce(jb.job_booked_date, rb.report_booked_date, wb.webhook_booked_date,
+                 qs.quote_sent_date, w.lead_received_date)   as booked_date,
         case
             when jb.job_booked_date is not null     then 'job'
-            when w.report_booked_date is not null   then 'report'
+            when rb.report_booked_date is not null  then 'report'
             when wb.webhook_booked_date is not null then 'webhook'
+            when qs.quote_sent_date is not null     then 'quote_sent'
             when w.lead_received_date is not null   then 'lead_proxy'
         end                                                 as booked_date_source
     from won w
     left join job_booked jb
            on jb.source_instance_id = w.source_instance_id
           and jb.external_opportunity_id = w.external_opportunity_id
+    left join report_booked_any rb
+           on rb.source_instance_id = w.source_instance_id
+          and rb.external_opportunity_id = w.external_opportunity_id
+    left join quote_sent qs
+           on qs.opportunity_key = w.opportunity_key
     left join webhook_booked wb
            on wb.source_instance_id = w.source_instance_id
           and wb.external_opportunity_id = w.external_opportunity_id

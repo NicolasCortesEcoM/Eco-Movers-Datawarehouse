@@ -1,5 +1,5 @@
--- The newest Lead Status generation per opportunity, for the ONE field that report
--- carries and nothing else does for every lead: `Time to Contact`.
+-- The newest Lead Status generation per opportunity, for the fields that report carries
+-- and nothing else does for every lead: `Time to Contact` and `Quote Sent`.
 --
 -- Everything else in Lead Status already reaches core through the observation layer
 -- (report_lead_status arm of int_opportunity_observations). Time-to-contact is not
@@ -23,10 +23,14 @@ select distinct on (opportunity_key)
     r.quote_number,
     r.report_generated_at           as observed_at,
     r.time_to_contact_minutes,
+    -- When the quote went out. Measured 2026-09-15 on 6,105 bookings with a real
+    -- booking date: the booking happens the SAME day the quote is sent (median 0, p75
+    -- 0 days) - a tighter proxy for the booking date than the lead's arrival (p75 2).
+    r.quote_sent_at_utc,
     r.received_at_utc
 from {{ ref('stg_smartmoving__report_lead_status') }} r
 join {{ ref('int_opportunity_quote_crosswalk') }} x
   on  x.source_instance_id = r.source_instance_id
   and x.quote_number       = r.quote_number
-where r.time_to_contact_minutes is not null
+where r.time_to_contact_minutes is not null or r.quote_sent_at_utc is not null
 order by opportunity_key, r.report_generated_at desc

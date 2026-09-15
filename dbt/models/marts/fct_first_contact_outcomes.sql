@@ -14,6 +14,18 @@
 -- that arrive at night are a different population (they self-serve online more) and
 -- mixing them in would blur the speed effect.
 --
+-- THE SLOWEST BAND CONVERTS BEST, AND THAT IS AN ARTIFACT, NOT A FINDING. Measured
+-- 2026-09-15 on the 457 leads answered after 2+ business days (2025+): they are
+-- Return Customer (69), Google Organic (58), GBP, Word of Mouth, Realtor - warm leads
+-- that were booked on the phone, often the same day they arrived (44 of the 246
+-- booked ones were booked the day the lead came in; 64 were booked BEFORE the
+-- "first contact"). SmartMoving's Time to Contact is the time to the first LOGGED
+-- communication (email, SMS, quote), not to the first conversation. A repeat customer
+-- who calls, books, and gets a confirmation email three days later reads as "answered
+-- in three days". So that band is selection (warm leads) plus measurement (unlogged
+-- calls), and its 59% conversion says nothing about speed. Read bands 01-04; treat
+-- 05-06 as "the CRM has no early touch on record", which is itself worth knowing.
+--
 -- Cohort grain on the lead's arrival month, like every other lead-outcome mart, so
 -- the maturity caveat applies: last week's leads have not finished deciding.
 -- Read the rates on rows with enough leads (>= 30) - the bands at the tails are thin.

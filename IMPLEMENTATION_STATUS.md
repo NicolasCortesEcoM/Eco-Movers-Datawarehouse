@@ -192,7 +192,16 @@ only lost leads had it) -> `int_first_contact_timing` (BUSINESS minutes: vars
 `business_hours_start/_end/business_days` in dbt_project.yml, 08:00-17:00, seven days -
 weekend leads are answered within the hour 61-64% of the time) ->
 `fct_first_contact_outcomes` (conversion, cancellation and lost rate by response band).
-First reading, 2026 bookings: 96.5% alive at day 1, 89.5% at day 7, 86.5% at day 14,
+Booking-date sources, verified 2026-09-15: SmartMoving blanks `Booked at Utc` in All
+Jobs once a job is cancelled, so 999 cancellations from 2026-02..07 (before webhooks
+on 07-22 and the Booked report on 09-05) have no recorded booking date - a closed
+historical window, not an ongoing gap. Source order job > Booked report (any
+generation) > webhook > Quote Sent (Nicolas's proxy: median 0 days, p75 0, to the
+real booking) > lead date; the source is on every row. The "2+ business days"
+response band converting at 59% is warm leads (return customers, word of mouth)
+booked on the phone before any logged touch - Time to Contact measures the first
+LOGGED communication - and is documented as an artifact in the mart.
+First reading, 2026 bookings: 96.2% alive at day 1, 89.3% at day 7, 86.2% at day 14,
 ~85% from day 21 on; the hazard peaks in days 7-21 (6.6%/window) - that is when to
 call. Bookings made 60+ days ahead cancel 38% vs 15% for 0-6 days. Speed: the team
 answers in a median 8 business minutes; slow first contact LOSES the lead (lost 43% ->
