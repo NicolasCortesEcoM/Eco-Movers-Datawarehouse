@@ -107,6 +107,7 @@ composite PK + merge.
 python run_ads.py --platform google_ads --list-accounts                 # the manager's tree, no load
 python run_ads.py --platform google_ads --dest postgres                  # last 30 days, every child account
 python run_ads.py --platform google_ads --dest postgres --from 2023-01-01 --to 2023-12-31
+python run_ads.py --platform microsoft_ads --dest postgres               # Bing: same flags; --from is clamped to Microsoft's 36-month retention
 python run_ads.py --platform google_ads --dest postgres --account 1234567890 --from 2023-01-01
 ```
 

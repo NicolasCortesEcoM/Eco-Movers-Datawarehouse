@@ -79,7 +79,7 @@ that can see a job that never ran.
 | Sales KPIs B0-B4 | done 2026-09-14 | - |
 | Phase A - Cancellations and Payments in core | done 2026-09-10; ZIP and reason marts done 2026-09-15 | serving views when a consumer exists |
 | Phase B - `serving.opportunities_v1` | done 2026-09-14 | - |
-| **Phase C - Marketing** | **in progress** | 3 more Google Ads accounts (blocked: no access yet), Meta and Bing credentials |
+| **Phase C - Marketing** | **in progress** | 3 more Google Ads accounts (blocked: no access yet), Meta credentials; Bing live 2026-09-15 |
 | Phase D - 13 unused schedulable reports | pending | see §4.2 |
 | Phase E - QuickBooks (Intuit Developer API) | scoped, not started | see §3 |
 | Tech debt C5-C8 | open | see §4.6 |
@@ -145,6 +145,15 @@ ready); Google Ads extraction (`pipeline/ads_pipeline/`, `run_ads.py`,
 reconciliation test attributed + unmapped = raw on every build. Verified to the cent
 against the Google Ads UI on two days.
 
+**Microsoft Advertising (Bing) live 2026-09-15**: OAuth bootstrap `scripts/msads_oauth.py`,
+client `microsoft_ads.py` (async report, JSON endpoints, refresh token rotated per run),
+`raw_microsoft_ads`, `stg_microsoft_ads__*`, second union arm in `int_ad_spend_daily`,
+n8n `ads_microsoft_daily` 06:10 PT, heartbeat. Backfill: 1,355 campaign-days, 10
+campaigns, $107,523 since 2024-10-04 (Microsoft keeps 36 months; the account is
+younger). 4 campaigns mapped per Nicolas (98.6% of spend); 6 small Oct-Nov 2024
+campaigns ($1,458) await his mapping in `mart_unmapped_ad_spend`. Bing CPL 2025:
+$61 local, $55 LD, $73 commercial; 2026: $68 / $65 / $60.
+
 **Rule (Nicolas, 2026-09-10):** cost splits per lead, not per the campaign's nominal
 line - $100 and 3 leads (1 LD, 2 Local) gives $33.33 / $66.67. Commercial is measured by
 its own campaigns, not by line. **Consumers aggregate by month; never average daily CPLs.**
@@ -156,7 +165,7 @@ Remaining, in order:
 2. **Nicolas**: Meta Business System User token (guide §3). Then `meta_ads.py`, its
    resource, one union arm. Meta is the second marketing source (1,331 leads in 2026,
    13% booked vs 32% for Google) - the CPA that changes decisions most.
-3. Bing Ads (593 leads) and Google LSA (499) by the same mould.
+3. Google LSA (499 leads) by the same mould; Bing is done.
 4. `serving.campaign_spend_daily_v1` when a consumer exists (rule: no consumer, no
    serving view; the mart is queryable from Metabase now).
 

@@ -6,13 +6,16 @@ raw_<platform>, one dlt pipeline per platform.
     python run_ads.py --platform google_ads --dest postgres --from 2023-01-01 --to 2023-12-31
     python run_ads.py --platform google_ads --dest postgres --account 1234567890 --from 2023-01-01
     python run_ads.py --platform google_ads --list-accounts               # what the manager can see; no load
+    python run_ads.py --platform microsoft_ads --dest postgres            # Bing: same flags, same window
 
 Deliberately NOT a `--job` of run.py: that CLI iterates SmartMoving instances and
 takes --quotes/--ids/--sweep-only, none of which mean anything here. A job that
 ignores most of its own flags is a trap for the next person.
 
 Credentials: .env (GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_LOGIN_CUSTOMER_ID,
-GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64). Postgres: the same postgres_* vars run.py uses.
+GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64; MICROSOFT_DEVELOPER_TOKEN, MICROSOFT_ADS_CLIENT_ID,
+MICROSOFT_ADS_CLIENT_SECRET, MICROSOFT_ADS_REFRESH_TOKEN - bootstrap the last one with
+scripts/msads_oauth.py). Postgres: the same postgres_* vars run.py uses.
 See marketing_ads_integration_guide.md.
 """
 
@@ -31,6 +34,7 @@ DUCKDB_PATH = Path.home() / ".smartmoving_dw" / "warehouse.duckdb"
 PLATFORMS = {
     # platform -> (dlt pipeline name, dataset/schema, source factory)
     "google_ads": ("google_ads_raw", "raw_google_ads"),
+    "microsoft_ads": ("microsoft_ads_raw", "raw_microsoft_ads"),
 }
 
 
@@ -44,10 +48,14 @@ def main():
                     help="last day to extract (YYYY-MM-DD); default: yesterday")
     ap.add_argument("--account", action="append", default=[],
                     help="child account id to read (repeatable); default: every ENABLED child")
-    ap.add_argument("--budget", type=int, default=50, help="max API calls this session")
+    ap.add_argument("--budget", type=int, default=None,
+                    help="max API calls this session (default 50 google_ads, 200 microsoft_ads)")
     ap.add_argument("--list-accounts", action="store_true",
                     help="print the manager's account tree and exit without loading")
     args = ap.parse_args()
+
+    if args.budget is None:
+        args.budget = 200 if args.platform == "microsoft_ads" else 50
 
     if args.platform == "google_ads":
         from ads_pipeline.google_ads import GoogleAds
@@ -66,6 +74,24 @@ def main():
             return
 
         source = google_ads_source(
+            date_from=args.date_from, date_to=args.date_to,
+            accounts=tuple(args.account) or None, call_budget=args.budget,
+        )
+
+    elif args.platform == "microsoft_ads":
+        from ads_pipeline.microsoft_ads import MicrosoftAds
+        from ads_pipeline.source import microsoft_ads_source
+
+        if args.list_accounts:
+            api = MicrosoftAds(budget=5)
+            print(f"user            : {api.user_name}")
+            print(f"customer id     : {api.customer_id}")
+            for a in api.accounts():
+                print(f"  account {a['account_id']}  {a['account_name']!r}  {a['account_number']}  "
+                      f"{a['status']}  {a['currency_code']}  {a['time_zone']}")
+            return
+
+        source = microsoft_ads_source(
             date_from=args.date_from, date_to=args.date_to,
             accounts=tuple(args.account) or None, call_budget=args.budget,
         )

@@ -6,7 +6,12 @@
 -- line's share to 2 decimals, so a campaign-day split three ways can miss the raw
 -- figure by up to $0.03 while being exactly right in substance.
 with raw_total as (
-    select sum(cost) as amount from {{ ref('stg_google_ads__campaign_daily') }}
+    -- One arm per platform staging model, matching int_ad_spend_daily's union.
+    select sum(amount) as amount from (
+        select sum(cost) as amount from {{ ref('stg_google_ads__campaign_daily') }}
+        union all
+        select sum(cost) as amount from {{ ref('stg_microsoft_ads__campaign_daily') }}
+    ) per_platform
 ),
 attributed as (
     select sum(spend) as amount, count(*) as n from {{ ref('fct_campaign_spend_daily') }}

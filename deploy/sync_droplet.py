@@ -174,6 +174,13 @@ def main() -> int:
         f"GOOGLE_ADS_DEVELOPER_TOKEN={shq(env.get('GOOGLE_ADS_DEVELOPER_TOKEN', ''))}",
         f"GOOGLE_ADS_LOGIN_CUSTOMER_ID={shq(env.get('GOOGLE_ADS_LOGIN_CUSTOMER_ID', ''))}",
         f"GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64={shq(env.get('GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64', ''))}",
+        # Microsoft Advertising: the refresh token is minted by scripts/msads_oauth.py
+        # and rotated in place by pipeline/ads_pipeline/microsoft_ads.py on every run.
+        f"MICROSOFT_DEVELOPER_TOKEN={shq(env.get('MICROSOFT_DEVELOPER_TOKEN', ''))}",
+        f"MICROSOFT_ADS_CLIENT_ID={shq(env.get('MICROSOFT_ADS_CLIENT_ID', ''))}",
+        f"MICROSOFT_ADS_CLIENT_SECRET={shq(env.get('MICROSOFT_ADS_CLIENT_SECRET', ''))}",
+        f"MICROSOFT_ADS_TENANT={shq(env.get('MICROSOFT_ADS_TENANT', 'common'))}",
+        f"MICROSOFT_ADS_REFRESH_TOKEN={shq(env.get('MICROSOFT_ADS_REFRESH_TOKEN', ''))}",
         "",
     ])
     with sftp.open(posixpath.join(APP_DIR, ".env"), "w") as fh:

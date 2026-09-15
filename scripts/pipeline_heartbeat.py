@@ -106,6 +106,13 @@ CHECKS = [
      "No Google Ads load completed. Check the ads_google_daily workflow in n8n; a "
      "CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION in its output means the Cloud "
      "project's API access level was downgraded."),
+    # Microsoft Advertising (Bing Ads), live since 2026-09-15. Same run cadence and
+    # the same 30 h tolerance as Google Ads.
+    ("microsoft_ads", 30.0,
+     "select max(_extracted_at) from raw_microsoft_ads.campaign_daily",
+     "No Microsoft Ads load completed. Check the ads_microsoft_daily workflow in n8n; "
+     "an 'invalid_grant' in its output means the refresh token expired (90 days "
+     "unused) - re-run scripts/msads_oauth.py and sync the droplet."),
 ]
 
 

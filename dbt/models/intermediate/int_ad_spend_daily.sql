@@ -34,9 +34,30 @@ with google as (
     from {{ ref('stg_google_ads__campaign_daily') }}
 ),
 
--- Future arms: meta_ads, bing_ads. Same columns, same grain.
+microsoft as (
+    select
+        platform,
+        account_id,
+        account_name,
+        campaign_id                          as platform_campaign_id,
+        campaign_name                        as platform_campaign_name,
+        campaign_status,
+        campaign_type                        as advertising_channel_type,
+        spend_date_local,
+        currency,
+        cost                                 as spend,
+        impressions,
+        clicks,
+        conversions                          as platform_conversions,
+        extracted_at
+    from {{ ref('stg_microsoft_ads__campaign_daily') }}
+),
+
+-- Future arm: meta_ads. Same columns, same grain.
 spend as (
     select * from google
+    union all
+    select * from microsoft
 ),
 
 map as (

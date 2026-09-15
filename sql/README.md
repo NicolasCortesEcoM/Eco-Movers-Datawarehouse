@@ -29,6 +29,12 @@ synthetic row), so `stg_google_ads__*` build before Google approves the develope
 dlt reuses the tables and adds nothing. Run as `platform_rw`. Idempotent. Applied to the
 droplet 2026-09-14.
 
+## `41_raw_microsoft_ads.sql`
+
+Same idea for Microsoft Advertising: `raw_microsoft_ads.accounts` and
+`raw_microsoft_ads.campaign_daily`, money columns as text (Microsoft sends decimal
+strings; staging casts). Applied to the droplet 2026-09-15.
+
 ## `34_report_retention.sql`
 
 Prunes the report landing tables: every generation is kept for 10 days, then one per

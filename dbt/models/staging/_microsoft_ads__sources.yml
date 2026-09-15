@@ -1,0 +1,55 @@
+version: 2
+
+sources:
+  - name: microsoft_ads
+    schema: raw_microsoft_ads
+    description: >
+      Microsoft Advertising (Bing Ads) campaign-level daily cost, landed by dlt from
+      pipeline/ads_pipeline (dbt-only; no consumer reads this). Every row carries the
+      ad account id it was read from as `account_id`, and the primary key includes it.
+      See marketing_ads_integration_guide.md.
+    tables:
+      - name: accounts
+        description: >
+          Every ad account the authorised user can see, replaced on every run. Grain
+          (platform, account_id).
+      - name: campaign_daily
+        description: >
+          One row per (ad account, campaign, account-local day). Grain
+          (platform, account_id, campaign_id, date); merge disposition, re-read over a
+          30-day overlapping window. `spend` and `conversions_value` are decimal
+          STRINGS as Microsoft sends them; staging casts.
+
+models:
+  - name: stg_microsoft_ads__accounts
+    description: The Microsoft Advertising ad accounts, typed. One row per account.
+    columns:
+      - name: account_key
+        description: platform || ':' || account_id
+        data_tests: [not_null, unique]
+      - name: account_id
+        data_tests: [not_null]
+
+  - name: stg_microsoft_ads__campaign_daily
+    description: >
+      Microsoft Advertising cost per campaign per day, typed. Money cast to numeric HERE
+      (CLAUDE.md "Money"). `date` is the ACCOUNT's local day, exposed as
+      `spend_date_local`. Same column set as stg_google_ads__campaign_daily so the two
+      union in int_ad_spend_daily.
+    columns:
+      - name: campaign_day_key
+        description: platform || ':' || account_id || ':' || campaign_id || ':' || YYYYMMDD
+        data_tests: [not_null, unique]
+      - name: platform
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['microsoft_ads']
+      - name: account_id
+        data_tests: [not_null]
+      - name: campaign_id
+        data_tests: [not_null]
+      - name: spend_date_local
+        data_tests: [not_null]
+      - name: cost
+        data_tests: [not_null]

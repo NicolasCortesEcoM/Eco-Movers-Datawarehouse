@@ -1,4 +1,4 @@
-"""dlt source for Google Ads raw extraction -> raw_google_ads.
+"""dlt sources for ad-platform raw extraction -> raw_google_ads, raw_microsoft_ads.
 
 Two resources:
 
@@ -34,9 +34,11 @@ from datetime import date, datetime, timedelta, timezone
 import dlt
 
 from .google_ads import PLATFORM, GoogleAds
+from .microsoft_ads import PLATFORM as MS_PLATFORM, MicrosoftAds
 
 DEFAULT_WINDOW_DAYS = 30
 BACKFILL_CHUNK_DAYS = 92
+MS_RETENTION_MONTHS = 36
 
 
 def _chunks(date_from: date, date_to: date, size: int):
@@ -114,3 +116,80 @@ def _json_loads(s):
     import json
 
     return json.loads(s) if isinstance(s, str) else s
+
+
+@dlt.source(name="microsoft_ads")
+def microsoft_ads_source(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    accounts: tuple[str, ...] | None = None,
+    call_budget: int = 200,
+):
+    """Same shape and same rules as google_ads_source: window not cursor, accounts
+    discovered each run, PK (platform, account_id, campaign_id, date), merge.
+    Microsoft restates recent days too (click quality, conversion lag), so the
+    30-day overlapping window applies unchanged. `spend` is landed as TEXT - the
+    decimal string Microsoft sends - and staging casts it to numeric."""
+    today = datetime.now(timezone.utc).date()
+    date_to = date_to or (today - timedelta(days=1))
+    date_from = date_from or (date_to - timedelta(days=DEFAULT_WINDOW_DAYS - 1))
+    if date_from > date_to:
+        raise ValueError(f"date_from {date_from} is after date_to {date_to}")
+
+    # Microsoft keeps 36 months of daily report data and rejects any range that ends
+    # before that (InvalidCustomDateRangeEnd, measured 2026-09-15: everything up to
+    # 2023-08-31 refused, 2023-09-01 accepted). Clamp instead of failing so a
+    # `--from 2023-01-01` backfill lands what exists.
+    earliest = date(today.year - 3, today.month, 1)
+    if date_from < earliest:
+        print(f"[{MS_PLATFORM}] {date_from} is older than the {MS_RETENTION_MONTHS}-month "
+              f"retention window; starting at {earliest}")
+        date_from = earliest
+
+    api = MicrosoftAds(budget=call_budget)
+    extracted_at = datetime.now(timezone.utc)
+
+    all_accounts = api.accounts()
+    active = [a for a in all_accounts if a["status"] == "Active"]
+    if accounts:
+        wanted = {"".join(ch for ch in a if ch.isdigit()) for a in accounts}
+        missing = wanted - {a["account_id"] for a in active}
+        if missing:
+            raise SystemExit(f"--account not found under customer {api.customer_id}: "
+                             f"{sorted(missing)}")
+        active = [a for a in active if a["account_id"] in wanted]
+
+    @dlt.resource(
+        name="accounts",
+        primary_key=("platform", "account_id"),
+        write_disposition="merge",
+    )
+    def accounts_resource():
+        for a in all_accounts:
+            yield {**a, "_extracted_at": extracted_at}
+
+    @dlt.resource(
+        name="campaign_daily",
+        primary_key=("platform", "account_id", "campaign_id", "date"),
+        write_disposition="merge",
+        columns={
+            "date": {"data_type": "date"},
+            "spend": {"data_type": "text"},
+            "conversions_value": {"data_type": "text"},
+            "_payload": {"data_type": "json"},
+            "_extracted_at": {"data_type": "timestamp"},
+        },
+    )
+    def campaign_daily_resource():
+        for acct in active:
+            for start, end in _chunks(date_from, date_to, BACKFILL_CHUNK_DAYS):
+                rows = api.campaign_daily(acct["account_id"], start.isoformat(), end.isoformat())
+                print(f"[{MS_PLATFORM}] account {acct['account_id']} ({acct['account_name']}) "
+                      f"{start}..{end}: {len(rows)} campaign-days")
+                for r in rows:
+                    r["date"] = date.fromisoformat(r["date"])
+                    r["_payload"] = _json_loads(r["_payload"])
+                    r["_extracted_at"] = extracted_at
+                    yield r
+
+    return accounts_resource, campaign_daily_resource

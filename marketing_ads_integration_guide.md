@@ -288,41 +288,94 @@ frena antes del 429.
 
 ---
 
-## 4. Bing Ads (Microsoft Advertising)
+## 4. Microsoft Advertising (Bing Ads) — en producción desde 2026-09-15
 
-Mismo molde, pero **el coste no sale de una consulta: sale de un reporte asíncrono**, y
-eso cambia la forma del cliente.
+Mismo molde que Google, con una diferencia de fondo: **el coste no sale de una
+consulta, sale de un reporte asíncrono**. Cliente: `pipeline/ads_pipeline/microsoft_ads.py`.
+Plataforma en raw y en el seed: `microsoft_ads`.
 
-**Credenciales.** Developer token (Microsoft Advertising → *Developer Token*), una app
-en *Microsoft Entra* para OAuth (client ID, secret, refresh token — mismo baile que
-Google), y dos ids: **Customer ID** (la organización) y **Account ID** (la cuenta).
+### 4.1 Credenciales (lo que hay montado)
+
+App en Microsoft Entra (*App registrations*, `ad7d4be7-…`), tipo web, redirect
+`http://localhost:8000/callback`. Todo en `.env`; nada en el repo ni en disco:
 
 ```
-BING_ADS_DEVELOPER_TOKEN=
-BING_ADS_CLIENT_ID=
-BING_ADS_CLIENT_SECRET=
-BING_ADS_REFRESH_TOKEN=
-BING_ADS_CUSTOMER_ID=
-BING_ADS_ACCOUNT_ID=
+MICROSOFT_DEVELOPER_TOKEN=         # Microsoft Advertising -> Developer Token
+MICROSOFT_ADS_CLIENT_ID=
+MICROSOFT_ADS_CLIENT_SECRET=       # el VALUE del secreto, no su Secret ID
+MICROSOFT_ADS_TENANT=common
+MICROSOFT_ADS_REDIRECT_URI=http://localhost:8000/callback
+MICROSOFT_ADS_REFRESH_TOKEN=       # lo escribe scripts/msads_oauth.py
+MICROSOFT_ADS_ACCESS_TOKEN=        # cortesía; el cliente lo renueva siempre
 ```
 
-Librería: `pip install bingads` (SDK oficial, expone los servicios SOAP).
+**Bootstrap, una vez:** `python scripts/msads_oauth.py` abre el navegador, captura el
+`code` en `localhost:8000/callback`, lo canjea en
+`login.microsoftonline.com/common/oauth2/v2.0/token` y deja ambos tokens en `.env`.
+Scope: `openid offline_access https://ads.microsoft.com/msads.manage`.
 
-**El flujo.** Con el *Reporting Service*:
+**Rotación.** El access token vive 60 min: el cliente lo renueva **en cada corrida** con
+el refresh token, y Microsoft devuelve un refresh token nuevo cada vez, que el cliente
+reescribe en `.env` (local o del droplet, el que esté corriendo). El refresh token
+caduca a los **90 días sin uso**; con la corrida diaria nunca caduca. Si cae
+(`invalid_grant`), o si se rota el secreto en Azure (`invalid_client`): repetir el
+bootstrap en el portátil y `python deploy/sync_droplet.py --no-build`.
 
-1. `SubmitGenerateReport` con un `CampaignPerformanceReportRequest`:
-   `Aggregation = Daily`, columnas `TimePeriod, AccountId, CampaignId, CampaignName,
-   CampaignStatus, Spend, Impressions, Clicks, Conversions`, rango de fechas.
-2. `PollGenerateReport` hasta `Status = Success` (segundos a minutos).
-3. Descargar la URL: un **ZIP con un CSV**. Descomprimir, parsear, aterrizar.
+**Gotcha medido 2026-09-15:** el error `AADSTS7000215 Invalid client secret` con un
+secreto de aspecto correcto significa que el secreto es de OTRA app registration o fue
+regenerado. Crear uno nuevo en la app correcta y copiar el *Value*.
 
-Tres llamadas y una descarga por corrida. El cliente registra las tres. El CSV, en raw
-igual que las otras dos — misma tabla, mismo esquema de §1.
+### 4.2 Cuentas: cómo se identifica cada fila
 
-Es exactamente el flujo que `report_bot` + `report_ingest` ya hacen con SmartMoving
-(pedir un reporte, esperar, descargar, aterrizar), solo que aquí la API lo permite sin
-bot. Si el SDK da problemas, **el plan B es el carril de correo de §5**: Microsoft
-Advertising sí permite programar este mismo reporte por email.
+El usuario autorizado (`info@ecomoversmoving.com`) pertenece al **customer**
+`254078736`, que contiene las **ad accounts**. Hoy una: **Eco-Movers** `151891163`
+(`F1208NCA`, USD, Pacific). Se descubren en cada corrida (`Accounts/Search` por
+usuario); una cuenta nueva se extrae al día siguiente sin cambio de código, y solo
+necesita su backfill (`--account <id> --from 2023-01-01`). `account_id` viaja en cada
+fila y forma parte de la PK, igual que en Google.
+
+### 4.3 El flujo: reporte asíncrono, en JSON, sin SDK
+
+Endpoints REST/JSON de la v13 (no SOAP, no `bingads`): cabeceras `Authorization:
+Bearer`, `DeveloperToken`, `CustomerId`, `CustomerAccountId`.
+
+1. `Reporting/v13/GenerateReport/Submit` con un `CampaignPerformanceReportRequest`:
+   `Aggregation = Daily`, `Format = Csv`, sin cabecera ni pie, columnas `TimePeriod,
+   AccountId, AccountName, AccountNumber, CurrencyCode, CampaignId, CampaignName,
+   CampaignStatus, CampaignType, Spend, Impressions, Clicks, Conversions, Revenue,
+   AllConversions`, rango de fechas; `ReportTimeZone` nulo = la zona de la cuenta.
+2. `GenerateReport/Poll` cada 5 s hasta `Success`.
+3. Descargar la URL: **ZIP con un CSV**, parseado en memoria, nunca escrito a disco.
+
+Submit + polls + descarga: 3-4 llamadas por (cuenta, trozo de 92 días); todas en el
+ledger con `source: "microsoft_ads"`. Presupuesto por sesión 200.
+
+**Retención: 36 meses.** Cualquier rango que termine antes se rechaza con
+`InvalidCustomDateRangeEnd` (medido: hasta 2023-08-31 rechazado, 2023-09-01 aceptado).
+El recurso dlt recorta `--from` al primer día del mes de hace 36 meses y lo dice por
+pantalla. Da igual para Eco-Movers: la cuenta gasta desde **2024-10-04**.
+
+**Dinero.** `Spend` y `Revenue` llegan como texto decimal; raw los guarda como texto y
+`stg_microsoft_ads__campaign_daily` los castea a `numeric` (`cost`, `conversions_value`)
+y deriva `cost_micros` solo para que el juego de columnas coincida con Google.
+`campaign_type` (`Search & content`, `Audience`…) ocupa el lugar de
+`advertising_channel_type`.
+
+`BidStrategyType` no es columna válida de este reporte (400 `Invalid JSON … Columns[9]`).
+
+### 4.4 CLI, programación, prueba
+
+```
+python pipeline/run_ads.py --platform microsoft_ads --list-accounts
+python pipeline/run_ads.py --platform microsoft_ads --dest postgres                 # últimos 30 días
+python pipeline/run_ads.py --platform microsoft_ads --dest postgres --from 2023-01-01  # backfill (se recorta a 36 meses)
+```
+
+n8n `ads_microsoft_daily` (id `ixIzTQTN2ysV626h`, 06:10 PT, SSH al droplet, mismo
+`errorWorkflow`); heartbeat `microsoft_ads` a 30 h. Backfill 2026-09-15: 1.355
+campaign-days, 10 campañas, $107.522,94 desde 2024-10-04; el 98,6 % del gasto mapeado
+con las 4 campañas que Nicolas confirmó (§6). Reconcilia a la vez que Google:
+`assert_ad_spend_reconciles` suma los dos brazos de staging.
 
 ---
 
@@ -407,6 +460,20 @@ Reglas:
   en `dim_referral_source.source_clean` (un `relationships` test).
 
 ---
+
+**Microsoft Advertising (Nicolas, 2026-09-15) — cargado en el seed:**
+
+| Campaña (id) | Source CRM |
+|---|---|
+| `Movers \| Bing All Markets` (485896493) | `Bing Ads` |
+| `Movers \| Bing Commercial` (487618884) | `Bing Ads Commercial` |
+| `Brand \| All Markets` (485877726) | `Bing Ads` |
+| `EM \| Movers \| Black Friday 2025` (487230127) | `Bing Ads` |
+
+Sin mapear, pendientes de Nicolas ($1.457,77 en total, todas de oct-nov 2024):
+`Remarketing | All Markets` ($1.094,95), y las cinco campañas por condado de 5 días
+(`Movers | King / Pierce / Snohomish / Thurston / Kitsap County`, $362,82). Están en
+`mart_unmapped_ad_spend`.
 
 ## 7. De gasto a KPI: `fct_campaign_spend_daily`
 

@@ -271,11 +271,11 @@ seeds:
       reference he supplied lives in marketing_ads_integration_guide.md section 6.
     columns:
       - name: platform
-        description: google_ads / meta_ads / bing_ads - matches raw_<platform>.
+        description: google_ads / microsoft_ads / meta_ads - matches raw_<platform>.
         data_tests:
           - not_null
           - accepted_values:
-              values: ['google_ads', 'meta_ads', 'bing_ads']
+              values: ['google_ads', 'microsoft_ads', 'meta_ads']
       - name: account_id
         description: The CHILD account the campaign lives in, never a naked campaign id.
         data_tests: [not_null]

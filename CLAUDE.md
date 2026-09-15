@@ -60,7 +60,7 @@ Should an analytical warehouse ever be needed, the move is deliberately cheap: d
 
 | Schema                                 | Contents                                                                                         | Who reads it              |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------- |
-| `raw_smartmoving`, `raw_google_ads`, `raw_quickbooks`, ... | Source payloads as received, merged on composite PK. Two loaders - see below. `raw_google_ads` is pre-created by `sql/40_raw_google_ads.sql` in dlt's exact shape so staging builds before the first load.                  | dbt only                  |
+| `raw_smartmoving`, `raw_google_ads`, `raw_microsoft_ads`, `raw_quickbooks`, ... | Source payloads as received, merged on composite PK. Two loaders - see below. `raw_google_ads` and `raw_microsoft_ads` are pre-created by `sql/40_` / `sql/41_` in dlt's exact shape so staging builds before the first load.                  | dbt only                  |
 | `staging`                              | dbt views: renamed, typed, lightly cleaned. One model per raw table. **Money is cast to `numeric` here**, at this boundary. | dbt only                  |
 | `core`                                 | Canonical, cross-source-resolved entities: `opportunities`, `jobs`, `leads`, `branches`, `agents`, `lines_of_business`, `opportunity_charges`, `payments`, `opportunity_payments`. Note `payments` (the scheduled report, whole) and `opportunity_payments` (the API's embedded payload) are deliberately separate and must not be merged - there is no shared payment id to merge on. See [`DATABASE.md`](DATABASE.md). | dbt only + read-only apps (unstable, see rule 6) |
 | `marts`                                | Analytical models for BI. May change whenever an analyst needs it. Also holds the `int_*` observation layer (dbt folder `models/intermediate/`, schema `marts` - it is dbt-owned and free to change, same as marts). | Metabase, analysts        |
@@ -188,6 +188,10 @@ Follow this order. Skipping steps produces sources that each behave differently 
   Its own CLI, not a `run.py --job`, because none of run.py's SmartMoving flags apply.
   Credentials: the service-account JSON lives base64-encoded in one `.env` variable and is
   decoded in memory - never a key file in the repo or on the droplet's disk.
+  Microsoft Advertising (`microsoft_ads.py`, live 2026-09-15): OAuth refresh token minted
+  once by `scripts/msads_oauth.py`, renewed on every run and rotated in place in `.env`;
+  cost comes from an async campaign-performance report (submit, poll, download a zip),
+  parsed in memory, landed in `raw_microsoft_ads.campaign_daily` with the same PK.
 - `pipeline/report_bot/` - Playwright bot that drives the SmartMoving **UI** so All Jobs
   gets emailed, because SmartMoving cannot schedule that report itself. **It downloads,
   parses and loads nothing** - it makes an email arrive, and `report_ingest` handles it
