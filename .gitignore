@@ -43,3 +43,11 @@ auth.json
 report-*.png
 error.png
 .playwright-mcp/
+
+# Google Cloud / Google Ads credentials - service-account keys and OAuth client
+# secrets. They live base64-encoded in .env (GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64).
+ecomovers-datawarehouse-*.json
+*service_account*.json
+*service-account*.json
+client_secret*.json
+google-ads.yaml

@@ -144,7 +144,7 @@ detecto la caida del 2026-09-09.
 | **KPIs de ventas (B0-B4)** | ✅ Completa | `opportunities_v1` sigue pendiente (ver Fase B abajo) |
 | **Fase A - Cancellations y Payments** | ✅ **Completa 2026-09-10** | - |
 | **Fase B - Contrato general** | ✅ **Completa 2026-09-14** | `serving.opportunities_v1` publicado, 68.231 filas |
-| **Fase C - Marketing y publicidad** | 🔵 En progreso | Jerarquia y mart hechos; falta `dim_ad_campaign_map` (Nicolas), tablas raw de Ads, CPL/CPA/CER |
+| **Fase C - Marketing y publicidad** | 🔵 En progreso | Jerarquia, mart y **toda la extraccion de Google Ads construida (2026-09-14)**; bloqueada solo por la aprobacion del developer token (Nicolas). Luego: backfill 2023, `dim_ad_campaign_map`, CPL/CPA/CER |
 | **Fase D - Reportes nuevos** | ⏳ Pendiente | 13 reportes programables disponibles y sin usar |
 | **Limpieza C4-C8, D** | ⏳ Parcial | C4 cerrado por la Fase A; C5-C8 abiertos |
 
@@ -299,7 +299,32 @@ Hecho:
 credenciales por plataforma, la consulta exacta, el cliente y el recurso dlt como copia
 del patron SmartMoving, el carril de correo para plataformas sin API, y el checklist.
 
-Falta, en orden - **y el paso 1 es de Nicolas**:
+**Extraccion de Google Ads - construida 2026-09-14, esperando a Google:**
+
+- Credenciales: cuenta de servicio GCP + developer token del Manager `2797921560`, en
+  `.env` (JSON en base64, decodificado en memoria); el `.json` se elimino del repo y
+  `.gitignore` bloquea claves GCP. `sync_droplet.py` las lleva al droplet.
+- `pipeline/ads_pipeline/google_ads.py` (cliente: ledger, budget, retry, descubrimiento
+  de child accounts bajo el Manager), `pipeline/ads_pipeline/source.py` (recursos
+  `accounts` y `campaign_daily`, PK `(platform, account_id, campaign_id, date)`, merge,
+  ventana 30 dias, backfill por tramos de 92 dias), `pipeline/run_ads.py` (CLI).
+  Probado en DuckDB con fila sintetica: tipos correctos, doble corrida sin duplicar.
+- `sql/40_raw_google_ads.sql` aplicado; `stg_google_ads__accounts` y
+  `stg_google_ads__campaign_daily` construyen y pasan tests (vacios) en el droplet.
+- n8n `ads_google_daily` (06:00 PT) creado **inactivo**.
+- **Estado medido desde portatil y droplet**: la cuenta de servicio autentica y ve el
+  Manager; toda lectura de datos devuelve `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION`.
+- **Que cambia cuando lleguen las otras tres child accounts: nada en codigo.** Se
+  descubren solas en la siguiente corrida; cada una necesita un backfill de una vez
+  con `--account <id> --from 2023-01-01`. Cada fila lleva `account_id` y esta en la PK,
+  asi que un Campaign ID repetido entre cuentas nunca se confunde.
+
+Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
+
+0. **Solicitar Explorer/Basic access** en Google Ads → Manager → API Center. Tras la
+   aprobacion: `run_ads.py --list-accounts`, prueba de 1 dia cuadrada al centavo contra
+   la UI, doble corrida, backfill `--from 2023-01-01`, publicar `ads_google_daily`,
+   anadir `google_ads` al heartbeat (umbral 30 h).
 
 1. **`dim_ad_campaign_map`** - seed. Nicolas lo construye con los nombres reales de las
    plataformas. Forma requerida:

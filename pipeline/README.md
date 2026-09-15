@@ -97,6 +97,29 @@ snapshot revives the opportunity in dbt. Two independent triggers:
   - Or discrete fields: `DESTINATION__POSTGRES__CREDENTIALS__HOST`, `__USERNAME`, `__PASSWORD`, `__DATABASE`, `__PORT`
   - dlt loads into `raw_smartmoving.*`; dbt builds `staging`/`core`/`marts`/`serving` on top.
 
+## Ad platforms: `run_ads.py` (Phase C)
+
+A second CLI, not a `--job` here, because none of `run.py`'s SmartMoving flags apply.
+Same rules: `.env` only, every call in `scripts/api_call_log.jsonl`, `--budget`,
+composite PK + merge.
+
+```
+python run_ads.py --platform google_ads --list-accounts                 # the manager's tree, no load
+python run_ads.py --platform google_ads --dest postgres                  # last 30 days, every child account
+python run_ads.py --platform google_ads --dest postgres --from 2023-01-01 --to 2023-12-31
+python run_ads.py --platform google_ads --dest postgres --account 1234567890 --from 2023-01-01
+```
+
+- **Manager -> children.** Auth is a service account added as a user of the Google Ads
+  MANAGER; children are discovered on every run, so a new account needs no code change -
+  only a one-off `--from 2023-01-01 --account <id>` backfill. Every row carries the
+  child's `account_id`, and it is in the PK.
+- **Window, not cursor.** Default re-reads the last 30 days; Google restates recent cost.
+  Backfills are chunked in 92-day pieces.
+- Access level: until the developer token has Explorer/Basic access, every read beyond
+  `--list-accounts`'s first line fails with `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION`.
+  That is Google's gate, not a bug. See `marketing_ads_integration_guide.md` §2.
+
 ## Design (non-negotiable decisions)
 
 - **Raw = API shape.** dlt normalizes nested data into child tables (`customers_service_window__opportunities__jobs`...) without loss. The wide "everything" row is a later dbt model, never built here.

@@ -1,0 +1,55 @@
+version: 2
+
+sources:
+  - name: google_ads
+    schema: raw_google_ads
+    description: >
+      Google Ads campaign-level daily cost, landed by dlt from
+      pipeline/ads_pipeline (dbt-only; no consumer reads this). Read from the
+      MANAGER account: every row carries the CHILD customer id it was read from as
+      `account_id`, and the primary key includes it. See
+      marketing_ads_integration_guide.md.
+    tables:
+      - name: accounts
+        description: >
+          The manager's account tree - manager (level 0) and every child under it -
+          replaced on every run. Grain (platform, account_id).
+      - name: campaign_daily
+        description: >
+          One row per (child account, campaign, account-local day). Grain
+          (platform, account_id, campaign_id, date); merge disposition, re-read over a
+          30-day overlapping window because Google restates recent days.
+          `cost_micros` is cost x 1,000,000, as sent; staging divides.
+
+models:
+  - name: stg_google_ads__accounts
+    description: The manager's account tree, typed. One row per account.
+    columns:
+      - name: account_key
+        description: platform || ':' || account_id
+        data_tests: [not_null, unique]
+      - name: account_id
+        data_tests: [not_null]
+
+  - name: stg_google_ads__campaign_daily
+    description: >
+      Google Ads cost per campaign per day, typed. Money cast to numeric HERE (CLAUDE.md
+      "Money"): `cost = cost_micros / 1,000,000`. `date` is the ACCOUNT's local day, not
+      UTC - Google has no other notion of a day - so it is exposed as `spend_date_local`.
+    columns:
+      - name: campaign_day_key
+        description: platform || ':' || account_id || ':' || campaign_id || ':' || YYYYMMDD
+        data_tests: [not_null, unique]
+      - name: platform
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['google_ads']
+      - name: account_id
+        data_tests: [not_null]
+      - name: campaign_id
+        data_tests: [not_null]
+      - name: spend_date_local
+        data_tests: [not_null]
+      - name: cost
+        data_tests: [not_null]

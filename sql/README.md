@@ -21,6 +21,14 @@ Plain SQL run against the central Postgres store. No ORM, no migrations tool yet
 - `app_read` (or a per-team role that inherits it) may `SELECT` on `serving` + `core` only - never `raw_*`/`staging`, never a vendor API key. RLS filters it to the entities listed for its role name in `core.entity_access`.
 - To onboard a consumer for an entity: `INSERT INTO core.entity_access(role_name, entity_id) VALUES ('their_role', 'their_entity');`
 
+## `40_raw_google_ads.sql`
+
+Pre-creates `raw_google_ads.accounts` and `raw_google_ads.campaign_daily` in the exact
+shape `pipeline/ads_pipeline/source.py` produces (types read off a dlt run against a
+synthetic row), so `stg_google_ads__*` build before Google approves the developer token.
+dlt reuses the tables and adds nothing. Run as `platform_rw`. Idempotent. Applied to the
+droplet 2026-09-14.
+
 ## `34_report_retention.sql`
 
 Prunes the report landing tables: every generation is kept for 10 days, then one per

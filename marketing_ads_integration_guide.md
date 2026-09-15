@@ -75,27 +75,55 @@ raw_<platform>.campaign_daily
 
 ## 2. Google Ads — por dónde empezamos
 
-### 2.1 Credenciales: cuatro piezas, y una de ellas requiere aprobación
+### 2.1 Credenciales: lo que hay montado (2026-09-14)
 
-| Pieza | Dónde se obtiene | Ojo |
+Se eligió **cuenta de servicio de Google Cloud + Manager Account (MCC)**, no el flujo
+OAuth de escritorio con refresh token que describía la primera versión de esta guía. La
+razón: una cuenta de servicio no depende de la sesión de ninguna persona, no caduca a
+los 6 meses sin uso, y Google Ads acepta añadirla **directamente como usuario del
+Manager** (sin delegación de dominio). Un solo acceso en el Manager cubre todas las
+child accounts presentes y futuras.
+
+| Pieza | Dónde vive | Estado |
 |---|---|---|
-| **Developer token** | Google Ads → cuenta administradora (MCC) → Herramientas → *API Center* | Al crearse tiene **acceso de prueba**: solo funciona contra cuentas de prueba. Para datos reales hay que solicitar **Basic access** (formulario, revisión de Google, días). **Empieza este trámite el primer día**; es el único paso con espera |
-| **OAuth2 client ID + secret** | Google Cloud Console → APIs y servicios → Credenciales → *ID de cliente OAuth*, tipo **"Aplicación de escritorio"** | Habilitar antes la *Google Ads API* en ese proyecto |
-| **Refresh token** | Un flujo OAuth una sola vez con la cuenta que tiene acceso a Google Ads | La librería oficial trae `examples/authentication/generate_user_credentials.py`. El refresh token no caduca salvo que se revoque o pasen 6 meses sin uso |
-| **Customer ID** | Esquina superior de Google Ads, 10 dígitos | **Sin guiones** en la API. Si accedes vía MCC, además `login_customer_id` = el id del MCC |
-
-Van al `.env` del droplet **y** de la laptop, nunca al repo:
+| **Developer token** | API Center del Manager `2797921560` | Obtenido. ⚠️ Nivel **"test accounts only"** hasta que Google apruebe *Explorer/Basic access* - ver abajo |
+| **Cuenta de servicio** | Proyecto GCP `ecomovers-datawarehouse`, email `datawarehouse-dev-tem@…iam.gserviceaccount.com` | Añadida como usuario del Manager. `ListAccessibleCustomers` la ve |
+| **Clave JSON de la cuenta de servicio** | `.env`, **base64 en una sola línea** (`GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64`) | El fichero `.json` original se eliminó del repo; `.gitignore` bloquea cualquier clave GCP futura |
+| **Login customer id** | `.env` → `GOOGLE_ADS_LOGIN_CUSTOMER_ID=2797921560` (el Manager) | Fijo |
 
 ```
 GOOGLE_ADS_DEVELOPER_TOKEN=
-GOOGLE_ADS_CLIENT_ID=
-GOOGLE_ADS_CLIENT_SECRET=
-GOOGLE_ADS_REFRESH_TOKEN=
-GOOGLE_ADS_CUSTOMER_ID=1234567890
-GOOGLE_ADS_LOGIN_CUSTOMER_ID=      # solo si vas por MCC
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=2797921560
+GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64=
 ```
 
-Librería: `pip install google-ads` en el venv del droplet y en `pipeline/requirements.txt`.
+`deploy/sync_droplet.py` copia las tres al `.env` del droplet (chmod 600) en cada sync.
+El cliente decodifica el JSON **en memoria**; nunca lo escribe a disco. Librería:
+`google-ads>=32` en `pipeline/requirements.txt`; el sync la instala.
+
+**El único bloqueo, y es de Google.** Un developer token nuevo solo puede leer cuentas
+de prueba. La llamada `customer_client` devuelve
+`CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` hasta que se solicite acceso en
+*Google Ads → Manager → Herramientas → API Center → nivel de acceso*. **Explorer** es el
+nivel de entrada (lectura, límite diario bajo, aprobación rápida); **Basic** requiere
+formulario y revisión de días. Con cualquiera de los dos el flujo de abajo arranca sin
+tocar código.
+
+### 2.1a Manager y child accounts: cómo se identifica cada fila
+
+- Toda petición lleva `login-customer-id = Manager` y `customer_id = child`.
+- **Las child accounts se descubren en cada corrida** (`SELECT … FROM customer_client`
+  bajo el Manager). Añadir una cuenta en Google Ads basta para que se extraiga al día
+  siguiente. **No hay lista de cuentas en código ni en `.env`.**
+- Cada fila de `raw_google_ads.campaign_daily` lleva `account_id` (el Customer ID de la
+  child), `account_name` y `account_time_zone`. La PK es
+  `(platform, account_id, campaign_id, date)`: un Campaign ID repetido entre cuentas
+  nunca colisiona.
+- `raw_google_ads.accounts` guarda el árbol completo (Manager nivel 0, children nivel 1)
+  para que "¿de qué cuentas estamos leyendo?" sea una consulta y no un recuerdo.
+- Lo único que necesita una cuenta nueva es **un backfill histórico de una vez**:
+  `run_ads.py --platform google_ads --dest postgres --account <id> --from 2023-01-01`,
+  porque la ventana diaria solo alcanza 30 días atrás.
 
 ### 2.2 La consulta: GAQL, una sola llamada por día extraído
 
@@ -162,17 +190,24 @@ cursor. Un `--from/--to` explícito para el backfill histórico.
 
 ### 2.5 CLI y programación
 
-- `pipeline/run.py --job google_ads --dest postgres [--from 2025-01-01 --to 2026-09-14]`
-- n8n: un workflow `ads_google_daily` que corre eso en el droplet una vez al día
-  (06:00 PT, después de que Google haya consolidado el día anterior). Copiar la forma
-  de los workflows `dlt_*` existentes: nodo SSH → `flock` → `run.py` → aserción de
-  salida → alerta por `errorWorkflow`.
-- Añadir `google_ads` a `pipeline_heartbeat.py` como quinto mecanismo, umbral 30 h.
+- **CLI propia**: `pipeline/run_ads.py --platform google_ads --dest postgres`
+  (últimos 30 días, todas las children). `--from/--to` para backfill (troceado en
+  tramos de 92 días), `--account <id>` repetible para acotar, `--list-accounts` para
+  ver el árbol sin cargar nada. No es un `--job` de `run.py`: ese CLI itera instancias
+  SmartMoving y acepta `--quotes/--ids/--sweep-only`, banderas sin sentido aquí.
+- n8n: **`ads_google_daily`** (id `fy77bRPxYnCI1uc4`, carpeta Datawarehouse), 06:00 PT,
+  nodo SSH → `flock` → `run_ads.py` → `Assert Exit Code` → `errorWorkflow`
+  `datawarehouse_error_handler`. **Creado inactivo**: publicar tras la primera corrida
+  manual correcta (§2.7). Un cron que falla cada día con el mismo error de acceso es
+  ruido, no vigilancia.
+- Tras la primera carga real: añadir `google_ads` a `pipeline_heartbeat.py` como
+  mecanismo, `max(_extracted_at) from raw_google_ads.campaign_daily`, umbral 30 h.
+  Antes no: alertaría a diario sobre una tabla vacía.
 
 ### 2.6 Cuota
 
 Distinta de SmartMoving y **no es una restricción**: Basic access da 15.000 operaciones
-por día; una extracción diaria de 30 días es una operación. Se registra en el ledger
+por día; una extracción diaria cuesta 1 llamada al árbol + 1 por child account. Se registra en el ledger
 igual, porque la regla es "toda llamada se registra", no "las caras se registran".
 
 ### 2.7 La prueba de que funciona
@@ -182,8 +217,9 @@ igual, porque la regla es "toda llamada se registra", no "las caras se registran
    coincidir al centavo (misma zona horaria de cuenta).
 2. Correr el mismo día **dos veces**. `count(*)` en raw no cambia. Si cambia, la PK está
    mal.
-3. Entonces, y solo entonces, el backfill: desde 2025-01-01 (los leads de `core` con
-   atribución fiable empiezan ahí) en tramos de 90 días.
+3. Entonces, y solo entonces, el backfill **desde 2023-01-01** (decisión de Nicolas,
+   2026-09-14: el histórico completo de la cuenta, si tiene campañas desde entonces).
+   `run_ads.py` lo trocea solo en tramos de 92 días. Luego publicar `ads_google_daily`.
 
 ---
 
@@ -354,19 +390,20 @@ decisión de reporte, no está en el modelo.
 
 Empezar por Google Ads. No pasar al siguiente punto sin cerrar el anterior.
 
-- [ ] **Hoy**: solicitar *Basic access* para el developer token de Google Ads. Es lo
-      único con espera de días.
-- [ ] Credenciales de Google Ads en el `.env` del droplet y de la laptop.
-- [ ] `pip install google-ads` en ambos venv; añadir a `pipeline/requirements.txt`.
-- [ ] `pipeline/ads_pipeline/google_ads.py` — el cliente, espejo de `sm_pipeline/client.py`.
-- [ ] `pipeline/ads_pipeline/source.py` — el recurso `campaign_daily`, PK compuesta, merge, ventana de 30 días.
-- [ ] `run.py --job google_ads`.
-- [ ] Prueba §2.7: un día, cuadre al centavo contra la UI, doble corrida sin duplicar.
-- [ ] `dbt/models/staging/_google_ads__sources.yml` + `stg_google_ads__campaign_daily.sql` (coste a `numeric` aquí).
-- [ ] Fila en `crm_sync_contract.md` §8: mecanismo, cadencia, coste, lo que no puede hacer.
-- [ ] Backfill desde 2025-01-01 en tramos de 90 días.
-- [ ] Workflow n8n `ads_google_daily` + quinto mecanismo en `pipeline_heartbeat.py`.
-- [ ] `dim_ad_campaign_map.csv` — **con los ids reales de la plataforma** (Nicolas).
+- [x] Credenciales en `.env` (laptop y droplet vía sync), JSON eliminado del repo, `.gitignore` ampliado. *(2026-09-14)*
+- [x] `google-ads>=32` en `pipeline/requirements.txt`; el sync lo instala en el droplet.
+- [x] `pipeline/ads_pipeline/google_ads.py` — cliente con ledger, presupuesto, retry, descubrimiento de children.
+- [x] `pipeline/ads_pipeline/source.py` — `accounts` + `campaign_daily`, PK compuesta, merge, ventana 30 días, backfill en tramos.
+- [x] `pipeline/run_ads.py` — CLI. Probado con fila sintética en DuckDB: tipos correctos, doble corrida sin duplicar.
+- [x] `sql/40_raw_google_ads.sql` — esquema raw pre-creado con la forma exacta de dlt; aplicado en el droplet.
+- [x] `stg_google_ads__accounts` + `stg_google_ads__campaign_daily` con tests; construyen (vacíos) en el droplet.
+- [x] Workflow n8n `ads_google_daily` creado, **inactivo**.
+- [x] Fila en `crm_sync_contract.md` §6.
+- [ ] **NICOLAS — el único bloqueo**: solicitar *Explorer* (o *Basic*) access en el API Center del Manager `2797921560`. Hasta entonces la API responde `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` desde el portátil y desde el droplet.
+- [ ] Tras la aprobación: `run_ads.py --list-accounts` → ver la child; prueba §2.7 (1 día, cuadre al centavo, doble corrida).
+- [ ] Backfill desde 2023-01-01. Publicar `ads_google_daily`. Añadir `google_ads` al heartbeat.
+- [ ] Añadir las otras tres child accounts al Manager → aparecen solas; backfill de cada una con `--account`.
+- [ ] `dim_ad_campaign_map.csv` — **con `(platform, account_id, campaign_id)` reales** (Nicolas). Con los datos ya en raw, `select distinct account_id, account_name, campaign_id, campaign_name from staging.stg_google_ads__campaign_daily` es la lista de partida.
 - [ ] `marts.fct_campaign_spend_daily` + `mart_unmapped_ad_spend`.
 - [ ] Repetir §3 (Meta) y §4 (Bing) sobre el mismo `ads_pipeline/` — cada uno es un
       cliente y un recurso más, no una arquitectura más.

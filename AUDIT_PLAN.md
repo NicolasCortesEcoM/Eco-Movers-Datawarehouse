@@ -144,6 +144,17 @@ coste por lead sea una multiplicacion. Reconcilia exacto con `fct_lead_source_da
 (67.677 = 67.677). Lo que queda - `dim_ad_campaign_map` (Nicolas), tablas raw de Ads,
 CPL/CPA/CER - esta detallado en `IMPLEMENTATION_STATUS.md`.
 
+### 🔵 Fase C — extraccion de Google Ads construida, bloqueada por Google (2026-09-14)
+
+Cliente, recurso dlt, CLI, esquema raw, staging con tests y workflow n8n (inactivo) -
+todo desplegado en el droplet. La cuenta de servicio autentica y ve el Manager
+`2797921560`; **cada lectura devuelve `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION`**
+hasta que Nicolas solicite Explorer/Basic access en el API Center. Nada mas por hacer
+de nuestro lado hasta entonces. Decision clave: `account_id` (la child) forma parte de
+la PK de `raw_google_ads.campaign_daily`, y las children se descubren en cada corrida,
+asi que las tres cuentas que faltan no requieren cambios. Detalle en
+`IMPLEMENTATION_STATUS.md` §2 y `marketing_ads_integration_guide.md` §2.
+
 ### ✅ Seeds de agentes, borrador completo (2026-09-14)
 
 `dim_agent` 31 -> 65 (los 34 nombres que faltaban: vendedores historicos 2023-2025,

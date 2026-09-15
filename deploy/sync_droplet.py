@@ -169,6 +169,11 @@ def main() -> int:
         # detection. `.get` rather than `[...]` for the same reason - a deploy must
         # not fail because monitoring is not wired up yet.
         f"HEARTBEAT_SLACK_WEBHOOK={shq(env.get('HEARTBEAT_SLACK_WEBHOOK', ''))}",
+        # Google Ads (Phase C). The service-account key travels base64-encoded in one
+        # variable and is decoded in memory by pipeline/ads_pipeline/google_ads.py.
+        f"GOOGLE_ADS_DEVELOPER_TOKEN={shq(env.get('GOOGLE_ADS_DEVELOPER_TOKEN', ''))}",
+        f"GOOGLE_ADS_LOGIN_CUSTOMER_ID={shq(env.get('GOOGLE_ADS_LOGIN_CUSTOMER_ID', ''))}",
+        f"GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64={shq(env.get('GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64', ''))}",
         "",
     ])
     with sftp.open(posixpath.join(APP_DIR, ".env"), "w") as fh:
@@ -192,6 +197,10 @@ def main() -> int:
         "if [ ! -x venv/bin/dbt ]; then python3 -m venv venv; "
         "  ./venv/bin/pip -q install --upgrade pip; "
         "  ./venv/bin/pip -q install 'dbt-postgres>=1.8,<1.10' 'dlt[postgres]>=1.4' 'requests>=2.31'; fi",
+        # Every sync, not only on venv creation: a new extraction client (google-ads,
+        # 2026-09-14) arrives as a requirements.txt line, and pip leaves satisfied
+        # pins alone, so this is a no-op on the runs where nothing changed.
+        "./venv/bin/pip -q install -r pipeline/requirements.txt",
         "set -a; . ./.env; set +a",
         "./venv/bin/dbt --version | head -3",
     ]

@@ -60,7 +60,7 @@ Should an analytical warehouse ever be needed, the move is deliberately cheap: d
 
 | Schema                                 | Contents                                                                                         | Who reads it              |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------- |
-| `raw_smartmoving`, `raw_quickbooks`, ... | Source payloads as received, merged on composite PK. Two loaders - see below.                  | dbt only                  |
+| `raw_smartmoving`, `raw_google_ads`, `raw_quickbooks`, ... | Source payloads as received, merged on composite PK. Two loaders - see below. `raw_google_ads` is pre-created by `sql/40_raw_google_ads.sql` in dlt's exact shape so staging builds before the first load.                  | dbt only                  |
 | `staging`                              | dbt views: renamed, typed, lightly cleaned. One model per raw table. **Money is cast to `numeric` here**, at this boundary. | dbt only                  |
 | `core`                                 | Canonical, cross-source-resolved entities: `opportunities`, `jobs`, `leads`, `branches`, `agents`, `lines_of_business`, `opportunity_charges`, `payments`, `opportunity_payments`. Note `payments` (the scheduled report, whole) and `opportunity_payments` (the API's embedded payload) are deliberately separate and must not be merged - there is no shared payment id to merge on. See [`DATABASE.md`](DATABASE.md). | dbt only + read-only apps (unstable, see rule 6) |
 | `marts`                                | Analytical models for BI. May change whenever an analyst needs it. Also holds the `int_*` observation layer (dbt folder `models/intermediate/`, schema `marts` - it is dbt-owned and free to change, same as marts). | Metabase, analysts        |
@@ -180,6 +180,14 @@ Follow this order. Skipping steps produces sources that each behave differently 
 - `smartmoving_api_docs/` - scraped reference for the SmartMoving External API (65 endpoints, base URL `https://api-public.smartmoving.com/v1`). Organized by category (`basic/`, `opportunities/`, `leads/`, etc.), each with `README.md` + `endpoints.json`; `openapi.yaml` is generated from these by `generate_openapi.py` (regenerate with `python smartmoving_api_docs/generate_openapi.py`). Endpoints under `/api/premium/` require the paid Premium API.
 - `smartmoving_*.md` (root) - condensed AI-context guides for the SmartMoving API, lead API, and webhooks; `smartmoving_api_complete_reference.md` is the exhaustive version; `smartmoving_api_findings.md` is ground truth from live API exploration (real enum values, volumes, PageSize cap of 200) - trust it over the scraped docs where they differ.
 - `pipeline/` - the dlt extraction pipeline: `run.py` CLI extracts leads/jobs-window/dims from both instances into DuckDB (dev) or Postgres (prod). Read `pipeline/README.md` before touching it - it records non-negotiable design rules (composite PKs, merge-everywhere, entity-local dates) and a dlt config-injection gotcha.
+- `pipeline/ads_pipeline/` + `pipeline/run_ads.py` - ad-platform extraction (Phase C). Google
+  Ads today: service-account auth through the MANAGER account, child accounts discovered
+  on every run, `raw_google_ads.campaign_daily` keyed on `(platform, account_id,
+  campaign_id, date)` so a campaign id can never be ambiguous across accounts. Same
+  obligations as the SmartMoving client: `.env` only, every call in the ledger, a budget.
+  Its own CLI, not a `run.py --job`, because none of run.py's SmartMoving flags apply.
+  Credentials: the service-account JSON lives base64-encoded in one `.env` variable and is
+  decoded in memory - never a key file in the repo or on the droplet's disk.
 - `pipeline/report_bot/` - Playwright bot that drives the SmartMoving **UI** so All Jobs
   gets emailed, because SmartMoving cannot schedule that report itself. **It downloads,
   parses and loads nothing** - it makes an email arrive, and `report_ingest` handles it
