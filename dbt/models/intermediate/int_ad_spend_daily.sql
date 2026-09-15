@@ -55,7 +55,7 @@ map as (
 referral as (
     select distinct on ({{ norm_text('referral_source_raw') }})
         {{ norm_text('referral_source_raw') }}   as referral_key,
-        coalesce(nullif(trim(source_clean), ''), referral_source_raw) as campaign,
+        coalesce(nullif(trim(source_clean), ''), trim(referral_source_raw)) as campaign,
         nullif(trim(campaign_group), '')         as campaign_group
     from {{ ref('dim_referral_source') }}
     order by 1, referral_source_raw

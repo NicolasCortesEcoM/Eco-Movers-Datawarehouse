@@ -1,2 +1,7 @@
 platform,account_id,platform_campaign_id,platform_campaign_name,crm_referral_source,valid_from,valid_to,notes
-google_ads,1776272460,22167609525,Movers | Pierce County,PNW Google Ads,2025-01-28,9999-12-31,Nicolas 2026-09-14. The only PNW Moving campaign mapped so far; the other five sit in mart_unmapped_ad_spend until he decides.
+google_ads,1776272460,21591783803,Movers | Full,PNW Google Ads,2024-08-16,9999-12-31,Nicolas 2026-09-15: every campaign in the PNW Moving account is the CRM source PNW Google Ads - the account is dedicated to that source.
+google_ads,1776272460,21591783806,DM | Movers | Brand,PNW Google Ads,2024-08-16,9999-12-31,Nicolas 2026-09-15 (dedicated account).
+google_ads,1776272460,21798970955,PNW Video Campaign,PNW Google Ads,2024-10-10,9999-12-31,Nicolas 2026-09-15 (dedicated account).
+google_ads,1776272460,21938945513,DM | Movers | Full  Trial 705,PNW Google Ads,2024-11-22,9999-12-31,Nicolas 2026-09-15 (dedicated account).
+google_ads,1776272460,22167609525,Movers | Pierce County,PNW Google Ads,2025-01-28,9999-12-31,Nicolas 2026-09-14 (dedicated account).
+google_ads,1776272460,22233442764,Movers | King County,PNW Google Ads,2025-02-14,9999-12-31,Nicolas 2026-09-15 (dedicated account).

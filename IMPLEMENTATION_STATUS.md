@@ -370,16 +370,24 @@ Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
    `cost_efficiency_ratio`) + `mart_unmapped_ad_spend` (la cola). Test de
    reconciliacion al centavo en cada build.
 
-   **Dos hallazgos del primer calculo real (PNW Google Ads, $9.026):**
-   - **El 63% del gasto atribuido ($5.655) cae en dias sin ningun lead** de esa campana
-     en el CRM. Es una campana de ~3-18 leads/mes contra 30 dias de gasto: a grano
-     diario el CPL es ruido. Esas filas van a `line_of_business = 'unassigned'`,
-     `has_leads = false`, y NO se pierden - pero el consumidor debe agregar por mes
-     (`sum(spend) / sum(leads)`), nunca promediar CPLs diarios.
-   - **CPL real, agosto 2026: $1.999 / 3 leads = $666.** Septiembre: $1.183 / 3. En
-     2025 el mismo campo daba $60-70. O el CRM no esta atribuyendo los leads a
-     `PNW Google Ads` desde 2026, o la campana se ha deteriorado 10x. Es la primera
-     pregunta que este mart permite hacer y merece respuesta de marketing.
+   **Corregido 2026-09-15 tras revision de Nicolas** (contaba 61 leads donde el CRM
+   tiene 156): el CRM guarda `PNW Google Ads ` CON espacio final (179 leads) y sin el
+   (124); ambas caian en la misma fila del seed pero, con `source_clean` vacio, la
+   etiqueta usaba la cadena cruda y la fuente se partia en dos. Arreglado en
+   `core.opportunities` (la etiqueta cae al `referral_source_raw` del seed, nunca al de
+   la oportunidad); cinco fuentes tenian el mismo defecto. Y por decision de Nicolas
+   **las seis campanas de la cuenta PNW Moving van a `PNW Google Ads`** - es una cuenta
+   dedicada; en otras cuentas cada campana tendra su propia fuente. Resultado: 100% del
+   gasto atribuido, $0 sin mapear.
+
+   **Lo que dicen los numeros correctos (PNW Google Ads, $39.181):**
+   - CPL historico **$86-$200**, CPA $280-$650, CER 0.10-0.41 (2024-10 → 2025-04).
+   - En los meses fuertes solo el 6-13% del gasto cae en dias sin lead; el "63%" de
+     la primera lectura era el bug. Aun asi: agregar por mes, nunca promediar CPLs
+     diarios.
+   - **2026-08: $1.999 / 3 leads = CPL $666, CPA $1.999.** Pendiente de aclarar con
+     Nicolas si los 431 leads del source `PNW` (2024-08..12) y los 15 de 2026-08 son la
+     misma fuente que `PNW Google Ads` antes de leerlo como deterioro.
 4. Vista `serving.campaign_daily_v1` cuando haya un consumidor.
 
 **REGLA DE REPARTO DEL COSTE, definida por Nicolas el 2026-09-10 y no negociable:** el

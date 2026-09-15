@@ -141,7 +141,15 @@ cxl as (
 referral as (
     select distinct on ({{ norm_text('referral_source_raw') }})
         {{ norm_text('referral_source_raw') }} as referral_key,
-        nullif(trim(source_clean), '')         as referral_source_clean,
+        -- The campaign LABEL. When the seed has no cleaned name, fall back to the
+        -- seed's own canonical raw string - NOT to each opportunity's raw string.
+        -- Found 2026-09-15: the CRM holds both "PNW Google Ads " (trailing space,
+        -- 179 leads) and "PNW Google Ads" (124). Both normalise onto this one seed
+        -- row, but with source_clean blank the label used to come from the raw
+        -- value, so one source showed as two campaigns and ad spend mapped onto
+        -- only one of them. Five sources had the same split.
+        coalesce(nullif(trim(source_clean), ''),
+                 trim(referral_source_raw))    as referral_source_clean,
         -- The marketing FAMILY the source rolls up to: `Google Ads Snohomish` and
         -- `Google Ads King` are both `Google Ads`. Two levels are needed because both
         -- questions are real - "how is the Snohomish campaign doing" and "how is
