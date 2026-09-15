@@ -321,7 +321,9 @@ del patron SmartMoving, el carril de correo para plataformas sin API, y el check
 
 Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
 
-0. **Solicitar Explorer/Basic access** en Google Ads → Manager → API Center. Tras la
+0. **Solicitar Explorer access para el proyecto de Cloud `ecomovers-datawarehouse`** en
+   `console.cloud.google.com/google/ads-apis/overview` - desde 2026-09-09 el nivel es del
+   proyecto, no del developer token ni del Manager (guia §2.1). Tras la
    aprobacion: `run_ads.py --list-accounts`, prueba de 1 dia cuadrada al centavo contra
    la UI, doble corrida, backfill `--from 2023-01-01`, publicar `ads_google_daily`,
    anadir `google_ads` al heartbeat (umbral 30 h).

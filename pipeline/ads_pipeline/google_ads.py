@@ -25,11 +25,13 @@ change. Every row carries the child's customer id as `account_id`, and the raw P
 (platform, account_id, campaign_id, date): the same campaign id in two accounts can
 never collide, and every row says which account it came from.
 
-Access level (measured 2026-09-14): the Cloud project's developer token was at "test
-accounts only" - `list_accessible_customers` works, everything else returns
-CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION until Explorer/Basic access is granted in
-the manager's API Center. The client raises that error as-is; there is nothing to
-retry.
+Access level (measured 2026-09-14): `list_accessible_customers` works, everything
+else returns CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION. Since 2026-09-09 Google grants
+the access level to the GOOGLE CLOUD PROJECT that owns the credentials (here the
+service account's project, ecomovers-datawarehouse), not to the developer token - the
+token is still sent but ignored. The fix is "Apply for access" on
+console.cloud.google.com/google/ads-apis/overview, not the manager's API Center. The
+client raises that error as-is; there is nothing to retry.
 """
 
 from __future__ import annotations

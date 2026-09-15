@@ -101,13 +101,29 @@ GOOGLE_ADS_SERVICE_ACCOUNT_JSON_B64=
 El cliente decodifica el JSON **en memoria**; nunca lo escribe a disco. Librería:
 `google-ads>=32` en `pipeline/requirements.txt`; el sync la instala.
 
-**El único bloqueo, y es de Google.** Un developer token nuevo solo puede leer cuentas
-de prueba. La llamada `customer_client` devuelve
-`CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` hasta que se solicite acceso en
-*Google Ads → Manager → Herramientas → API Center → nivel de acceso*. **Explorer** es el
-nivel de entrada (lectura, límite diario bajo, aprobación rápida); **Basic** requiere
-formulario y revisión de días. Con cualquiera de los dos el flujo de abajo arranca sin
-tocar código.
+**El único bloqueo, y es de Google — y desde el 2026-09-09 se resuelve en Cloud
+Console, NO en el API Center del Manager.** Ese día Google retiró el developer token
+como unidad de acceso: se sigue enviando en la cabecera pero la API lo ignora, y el
+nivel (Test / Explorer / Basic / Standard) **se concede al proyecto de Google Cloud**.
+El nuestro es `ecomovers-datawarehouse`, el que posee la cuenta de servicio, y nace en
+nivel Test - de ahí `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` en cada lectura real.
+Un "Explorer" concedido en el API Center del Manager no cambia nada (medido: 30 min de
+sondeo tras verlo en la UI, mismo error).
+
+Cómo se sube de nivel (documentación oficial, `developers.google.com/google-ads/api/docs/access-levels`):
+
+1. Cloud Console, proyecto `ecomovers-datawarehouse` → confirmar *Google Ads API*
+   habilitada (eso da Test).
+2. `console.cloud.google.com/google/ads-apis/overview` → "Upgrade access level" →
+   **Apply for access**. **Explorer**: sin verificación de marca, minutos; 2.880
+   operaciones/día en producción. Nuestra corrida diaria usa ~2; sobra.
+3. **Basic** (15.000/día) exige antes *brand verification* del proyecto; revisión
+   automática en minutos. Solo si algún día hace falta.
+4. Una cuenta de facturación en prueba gratuita o suspendida bloquea la aprobación.
+
+Ya no hace falta Manager para usar la API; el nuestro se conserva porque es la forma
+de leer todas las children con un solo acceso. El cliente OAuth "web" (client_secret)
+NO es necesario para el flujo de cuenta de servicio.
 
 ### 2.1a Manager y child accounts: cómo se identifica cada fila
 
@@ -399,7 +415,7 @@ Empezar por Google Ads. No pasar al siguiente punto sin cerrar el anterior.
 - [x] `stg_google_ads__accounts` + `stg_google_ads__campaign_daily` con tests; construyen (vacíos) en el droplet.
 - [x] Workflow n8n `ads_google_daily` creado, **inactivo**.
 - [x] Fila en `crm_sync_contract.md` §6.
-- [ ] **NICOLAS — el único bloqueo**: solicitar *Explorer* (o *Basic*) access en el API Center del Manager `2797921560`. Hasta entonces la API responde `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` desde el portátil y desde el droplet.
+- [ ] **NICOLAS — el único bloqueo**: solicitar *Explorer* access para el PROYECTO DE CLOUD `ecomovers-datawarehouse` en `console.cloud.google.com/google/ads-apis/overview` (§2.1). El API Center del Manager ya no decide nada desde 2026-09-09.
 - [ ] Tras la aprobación: `run_ads.py --list-accounts` → ver la child; prueba §2.7 (1 día, cuadre al centavo, doble corrida).
 - [ ] Backfill desde 2023-01-01. Publicar `ads_google_daily`. Añadir `google_ads` al heartbeat.
 - [ ] Añadir las otras tres child accounts al Manager → aparecen solas; backfill de cada una con `--account`.
