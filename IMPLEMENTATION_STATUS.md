@@ -150,8 +150,8 @@ client `microsoft_ads.py` (async report, JSON endpoints, refresh token rotated p
 `raw_microsoft_ads`, `stg_microsoft_ads__*`, second union arm in `int_ad_spend_daily`,
 n8n `ads_microsoft_daily` 06:10 PT, heartbeat. Backfill: 1,355 campaign-days, 10
 campaigns, $107,523 since 2024-10-04 (Microsoft keeps 36 months; the account is
-younger). 4 campaigns mapped per Nicolas (98.6% of spend); 6 small Oct-Nov 2024
-campaigns ($1,458) await his mapping in `mart_unmapped_ad_spend`. Bing CPL 2025:
+younger). All 10 campaigns mapped per Nicolas (100% of spend: 9 -> `Bing Ads`, `Movers | Bing
+Commercial` -> `Bing Ads Commercial`); `Bing` / `Bing <city>` stay organic. Bing CPL 2025:
 $61 local, $55 LD, $73 commercial; 2026: $68 / $65 / $60.
 
 **Rule (Nicolas, 2026-09-10):** cost splits per lead, not per the campaign's nominal

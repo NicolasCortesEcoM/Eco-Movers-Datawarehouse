@@ -470,10 +470,10 @@ Reglas:
 | `Brand \| All Markets` (485877726) | `Bing Ads` |
 | `EM \| Movers \| Black Friday 2025` (487230127) | `Bing Ads` |
 
-Sin mapear, pendientes de Nicolas ($1.457,77 en total, todas de oct-nov 2024):
-`Remarketing | All Markets` ($1.094,95), y las cinco campañas por condado de 5 días
-(`Movers | King / Pierce / Snohomish / Thurston / Kitsap County`, $362,82). Están en
-`mart_unmapped_ad_spend`.
+Las otras seis campañas de la cuenta (`Remarketing | All Markets` y las cinco
+`Movers | <County>` de oct-nov 2024) son `Bing Ads` (Nicolas, 2026-09-15): **el 100 %
+del gasto de Eco-Movers está mapeado**. El source `Bing` (y `Bing <ciudad>`) es
+**orgánico**: `is_paid = FALSE`, no aparece en el mapa y nunca recibe gasto.
 
 ## 7. De gasto a KPI: `fct_campaign_spend_daily`
 
