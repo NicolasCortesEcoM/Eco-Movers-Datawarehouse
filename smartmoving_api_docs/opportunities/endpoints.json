@@ -52,7 +52,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Item(s) added to room",
-      "response_schema_sample": "{\n    \"items\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"quantity\": 0,\n        \"quantityNotGoing\": 0,\n        \"saveToMaster\": false\n    }]\n}"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"quantity\": 0\n}]"
     },
     {
       "method": "POST",
@@ -88,7 +88,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Materials added to job",
-      "response_schema_sample": "{\n    \"materials\": [{\n        \"quantity\": 0,\n        \"materialId\": \"string\"\n    }]\n}"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"quantity\": 0,\n    \"materialId\": \"string\"\n}]"
     },
     {
       "method": "POST",
@@ -132,7 +132,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "POST",
@@ -152,7 +152,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Opportunity details",
-      "response_schema_sample": "{\n    \"tariffId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"customerId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"affiliateId\": \"string\",\n    \"branchId\": \"string\",\n    \"moveDate\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"serviceTypeId\": {},\n    \"utmInformation\": {\n        \"utmAdGroup\": \"string\",\n        \"utmCampaign\": \"string\",\n        \"utmContent\": \"string\",\n        \"utmCustomTracking\": \"string\",\n        \"utmKeyword\": \"string\",\n        \"utmMedium\": \"string\",\n        \"utmSource\": \"string\"\n    },\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"opportunityId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -179,8 +179,8 @@
         "Response: 201 Created",
         "Response: 400 Bad Request"
       ],
-      "response_description": null,
-      "response_schema_sample": "{\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+      "response_description": "Created",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
     },
     {
       "method": "POST",
@@ -208,8 +208,8 @@
         "Response: 404 Not Found",
         "Response: 400 Bad Request"
       ],
-      "response_description": null,
-      "response_schema_sample": "{\n    \"serviceType\": {}\n}"
+      "response_description": "Created",
+      "response_schema_sample": null
     },
     {
       "method": "POST",
@@ -238,7 +238,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Room details",
-      "response_schema_sample": "[{\n    \"name\": \"string\",\n    \"roomTypeId\": \"string\"\n}]"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"roomTypeId\": \"string\"\n}]"
     },
     {
       "method": "DELETE",
@@ -274,7 +274,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "DELETE",
@@ -311,7 +311,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "GET",
@@ -531,7 +531,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Opportunity inventory",
-      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"createdAtUtc\": \"string\",\n    \"lastModifiedById\": \"string\",\n    \"lastModifiedFromApplication\": {},\n    \"densityFactor\": 0,\n    \"boxes\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"shortCode\": 0,\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"imageUrl\": \"string\",\n        \"quantity\": 0,\n        \"inventoryItemId\": \"string\"\n    }],\n    \"rooms\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"roomType\": \"string\",\n        \"items\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"description\": \"string\",\n            \"notes\": \"string\",\n            \"shortCode\": 0,\n            \"quantity\": 0,\n            \"volume\": 0,\n            \"weight\": 0,\n            \"width\": 0,\n            \"depth\": 0,\n            \"height\": 0,\n            \"type\": {},\n            \"inventoryItemId\": \"string\",\n            \"imageUrls\": [\"string\"]\n        }]\n    }],\n    \"lockStatus\": true\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"createdAtUtc\": \"string\",\n    \"lastModifiedById\": \"string\",\n    \"lastModifiedFromApplication\": {},\n    \"densityFactor\": 0,\n    \"boxes\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"shortCode\": 0,\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"imageUrl\": \"string\",\n        \"quantity\": 0,\n        \"inventoryItemId\": \"string\"\n    }],\n    \"rooms\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"roomType\": \"string\",\n        \"items\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"description\": \"string\",\n            \"notes\": \"string\",\n            \"shortCode\": 0,\n            \"quantity\": 0,\n            \"volume\": 0,\n            \"weight\": 0,\n            \"overrideDefaultWeight\": true,\n            \"width\": 0,\n            \"depth\": 0,\n            \"height\": 0,\n            \"type\": {},\n            \"inventoryItemId\": \"string\",\n            \"imageUrls\": [\"string\"]\n        }]\n    }],\n    \"lockStatus\": true\n}"
     },
     {
       "method": "GET",
@@ -588,7 +588,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Call added to opportunity",
-      "response_schema_sample": "{\n    \"callType\": {},\n    \"outcome\": {},\n    \"callDateTime\": \"string\",\n    \"description\": \"string\",\n    \"fromNumber\": \"string\",\n    \"toNumber\": \"string\",\n    \"createdBy\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"callId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -617,7 +617,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Note added to opportunity",
-      "response_schema_sample": "{\n    \"notes\": \"string\",\n    \"createdBy\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"noteId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -632,7 +632,7 @@
       "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-followups-followupid-mark-compl",
       "parameters": [
         {
-          "name": "followupId",
+          "name": "opportunityId",
           "location": "template",
           "required": true,
           "type_": "string",
@@ -640,7 +640,7 @@
           "description": null
         },
         {
-          "name": "opportunityId",
+          "name": "followupId",
           "location": "template",
           "required": true,
           "type_": "string",
@@ -713,7 +713,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Item successfully deleted",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "POST",
@@ -741,7 +741,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Inventory submitted successfully",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "PUT",
@@ -777,7 +777,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
     },
     {
       "method": "PUT",
@@ -837,7 +837,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Item successfully updated",
-      "response_schema_sample": "{\n    \"notes\": \"string\",\n    \"volume\": 0,\n    \"weight\": 0,\n    \"quantity\": 0,\n    \"quantityNotGoing\": 0\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"quantity\": 0\n}"
     },
     {
       "method": "PATCH",
@@ -866,7 +866,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Opportunity updated successfully",
-      "response_schema_sample": "{\n    \"moveSizeId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"branchId\": \"string\",\n    \"opportunityType\": {},\n    \"volume\": 0,\n    \"weight\": 0,\n    \"isBinding\": true,\n    \"depositAmount\": 0,\n    \"referralSourceId\": \"string\",\n    \"affiliateId\": \"string\",\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\"\n}"
+      "response_schema_sample": null
     }
   ]
 }

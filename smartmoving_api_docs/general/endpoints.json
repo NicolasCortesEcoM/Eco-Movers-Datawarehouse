@@ -6,9 +6,11 @@
       "method": "GET",
       "path": "https://api-public.smartmoving.com/v1/api/ping",
       "title": "/api/ping - GET",
-      "description": "ping",
+      "description": null,
       "category": "general",
-      "tags": [],
+      "tags": [
+        "ping"
+      ],
       "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-ping",
       "parameters": [],
       "response_codes": [
@@ -19,16 +21,31 @@
     },
     {
       "method": "POST",
-      "path": "",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/attachments",
       "title": "Add attachment to opportunity",
-      "description": null,
+      "description": "Attaches a file to an opportunity. File must be of type '.doc', '.docx', '.xls', '.xlsx', '.pdf', '.txt', '.csv', '.png', '.jpeg', or '.jpg'. The\r\n                       file content must be a Base64 encoded byte array. The documents category does not accept image files.",
       "category": "general",
-      "tags": [],
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
       "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-attachments",
-      "parameters": [],
-      "response_codes": [],
-      "response_description": null,
-      "response_schema_sample": "{\n    \"base64Contents\": \"string\",\n    \"fileName\": \"string\",\n    \"category\": {}"
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 201 Created",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "File attached to opportunity",
+      "response_schema_sample": null
     }
   ]
 }

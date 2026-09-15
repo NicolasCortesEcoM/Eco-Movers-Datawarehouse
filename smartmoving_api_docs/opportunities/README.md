@@ -21,6 +21,11 @@
 | `changeVolumeWeightCalculationMode` | query | No | `boolean` |  | If true or not specified, the opportunity will be updated to calculate by inventory when items are added. |
 | `markAsNeedsReview` | query | No | `boolean` |  | If true or not specified, the inventory will be marked as needing review |
 
+### Optional / Filter Parameters
+
+- **`changeVolumeWeightCalculationMode`** (boolean) — if true or not specified, the opportunity is switched to calculate volume/weight by inventory once items are added; set to `false` to leave the existing calculation mode untouched.
+- **`markAsNeedsReview`** (boolean) — if true or not specified, the inventory is flagged as needing review after this change; set to `false` to skip flagging it.
+
 ### Responses
 
 - **Response: 200 OK**
@@ -31,19 +36,11 @@
 **Sample response:**
 
 ```json
-{
-    "items": [{
-        "id": "string",
-        "name": "string",
-        "description": "string",
-        "notes": "string",
-        "volume": 0,
-        "weight": 0,
-        "quantity": 0,
-        "quantityNotGoing": 0,
-        "saveToMaster": false
-    }]
-}
+[{
+    "id": "string",
+    "name": "string",
+    "quantity": 0
+}]
 ```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-inventory-rooms-roomid](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-inventory-rooms-roomid)
@@ -75,12 +72,11 @@
 **Sample response:**
 
 ```json
-{
-    "materials": [{
-        "quantity": 0,
-        "materialId": "string"
-    }]
-}
+[{
+    "id": "string",
+    "quantity": 0,
+    "materialId": "string"
+}]
 ```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-estimated-jobs-jobid-materials](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-estimated-jobs-jobid-materials)
@@ -103,18 +99,16 @@
 | `jobId` | template | -... Yes | `string` |  |  |
 | `category` | query | No | `string` |  |  |
 
+### Optional / Filter Parameters
+
+- **`category`** (string) — restricts results to attachments/documents filed under a specific category.
+
 ### Responses
 
 - **Response: 200 OK**
 - **Response: 400 Bad Request**
 
 > OK
-
-**Sample response:**
-
-```json
-{opportunityId}
-```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-jobs-jobid-confirm](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-jobs-jobid-confirm)
 
@@ -144,49 +138,7 @@ _No parameters._
 
 ```json
 {
-    "tariffId": "string",
-    "salesPersonId": "string",
-    "customerId": "string",
-    "referralSourceId": "string",
-    "affiliateId": "string",
-    "branchId": "string",
-    "moveDate": "string",
-    "moveSizeId": "string",
-    "serviceTypeId": {},
-    "utmInformation": {
-        "utmAdGroup": "string",
-        "utmCampaign": "string",
-        "utmContent": "string",
-        "utmCustomTracking": "string",
-        "utmKeyword": "string",
-        "utmMedium": "string",
-        "utmSource": "string"
-    },
-    "originAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    },
-    "destinationAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    },
-    "customField01": "string",
-    "customField02": "string",
-    "customField03": "string"
+    "opportunityId": "string"
 }
 ```
 
@@ -213,10 +165,14 @@ _No parameters._
 - **Response: 201 Created**
 - **Response: 400 Bad Request**
 
+> Created
+
 **Sample response:**
 
 ```json
 {
+    "id": "string",
+    "opportunityId": "string",
     "type": {},
     "title": "string",
     "assignedToId": "string",
@@ -251,13 +207,7 @@ _No parameters._
 - **Response: 404 Not Found**
 - **Response: 400 Bad Request**
 
-**Sample response:**
-
-```json
-{
-    "serviceType": {}
-}
-```
+> Created
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-jobs](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-jobs)
 
@@ -267,7 +217,7 @@ _No parameters._
 
 **Method:** `POST`  
 **Path:** `https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/rooms`  
-**Description:** Add new rooms to your lead or opportunity, and use it to load your job's inventory.  
+**Description:** Add new rooms to your lead or opportunity, and use it to load your job’s inventory.  
 
 **Tags:** `opportunities` `premium`
 
@@ -289,6 +239,7 @@ _No parameters._
 
 ```json
 [{
+    "id": "string",
     "name": "string",
     "roomTypeId": "string"
 }]
@@ -320,12 +271,6 @@ _No parameters._
 
 > OK
 
-**Sample response:**
-
-```json
-{opportunityId}
-```
-
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-followups-followupid](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-followups-followupid)
 
 ---
@@ -352,12 +297,6 @@ _No parameters._
 - **Response: 400 Bad Request**
 
 > OK
-
-**Sample response:**
-
-```json
-{opportunityId}
-```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-jobs-jobid](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-jobs-jobid)
 
@@ -513,6 +452,17 @@ _No parameters._
 | `IncludeDispatchInfo` | query | No | `boolean` |  |  |
 | `IncludeCharges` | query | No | `boolean` |  |  |
 | `IncludeNotes` | query | No | `boolean` |  |  |
+
+### Optional / Filter Parameters
+
+- **`IncludeEstimatedCharges`** (boolean) — adds the job's estimated charges to the response.
+- **`IncludeActualCharges`** (boolean) — adds the job's actual (post-move) charges to the response.
+- **`IncludeEstimatedMaterials`** (boolean) — adds the job's estimated materials usage to the response.
+- **`IncludeActualMaterials`** (boolean) — adds the job's actual (post-move) materials usage to the response.
+- **`IncludeStops`** (boolean) — adds the job's stops (addresses visited) to the response.
+- **`IncludeDispatchInfo`** (boolean) — adds dispatch details (crew, truck, timing) to the response.
+- **`IncludeCharges`** (boolean) — adds the opportunity's (or job's) charges to the response.
+- **`IncludeNotes`** (boolean) — adds notes logged on the job to the response.
 
 ### Responses
 
@@ -699,6 +649,7 @@ _No parameters._
             "quantity": 0,
             "volume": 0,
             "weight": 0,
+            "overrideDefaultWeight": true,
             "width": 0,
             "depth": 0,
             "height": 0,
@@ -786,13 +737,7 @@ _No parameters._
 
 ```json
 {
-    "callType": {},
-    "outcome": {},
-    "callDateTime": "string",
-    "description": "string",
-    "fromNumber": "string",
-    "toNumber": "string",
-    "createdBy": "string"
+    "callId": "string"
 }
 ```
 
@@ -826,8 +771,7 @@ _No parameters._
 
 ```json
 {
-    "notes": "string",
-    "createdBy": "string"
+    "noteId": "string"
 }
 ```
 
@@ -847,8 +791,8 @@ _No parameters._
 
 | Name | In | Required | Type | Example | Description |
 |------|----|----------|------|---------|-------------|
-| `followupId` | template | -... Yes | `string` |  |  |
 | `opportunityId` | template | -... Yes | `string` |  |  |
+| `followupId` | template | -... Yes | `string` |  |  |
 
 ### Responses
 
@@ -895,18 +839,17 @@ _No parameters._
 | `changeVolumeWeightCalculationMode` | query | No | `boolean` |  | If true or not specified, the opportunity will be updated to calculate by inventory when items are deleted. |
 | `markAsNeedsReview` | query | No | `boolean` |  | If true or not specified, the inventory will be marked as needing review |
 
+### Optional / Filter Parameters
+
+- **`changeVolumeWeightCalculationMode`** (boolean) — if true or not specified, the opportunity is switched to calculate volume/weight by inventory once items are added; set to `false` to leave the existing calculation mode untouched.
+- **`markAsNeedsReview`** (boolean) — if true or not specified, the inventory is flagged as needing review after this change; set to `false` to skip flagging it.
+
 ### Responses
 
 - **Response: 200 OK**
 - **Response: 400 Bad Request**
 
 > Item successfully deleted
-
-**Sample response:**
-
-```json
-{opportunityId}
-```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-inventory-rooms-roomid-items](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=delete-api-premium-opportunities-opportunityid-inventory-rooms-roomid-items)
 
@@ -932,12 +875,6 @@ _No parameters._
 - **Response: 400 Bad Request**
 
 > Inventory submitted successfully
-
-**Sample response:**
-
-```json
-{opportunityId}
-```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-inventory-submit](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-inventory-submit)
 
@@ -969,6 +906,8 @@ _No parameters._
 
 ```json
 {
+    "id": "string",
+    "opportunityId": "string",
     "type": {},
     "title": "string",
     "assignedToId": "string",
@@ -1001,6 +940,11 @@ _No parameters._
 | `changeVolumeWeightCalculationMode` | query | No | `boolean` |  | If true or not specified, the opportunity will be updated to calculate by inventory when items are updated. |
 | `markAsNeedsReview` | query | No | `boolean` |  | If true or not specified, the inventory will be marked as needing review |
 
+### Optional / Filter Parameters
+
+- **`changeVolumeWeightCalculationMode`** (boolean) — if true or not specified, the opportunity is switched to calculate volume/weight by inventory once items are added; set to `false` to leave the existing calculation mode untouched.
+- **`markAsNeedsReview`** (boolean) — if true or not specified, the inventory is flagged as needing review after this change; set to `false` to skip flagging it.
+
 ### Responses
 
 - **Response: 200 OK**
@@ -1012,11 +956,9 @@ _No parameters._
 
 ```json
 {
-    "notes": "string",
-    "volume": 0,
-    "weight": 0,
-    "quantity": 0,
-    "quantityNotGoing": 0
+    "id": "string",
+    "name": "string",
+    "quantity": 0
 }
 ```
 
@@ -1045,26 +987,6 @@ _No parameters._
 - **Response: 500 Internal Server Error**
 
 > Opportunity updated successfully
-
-**Sample response:**
-
-```json
-{
-    "moveSizeId": "string",
-    "salesPersonId": "string",
-    "branchId": "string",
-    "opportunityType": {},
-    "volume": 0,
-    "weight": 0,
-    "isBinding": true,
-    "depositAmount": 0,
-    "referralSourceId": "string",
-    "affiliateId": "string",
-    "customField01": "string",
-    "customField02": "string",
-    "customField03": "string"
-}
-```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=patch-api-premium-opportunities-opportunityid](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=patch-api-premium-opportunities-opportunityid)
 

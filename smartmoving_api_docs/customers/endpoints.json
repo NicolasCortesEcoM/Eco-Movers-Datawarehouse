@@ -18,7 +18,7 @@
         "Response: 200 OK"
       ],
       "response_description": "Customer Id",
-      "response_schema_sample": "{\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}"
+      "response_schema_sample": "\"string\""
     },
     {
       "method": "GET",
@@ -117,7 +117,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Success",
-      "response_schema_sample": "{\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}"
+      "response_schema_sample": null
     }
   ]
 }

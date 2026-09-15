@@ -25,17 +25,7 @@ _No parameters._
 **Sample response:**
 
 ```json
-{
-    "name": "string",
-    "phoneNumber": "string",
-    "phoneType": {},
-    "emailAddress": "string",
-    "address": "string",
-    "secondaryPhoneNumbers": [{
-        "phoneNumber": "string",
-        "phoneType": {}
-    }]
-}
+"string"
 ```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-customers](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-customers)
@@ -57,6 +47,10 @@ _No parameters._
 | `customerId` | template | -... Yes | `string` |  |  |
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -96,6 +90,10 @@ _No parameters._
 | Name | In | Required | Type | Example | Description |
 |------|----|----------|------|---------|-------------|
 | `searchQuery` | query | No | `string` |  |  |
+
+### Optional / Filter Parameters
+
+- **`searchQuery`** (string) — the text to match against a customer's name, email address, or phone number; required in practice even though the portal marks it optional.
 
 ### Responses
 
@@ -145,22 +143,6 @@ _No parameters._
 - **Response: 400 Bad Request**
 
 > Success
-
-**Sample response:**
-
-```json
-{
-    "name": "string",
-    "phoneNumber": "string",
-    "phoneType": {},
-    "emailAddress": "string",
-    "address": "string",
-    "secondaryPhoneNumbers": [{
-        "phoneNumber": "string",
-        "phoneType": {}
-    }]
-}
-```
 
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-customers-customerid](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=put-api-premium-customers-customerid)
 

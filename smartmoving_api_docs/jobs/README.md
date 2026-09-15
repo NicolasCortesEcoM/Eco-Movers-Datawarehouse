@@ -27,18 +27,6 @@
 
 > Notes updated successfully
 
-**Sample response:**
-
-```json
-{
-    "crewNotes": "string",
-    "customerNotes": "string",
-    "internalNotes": "string",
-    "accountingNotes": "string",
-    "dispatcherNotes": "string"
-}
-```
-
 **Documentation:** [https://developer.smartmoving.com/api-details#api=public-api-v1&operation=patch-api-premium-opportunities-opportunityid-jobs-jobid-notes](https://developer.smartmoving.com/api-details#api=public-api-v1&operation=patch-api-premium-opportunities-opportunityid-jobs-jobid-notes)
 
 ---
@@ -80,15 +68,10 @@
     "addressUnit": "string",
     "propertyName": "string",
     "propertyType": {},
-    "stopType": {},
     "stairs": 0,
+    "parkingDescription": "string",
     "hasElevator": true,
-    "notes": "string",
-    "street": "string",
-    "city": "string",
-    "state": "string",
-    "zip": "string",
-    "county": "string"
+    "notes": "string"
 }]
 ```
 

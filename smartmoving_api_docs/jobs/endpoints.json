@@ -37,7 +37,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Notes updated successfully",
-      "response_schema_sample": "{\n    \"crewNotes\": \"string\",\n    \"customerNotes\": \"string\",\n    \"internalNotes\": \"string\",\n    \"accountingNotes\": \"string\",\n    \"dispatcherNotes\": \"string\"\n}"
+      "response_schema_sample": null
     },
     {
       "method": "PUT",
@@ -75,7 +75,7 @@
         "Response: 404 Not Found"
       ],
       "response_description": "Updated stops",
-      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"isOrigin\": true,\n    \"isDestination\": true,\n    \"order\": 0,\n    \"addressFullAddress\": \"string\",\n    \"addressLat\": 0,\n    \"addressLng\": 0,\n    \"addressUnit\": \"string\",\n    \"propertyName\": \"string\",\n    \"propertyType\": {},\n    \"stopType\": {},\n    \"stairs\": 0,\n    \"hasElevator\": true,\n    \"notes\": \"string\",\n    \"street\": \"string\",\n    \"city\": \"string\",\n    \"state\": \"string\",\n    \"zip\": \"string\",\n    \"county\": \"string\"\n}]"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"isOrigin\": true,\n    \"isDestination\": true,\n    \"order\": 0,\n    \"addressFullAddress\": \"string\",\n    \"addressLat\": 0,\n    \"addressLng\": 0,\n    \"addressUnit\": \"string\",\n    \"propertyName\": \"string\",\n    \"propertyType\": {},\n    \"stairs\": 0,\n    \"parkingDescription\": \"string\",\n    \"hasElevator\": true,\n    \"notes\": \"string\"\n}]"
     }
   ]
 }

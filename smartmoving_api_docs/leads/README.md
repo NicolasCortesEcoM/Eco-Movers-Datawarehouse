@@ -30,36 +30,7 @@
 
 ```json
 {
-    "customerId": "string",
-    "referralSourceId": "string",
-    "tariffId": "string",
-    "branchId": "string",
-    "moveDate": "string",
-    "moveSizeId": "string",
-    "salesPersonId": "string",
-    "serviceTypeId": {},
-    "originAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    },
-    "destinationAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    }
+    "opportunityId": "string"
 }
 ```
 
@@ -91,45 +62,7 @@ _No parameters._
 
 ```json
 {
-    "firstName": "string",
-    "lastName": "string",
-    "fullName": "string",
-    "phoneNumber": "string",
-    "extension": "string",
-    "phoneType": "string",
-    "email": "string",
-    "moveDate": "string",
-    "leadCost": 0,
-    "originStreet": "string",
-    "originCity": "string",
-    "originState": "string",
-    "originZip": "string",
-    "originAddressFull": "string",
-    "destinationStreet": "string",
-    "destinationCity": "string",
-    "destinationState": "string",
-    "destinationZip": "string",
-    "destinationAddressFull": "string",
-    "bedrooms": "string",
-    "notes": "string",
-    "referralSource": "string",
-    "referralSourceId": "string",
-    "affiliate": "string",
-    "affiliateId": "string",
-    "moveSize": "string",
-    "moveSizeId": "string",
-    "serviceType": "string",
-    "branchId": "string",
-    "opportunityType": "string",
-    "trackingParameters": "string",
-    "userOptIn": true,
-    "utmAdGroup": "string",
-    "utmCampaign": "string",
-    "utmContent": "string",
-    "utmCustomTracking": "string",
-    "utmKeyword": "string",
-    "utmMedium": "string",
-    "utmSource": "string"
+    "leadId": "string"
 }
 ```
 
@@ -152,6 +85,10 @@ _No parameters._
 | `salesPersonId` | template | -... Yes | `string` |  |  |
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -198,6 +135,7 @@ _No parameters._
         "moveSizeId": "string",
         "status": {},
         "lostReason": "string",
+        "badLeadReason": "string",
         "moveSizeName": "string",
         "createdAtUtc": "string"
     }]
@@ -233,48 +171,7 @@ _No parameters._
 
 ```json
 {
-    "customerName": "string",
-    "moveDate": "string",
-    "utmInformation": {
-        "utmAdGroup": "string",
-        "utmCampaign": "string",
-        "utmContent": "string",
-        "utmCustomTracking": "string",
-        "utmKeyword": "string",
-        "utmMedium": "string",
-        "utmSource": "string"
-    },
-    "emailAddress": "string",
-    "phoneNumber": "string",
-    "phoneType": {},
-    "branchId": "string",
-    "referralSourceId": "string",
-    "salesPersonId": "string",
-    "serviceTypeId": {},
-    "moveSizeId": "string",
-    "originAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    },
-    "destinationAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    },
-    "fromExternalApi": true
+    "leadId": "string"
 }
 ```
 
@@ -307,47 +204,7 @@ _No parameters._
 
 ```json
 {
-    "customerName": "string",
-    "branchId": "string",
-    "referralSourceId": "string",
-    "moveDate": "string",
-    "utmInformation": {
-        "utmAdGroup": "string",
-        "utmCampaign": "string",
-        "utmContent": "string",
-        "utmCustomTracking": "string",
-        "utmKeyword": "string",
-        "utmMedium": "string",
-        "utmSource": "string"
-    },
-    "emailAddress": "string",
-    "phoneNumber": "string",
-    "phoneType": {},
-    "salesPersonId": "string",
-    "serviceTypeId": {},
-    "moveSizeId": "string",
-    "originAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    },
-    "destinationAddress": {
-        "fullAddress": "string",
-        "street": "string",
-        "unit": "string",
-        "city": "string",
-        "state": "string",
-        "zip": "string",
-        "lat": 0,
-        "lng": 0,
-        "country": "string"
-    }
+    "leadId": "string"
 }
 ```
 

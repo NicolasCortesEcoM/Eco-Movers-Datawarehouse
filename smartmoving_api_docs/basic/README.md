@@ -21,6 +21,12 @@
 | `referralSourceId` | query | No | `string` |  |  |
 | `branchId` | query | No | `string` |  |  |
 
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`referralSourceId`** (string) — restricts the results to affiliates tied to a single referral source.
+- **`branchId`** (string) — restricts the results to affiliates belonging to a single branch; omit to get affiliates across every branch.
+
 ### Responses
 
 - **Response: 200 OK**
@@ -70,6 +76,13 @@
 | `FromServiceDate` | query | No | `integer` |  | Format: yyyyMMdd, eg. 20240831 |
 | `ToServiceDate` | query | No | `integer` |  | Format: yyyyMMdd, eg. 20240831 |
 | `IncludeOpportunityInfo` | query | No | `boolean` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`FromServiceDate`** (integer) — the earliest job service date to include; combine with `ToServiceDate` to scope customers to a specific window instead of returning the entire list.
+- **`ToServiceDate`** (integer) — the latest job service date to include; combine with `FromServiceDate` to scope customers to a specific window instead of returning the entire list.
+- **`IncludeOpportunityInfo`** (boolean) — when filtering by service date, the customer's related opportunity info is included by default; set `IncludeOpportunityInfo=false` to exclude it and get a lighter response.
 
 ### Responses
 
@@ -123,6 +136,10 @@
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -206,6 +223,10 @@
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
 
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+
 ### Responses
 
 - **Response: 200 OK**
@@ -248,6 +269,10 @@
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -301,6 +326,10 @@
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -414,8 +443,15 @@
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
-| `Status` | query | No | `` |  | Filter by status: Active or Inactive |
+| `Status` | query | No | `string` |  | Filter by status: Active or Inactive |
 | `BranchId` | query | No | `string` |  | Filter by branch ID |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`Status`** (string) — restricts the results to crew members in the given status; accepted values are `Active` or `Inactive`.
+  Example: `GET /api/crew-members?Status=Active`
+- **`BranchId`** (string) — restricts the results to records belonging to a single branch; omit to get affiliates across every branch.
 
 ### Responses
 
@@ -539,6 +575,12 @@
 | `To` | query | No | `integer` |  |  |
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`From`** (integer) — the start of the date range to filter on (see the parameter's own Format note above); omit to leave the range open-ended on that side.
+- **`To`** (integer) — the end of the date range to filter on (see the parameter's own Format note above); omit to leave the range open-ended on that side.
 
 ### Responses
 
@@ -668,6 +710,7 @@
     "moveSizeId": "string",
     "status": {},
     "lostReason": "string",
+    "badLeadReason": "string",
     "moveSizeName": "string",
     "createdAtUtc": "string"
 }
@@ -695,6 +738,16 @@
 | `To` | query | No | `integer` |  | Format: yyyyMMdd, eg. 20240831 |
 | `IncludeBad` | query | No | `boolean` |  |  |
 | `IncludeLost` | query | No | `boolean` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`From`** (integer) — the start of the date range to filter on (see the parameter's own Format note above); omit to leave the range open-ended on that side.
+- **`To`** (integer) — the end of the date range to filter on (see the parameter's own Format note above); omit to leave the range open-ended on that side.
+- **`IncludeBad`** (boolean) — by default this endpoint excludes leads marked as a Bad Lead; set `IncludeBad=true` to include them in the results.
+  Example: `GET /api/leads?IncludeBad=true`
+- **`IncludeLost`** (boolean) — by default this endpoint excludes leads (or opportunities) marked Lost; set `IncludeLost=true` to include them.
+  Example: `GET /api/leads?IncludeLost=true`
 
 ### Responses
 
@@ -741,6 +794,7 @@
         "moveSizeId": "string",
         "status": {},
         "lostReason": "string",
+        "badLeadReason": "string",
         "moveSizeName": "string",
         "createdAtUtc": "string"
     }]
@@ -765,6 +819,10 @@
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -808,6 +866,10 @@
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
 
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+
 ### Responses
 
 - **Response: 200 OK**
@@ -841,8 +903,8 @@
 ## Get opportunities by customer Id
 
 **Method:** `GET`  
-**Path:** `https://api-public.smartmoving.com/v1/api/customers/{customerId}/opportunities[?Page][&PageSize]`  
-**Description:** Get opportunities by customer Id  
+**Path:** `https://api-public.smartmoving.com/v1/api/customers/{customerId}/opportunities[?Page][&PageSize][&branchId]`  
+**Description:** Get a customer's opportunities. Optionally filter by branch.  
 
 **Tags:** `basic` `opportunities`
 
@@ -853,6 +915,12 @@
 | `customerId` | template | -... Yes | `string` |  |  |
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+| `branchId` | query | No | `string` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`branchId`** (string) — restricts the results to affiliates belonging to a single branch; omit to get affiliates across every branch.
 
 ### Responses
 
@@ -893,13 +961,26 @@
 | `IncludeTripInfo` | query | No | `boolean` |  |  |
 | `IncludePayments` | query | No | `boolean` |  |  |
 | `IncludeSurveys` | query | No | `boolean` |  |  |
-| `IncludeJobAddresses` | query | No | `boolean` |  | List of job's addresses/stops, returned in the order they were stored going from Origin, to Destination. |
+| `IncludeJobAddresses` | query | No | `boolean` |  | List of job’s addresses/stops, returned in the order they were stored going from Origin, to Destination. |
 | `IncludeTasks` | query | No | `boolean` |  |  |
 | `IncludeFiles` | query | No | `boolean` |  |  |
 | `IncludePhotos` | query | No | `boolean` |  |  |
 | `IncludeDocuments` | query | No | `boolean` |  |  |
 | `IncludeCharges` | query | No | `boolean` |  |  |
 | `IncludeDispatchInfo` | query | No | `boolean` |  |  |
+
+### Optional / Filter Parameters
+
+- **`IncludeTripInfo`** (boolean) — adds trip-level details (mileage, routing) for each job on the opportunity to the response.
+- **`IncludePayments`** (boolean) — adds the opportunity's recorded payments to the response.
+- **`IncludeSurveys`** (boolean) — adds any customer survey responses tied to the opportunity to the response.
+- **`IncludeJobAddresses`** (boolean) — adds each job's addresses/stops to the response, returned in stop order from Origin to Destination.
+- **`IncludeTasks`** (boolean) — adds the opportunity's task list to the response.
+- **`IncludeFiles`** (boolean) — adds the opportunity's attached files to the response.
+- **`IncludePhotos`** (boolean) — adds photos attached to the opportunity to the response.
+- **`IncludeDocuments`** (boolean) — adds the opportunity's documents (e.g. contracts, signed forms) to the response.
+- **`IncludeCharges`** (boolean) — adds the opportunity's (or job's) charges to the response.
+- **`IncludeDispatchInfo`** (boolean) — adds dispatch details (crew, truck, timing) to the response.
 
 ### Responses
 
@@ -922,10 +1003,12 @@
         "phoneType": {}
     },
     "branch": {
+        "id": "string",
         "name": "string",
         "phoneNumber": "string"
     },
     "contacts": [{
+        "id": "string",
         "name": "string",
         "emailAddress": "string",
         "phoneNumber": "string",
@@ -937,6 +1020,7 @@
     "status": {},
     "leadStatus": "string",
     "moveSize": {
+        "id": "string",
         "name": "string",
         "description": "string",
         "volume": 0
@@ -951,6 +1035,7 @@
         "finalTotal": 0
     },
     "estimator": {
+        "id": "string",
         "name": "string",
         "mobileNumber": "string",
         "branchId": "string",
@@ -958,6 +1043,10 @@
         "title": "string"
     },
     "salesAssignee": {
+        "id": "string",
+        "name": "string"
+    },
+    "moveCoordinator": {
         "id": "string",
         "name": "string"
     },
@@ -978,11 +1067,13 @@
         "confirmed": true,
         "jobAddresses": ["string"],
         "jobDocuments": [{
+            "id": "string",
             "title": "string",
             "type": {},
             "isComplete": true
         }],
         "estimatedCharges": [{
+            "id": "string",
             "name": "string",
             "chargeCategory": 0,
             "description": "string",
@@ -993,6 +1084,7 @@
             "totalCost": 0
         }],
         "actualCharges": [{
+            "id": "string",
             "name": "string",
             "chargeCategory": 0,
             "description": "string",
@@ -1024,6 +1116,7 @@
         }
     }],
     "payments": [{
+        "id": "string",
         "source": {},
         "paymentType": {},
         "amount": 0,
@@ -1035,6 +1128,7 @@
         "paymentCategory": {}
     }],
     "tripInfo": {
+        "id": "string",
         "isTripInfoApplied": true,
         "pickupSpreadFirstAvailableDate": 0,
         "pickupSpreadLastAvailableDate": 0,
@@ -1050,12 +1144,15 @@
     "opportunityFiles": ["string"],
     "photos": ["string"],
     "opportunityDocuments": [{
+        "id": "string",
         "title": "string",
         "type": {},
         "isComplete": true
     }],
     "surveys": [{
+        "id": "string",
         "assignedTo": {
+            "id": "string",
             "name": "string",
             "mobileNumber": "string",
             "branchId": "string",
@@ -1070,6 +1167,7 @@
         "isConfirmed": true
     }],
     "tasks": [{
+        "id": "string",
         "title": "string",
         "customer": {
             "id": "string",
@@ -1079,6 +1177,7 @@
             "phoneType": {}
         },
         "assignedTo": {
+            "id": "string",
             "name": "string",
             "mobileNumber": "string",
             "branchId": "string",
@@ -1117,13 +1216,26 @@
 | `IncludeTripInfo` | query | No | `boolean` |  |  |
 | `IncludePayments` | query | No | `boolean` |  |  |
 | `IncludeSurveys` | query | No | `boolean` |  |  |
-| `IncludeJobAddresses` | query | No | `boolean` |  | List of job's addresses/stops, returned in the order they were stored going from Origin, to Destination. |
+| `IncludeJobAddresses` | query | No | `boolean` |  | List of job’s addresses/stops, returned in the order they were stored going from Origin, to Destination. |
 | `IncludeTasks` | query | No | `boolean` |  |  |
 | `IncludeFiles` | query | No | `boolean` |  |  |
 | `IncludePhotos` | query | No | `boolean` |  |  |
 | `IncludeDocuments` | query | No | `boolean` |  |  |
 | `IncludeCharges` | query | No | `boolean` |  |  |
 | `IncludeDispatchInfo` | query | No | `boolean` |  |  |
+
+### Optional / Filter Parameters
+
+- **`IncludeTripInfo`** (boolean) — adds trip-level details (mileage, routing) for each job on the opportunity to the response.
+- **`IncludePayments`** (boolean) — adds the opportunity's recorded payments to the response.
+- **`IncludeSurveys`** (boolean) — adds any customer survey responses tied to the opportunity to the response.
+- **`IncludeJobAddresses`** (boolean) — adds each job's addresses/stops to the response, returned in stop order from Origin to Destination.
+- **`IncludeTasks`** (boolean) — adds the opportunity's task list to the response.
+- **`IncludeFiles`** (boolean) — adds the opportunity's attached files to the response.
+- **`IncludePhotos`** (boolean) — adds photos attached to the opportunity to the response.
+- **`IncludeDocuments`** (boolean) — adds the opportunity's documents (e.g. contracts, signed forms) to the response.
+- **`IncludeCharges`** (boolean) — adds the opportunity's (or job's) charges to the response.
+- **`IncludeDispatchInfo`** (boolean) — adds dispatch details (crew, truck, timing) to the response.
 
 ### Responses
 
@@ -1146,10 +1258,12 @@
         "phoneType": {}
     },
     "branch": {
+        "id": "string",
         "name": "string",
         "phoneNumber": "string"
     },
     "contacts": [{
+        "id": "string",
         "name": "string",
         "emailAddress": "string",
         "phoneNumber": "string",
@@ -1161,6 +1275,7 @@
     "status": {},
     "leadStatus": "string",
     "moveSize": {
+        "id": "string",
         "name": "string",
         "description": "string",
         "volume": 0
@@ -1175,6 +1290,7 @@
         "finalTotal": 0
     },
     "estimator": {
+        "id": "string",
         "name": "string",
         "mobileNumber": "string",
         "branchId": "string",
@@ -1182,6 +1298,10 @@
         "title": "string"
     },
     "salesAssignee": {
+        "id": "string",
+        "name": "string"
+    },
+    "moveCoordinator": {
         "id": "string",
         "name": "string"
     },
@@ -1202,11 +1322,13 @@
         "confirmed": true,
         "jobAddresses": ["string"],
         "jobDocuments": [{
+            "id": "string",
             "title": "string",
             "type": {},
             "isComplete": true
         }],
         "estimatedCharges": [{
+            "id": "string",
             "name": "string",
             "chargeCategory": 0,
             "description": "string",
@@ -1217,6 +1339,7 @@
             "totalCost": 0
         }],
         "actualCharges": [{
+            "id": "string",
             "name": "string",
             "chargeCategory": 0,
             "description": "string",
@@ -1248,6 +1371,7 @@
         }
     }],
     "payments": [{
+        "id": "string",
         "source": {},
         "paymentType": {},
         "amount": 0,
@@ -1259,6 +1383,7 @@
         "paymentCategory": {}
     }],
     "tripInfo": {
+        "id": "string",
         "isTripInfoApplied": true,
         "pickupSpreadFirstAvailableDate": 0,
         "pickupSpreadLastAvailableDate": 0,
@@ -1274,12 +1399,15 @@
     "opportunityFiles": ["string"],
     "photos": ["string"],
     "opportunityDocuments": [{
+        "id": "string",
         "title": "string",
         "type": {},
         "isComplete": true
     }],
     "surveys": [{
+        "id": "string",
         "assignedTo": {
+            "id": "string",
             "name": "string",
             "mobileNumber": "string",
             "branchId": "string",
@@ -1294,6 +1422,7 @@
         "isConfirmed": true
     }],
     "tasks": [{
+        "id": "string",
         "title": "string",
         "customer": {
             "id": "string",
@@ -1303,6 +1432,7 @@
             "phoneType": {}
         },
         "assignedTo": {
+            "id": "string",
             "name": "string",
             "mobileNumber": "string",
             "branchId": "string",
@@ -1375,7 +1505,7 @@
 
 **Method:** `GET`  
 **Path:** `https://api-public.smartmoving.com/v1/api/referral-sources[?Page][&PageSize][&includePrivate][&includeLeadProviders]`  
-**Description:** Get all of your account's referral sources, with the option to retrieve all of them or only your public ones (users on public lead forms you might have embedded on your website). If desired, you can also include your active lead providers in the response.  
+**Description:** Get all of your account’s referral sources, with the option to retrieve all of them or only your public ones (users on public lead forms you might have embedded on your website). If desired, you can also include your active lead providers in the response.  
 
 **Tags:** `basic`
 
@@ -1387,6 +1517,14 @@
 | `PageSize` | query | No | `integer` |  |  |
 | `includePrivate` | query | No | `boolean` |  |  |
 | `includeLeadProviders` | query | No | `boolean` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`includePrivate`** (boolean) — referral sources can be marked private (internal-use only); by default they are hidden, set `includePrivate=true` to include them in the results.
+  Example: `GET /api/referral-sources?includePrivate=true`
+- **`includeLeadProviders`** (boolean) — by default referral sources that are lead providers (paid lead vendors) are excluded; set `includeLeadProviders=true` to include them in the results.
+  Example: `GET /api/referral-sources?includeLeadProviders=true`
 
 ### Responses
 
@@ -1431,6 +1569,10 @@
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -1514,6 +1656,7 @@ _No parameters._
     "moveSizeId": "string",
     "status": {},
     "lostReason": "string",
+    "badLeadReason": "string",
     "moveSizeName": "string",
     "createdAtUtc": "string"
 }]
@@ -1538,6 +1681,10 @@ _No parameters._
 | `customerId` | template | -... Yes | `string` |  |  |
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -1592,6 +1739,14 @@ _No parameters._
 | `IncludeDisabled` | query | No | `boolean` |  |  |
 | `IncludeTechMate` | query | No | `boolean` |  | Include external tariffs created on TechMate in the response. |
 
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+- **`IncludeDisabled`** (boolean) — by default this endpoint excludes tariffs that have been disabled; set `IncludeDisabled=true` to include them in the results.
+  Example: `GET /api/tariffs?IncludeDisabled=true`
+- **`IncludeTechMate`** (boolean) — include external tariffs that were created on TechMate in the response; omit or set to `false` to see only tariffs created directly in SmartMoving.
+  Example: `GET /api/tariffs?IncludeTechMate=true`
+
 ### Responses
 
 - **Response: 200 OK**
@@ -1639,6 +1794,10 @@ _No parameters._
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 

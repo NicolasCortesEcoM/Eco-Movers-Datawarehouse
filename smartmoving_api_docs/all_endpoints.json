@@ -5,9 +5,11 @@
       "method": "GET",
       "path": "https://api-public.smartmoving.com/v1/api/ping",
       "title": "/api/ping - GET",
-      "description": "ping",
+      "description": null,
       "category": "general",
-      "tags": [],
+      "tags": [
+        "ping"
+      ],
       "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=get-api-ping",
       "parameters": [],
       "response_codes": [
@@ -18,16 +20,31 @@
     },
     {
       "method": "POST",
-      "path": "",
+      "path": "https://api-public.smartmoving.com/v1/api/premium/opportunities/{opportunityId}/attachments",
       "title": "Add attachment to opportunity",
-      "description": null,
+      "description": "Attaches a file to an opportunity. File must be of type '.doc', '.docx', '.xls', '.xlsx', '.pdf', '.txt', '.csv', '.png', '.jpeg', or '.jpg'. The\r\n                       file content must be a Base64 encoded byte array. The documents category does not accept image files.",
       "category": "general",
-      "tags": [],
+      "tags": [
+        "opportunities",
+        "premium"
+      ],
       "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-attachments",
-      "parameters": [],
-      "response_codes": [],
-      "response_description": null,
-      "response_schema_sample": "{\n    \"base64Contents\": \"string\",\n    \"fileName\": \"string\",\n    \"category\": {}"
+      "parameters": [
+        {
+          "name": "opportunityId",
+          "location": "template",
+          "required": true,
+          "type_": "string",
+          "example": null,
+          "description": null
+        }
+      ],
+      "response_codes": [
+        "Response: 201 Created",
+        "Response: 400 Bad Request"
+      ],
+      "response_description": "File attached to opportunity",
+      "response_schema_sample": null
     },
     {
       "method": "POST",
@@ -79,7 +96,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Item(s) added to room",
-      "response_schema_sample": "{\n    \"items\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"quantity\": 0,\n        \"quantityNotGoing\": 0,\n        \"saveToMaster\": false\n    }]\n}"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"quantity\": 0\n}]"
     },
     {
       "method": "POST",
@@ -115,7 +132,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Materials added to job",
-      "response_schema_sample": "{\n    \"materials\": [{\n        \"quantity\": 0,\n        \"materialId\": \"string\"\n    }]\n}"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"quantity\": 0,\n    \"materialId\": \"string\"\n}]"
     },
     {
       "method": "POST",
@@ -159,7 +176,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "PUT",
@@ -188,7 +205,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Opportunity details",
-      "response_schema_sample": "{\n    \"customerId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"tariffId\": \"string\",\n    \"branchId\": \"string\",\n    \"moveDate\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"serviceTypeId\": {},\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    }\n}"
+      "response_schema_sample": "{\n    \"opportunityId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -206,7 +223,7 @@
         "Response: 200 OK"
       ],
       "response_description": "Customer Id",
-      "response_schema_sample": "{\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}"
+      "response_schema_sample": "\"string\""
     },
     {
       "method": "POST",
@@ -226,7 +243,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Lead created successfully",
-      "response_schema_sample": "{\n    \"firstName\": \"string\",\n    \"lastName\": \"string\",\n    \"fullName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"extension\": \"string\",\n    \"phoneType\": \"string\",\n    \"email\": \"string\",\n    \"moveDate\": \"string\",\n    \"leadCost\": 0,\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"bedrooms\": \"string\",\n    \"notes\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"affiliate\": \"string\",\n    \"affiliateId\": \"string\",\n    \"moveSize\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"serviceType\": \"string\",\n    \"branchId\": \"string\",\n    \"opportunityType\": \"string\",\n    \"trackingParameters\": \"string\",\n    \"userOptIn\": true,\n    \"utmAdGroup\": \"string\",\n    \"utmCampaign\": \"string\",\n    \"utmContent\": \"string\",\n    \"utmCustomTracking\": \"string\",\n    \"utmKeyword\": \"string\",\n    \"utmMedium\": \"string\",\n    \"utmSource\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"leadId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -246,7 +263,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Opportunity details",
-      "response_schema_sample": "{\n    \"tariffId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"customerId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"affiliateId\": \"string\",\n    \"branchId\": \"string\",\n    \"moveDate\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"serviceTypeId\": {},\n    \"utmInformation\": {\n        \"utmAdGroup\": \"string\",\n        \"utmCampaign\": \"string\",\n        \"utmContent\": \"string\",\n        \"utmCustomTracking\": \"string\",\n        \"utmKeyword\": \"string\",\n        \"utmMedium\": \"string\",\n        \"utmSource\": \"string\"\n    },\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"opportunityId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -273,8 +290,8 @@
         "Response: 201 Created",
         "Response: 400 Bad Request"
       ],
-      "response_description": null,
-      "response_schema_sample": "{\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+      "response_description": "Created",
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
     },
     {
       "method": "POST",
@@ -302,8 +319,8 @@
         "Response: 404 Not Found",
         "Response: 400 Bad Request"
       ],
-      "response_description": null,
-      "response_schema_sample": "{\n    \"serviceType\": {}\n}"
+      "response_description": "Created",
+      "response_schema_sample": null
     },
     {
       "method": "POST",
@@ -332,7 +349,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Room details",
-      "response_schema_sample": "[{\n    \"name\": \"string\",\n    \"roomTypeId\": \"string\"\n}]"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"roomTypeId\": \"string\"\n}]"
     },
     {
       "method": "DELETE",
@@ -368,7 +385,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "DELETE",
@@ -405,7 +422,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "GET",
@@ -738,7 +755,7 @@
           "name": "Status",
           "location": "query",
           "required": false,
-          "type_": "",
+          "type_": "string",
           "example": null,
           "description": "Filter by status: Active or Inactive"
         },
@@ -1091,7 +1108,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Lead",
-      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"customerName\": \"string\",\n    \"emailAddress\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceName\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"serviceDate\": 0,\n    \"salesPersonId\": \"string\",\n    \"salesPerson\": \"string\",\n    \"type\": {},\n    \"branchId\": \"string\",\n    \"branchName\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"status\": {},\n    \"lostReason\": \"string\",\n    \"moveSizeName\": \"string\",\n    \"createdAtUtc\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"customerName\": \"string\",\n    \"emailAddress\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceName\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"serviceDate\": 0,\n    \"salesPersonId\": \"string\",\n    \"salesPerson\": \"string\",\n    \"type\": {},\n    \"branchId\": \"string\",\n    \"branchName\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"status\": {},\n    \"lostReason\": \"string\",\n    \"badLeadReason\": \"string\",\n    \"moveSizeName\": \"string\",\n    \"createdAtUtc\": \"string\"\n}"
     },
     {
       "method": "GET",
@@ -1158,7 +1175,7 @@
         "Response: 200 OK"
       ],
       "response_description": "Leads",
-      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"customerName\": \"string\",\n        \"emailAddress\": \"string\",\n        \"referralSource\": \"string\",\n        \"referralSourceName\": \"string\",\n        \"affiliateId\": \"string\",\n        \"affiliateName\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {},\n        \"serviceDate\": 0,\n        \"salesPersonId\": \"string\",\n        \"salesPerson\": \"string\",\n        \"type\": {},\n        \"branchId\": \"string\",\n        \"branchName\": \"string\",\n        \"originAddressFull\": \"string\",\n        \"originStreet\": \"string\",\n        \"originCity\": \"string\",\n        \"originState\": \"string\",\n        \"originZip\": \"string\",\n        \"destinationAddressFull\": \"string\",\n        \"destinationStreet\": \"string\",\n        \"destinationCity\": \"string\",\n        \"destinationState\": \"string\",\n        \"destinationZip\": \"string\",\n        \"moveSizeId\": \"string\",\n        \"status\": {},\n        \"lostReason\": \"string\",\n        \"moveSizeName\": \"string\",\n        \"createdAtUtc\": \"string\"\n    }]\n}"
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"customerName\": \"string\",\n        \"emailAddress\": \"string\",\n        \"referralSource\": \"string\",\n        \"referralSourceName\": \"string\",\n        \"affiliateId\": \"string\",\n        \"affiliateName\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {},\n        \"serviceDate\": 0,\n        \"salesPersonId\": \"string\",\n        \"salesPerson\": \"string\",\n        \"type\": {},\n        \"branchId\": \"string\",\n        \"branchName\": \"string\",\n        \"originAddressFull\": \"string\",\n        \"originStreet\": \"string\",\n        \"originCity\": \"string\",\n        \"originState\": \"string\",\n        \"originZip\": \"string\",\n        \"destinationAddressFull\": \"string\",\n        \"destinationStreet\": \"string\",\n        \"destinationCity\": \"string\",\n        \"destinationState\": \"string\",\n        \"destinationZip\": \"string\",\n        \"moveSizeId\": \"string\",\n        \"status\": {},\n        \"lostReason\": \"string\",\n        \"badLeadReason\": \"string\",\n        \"moveSizeName\": \"string\",\n        \"createdAtUtc\": \"string\"\n    }]\n}"
     },
     {
       "method": "GET",
@@ -1201,7 +1218,7 @@
         "Response: 200 OK"
       ],
       "response_description": "Leads",
-      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"customerName\": \"string\",\n        \"emailAddress\": \"string\",\n        \"referralSource\": \"string\",\n        \"referralSourceName\": \"string\",\n        \"affiliateId\": \"string\",\n        \"affiliateName\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {},\n        \"serviceDate\": 0,\n        \"salesPersonId\": \"string\",\n        \"salesPerson\": \"string\",\n        \"type\": {},\n        \"branchId\": \"string\",\n        \"branchName\": \"string\",\n        \"originAddressFull\": \"string\",\n        \"originStreet\": \"string\",\n        \"originCity\": \"string\",\n        \"originState\": \"string\",\n        \"originZip\": \"string\",\n        \"destinationAddressFull\": \"string\",\n        \"destinationStreet\": \"string\",\n        \"destinationCity\": \"string\",\n        \"destinationState\": \"string\",\n        \"destinationZip\": \"string\",\n        \"moveSizeId\": \"string\",\n        \"status\": {},\n        \"lostReason\": \"string\",\n        \"moveSizeName\": \"string\",\n        \"createdAtUtc\": \"string\"\n    }]\n}"
+      "response_schema_sample": "{\n    \"pageNumber\": 0,\n    \"pageSize\": 0,\n    \"lastPage\": true,\n    \"totalPages\": 0,\n    \"totalResults\": 0,\n    \"totalThisPage\": 0,\n    \"pageResults\": [{\n        \"id\": \"string\",\n        \"customerName\": \"string\",\n        \"emailAddress\": \"string\",\n        \"referralSource\": \"string\",\n        \"referralSourceName\": \"string\",\n        \"affiliateId\": \"string\",\n        \"affiliateName\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {},\n        \"serviceDate\": 0,\n        \"salesPersonId\": \"string\",\n        \"salesPerson\": \"string\",\n        \"type\": {},\n        \"branchId\": \"string\",\n        \"branchName\": \"string\",\n        \"originAddressFull\": \"string\",\n        \"originStreet\": \"string\",\n        \"originCity\": \"string\",\n        \"originState\": \"string\",\n        \"originZip\": \"string\",\n        \"destinationAddressFull\": \"string\",\n        \"destinationStreet\": \"string\",\n        \"destinationCity\": \"string\",\n        \"destinationState\": \"string\",\n        \"destinationZip\": \"string\",\n        \"moveSizeId\": \"string\",\n        \"status\": {},\n        \"lostReason\": \"string\",\n        \"badLeadReason\": \"string\",\n        \"moveSizeName\": \"string\",\n        \"createdAtUtc\": \"string\"\n    }]\n}"
     },
     {
       "method": "GET",
@@ -1350,9 +1367,9 @@
     },
     {
       "method": "GET",
-      "path": "https://api-public.smartmoving.com/v1/api/customers/{customerId}/opportunities[?Page][&PageSize]",
+      "path": "https://api-public.smartmoving.com/v1/api/customers/{customerId}/opportunities[?Page][&PageSize][&branchId]",
       "title": "Get opportunities by customer Id",
-      "description": "Get opportunities by customer Id",
+      "description": "Get a customer's opportunities. Optionally filter by branch.",
       "category": "basic",
       "tags": [
         "basic",
@@ -1381,6 +1398,14 @@
           "location": "query",
           "required": false,
           "type_": "integer",
+          "example": null,
+          "description": null
+        },
+        {
+          "name": "branchId",
+          "location": "query",
+          "required": false,
+          "type_": "string",
           "example": null,
           "description": null
         }
@@ -1498,7 +1523,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Opportunity details",
-      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"quoteNumber\": 0,\n    \"customer\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    },\n    \"branch\": {\n        \"name\": \"string\",\n        \"phoneNumber\": \"string\"\n    },\n    \"contacts\": [{\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }],\n    \"opportunityType\": {},\n    \"type\": {},\n    \"serviceDate\": 0,\n    \"status\": {},\n    \"leadStatus\": \"string\",\n    \"moveSize\": {\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"volume\": 0\n    },\n    \"volume\": 0,\n    \"weight\": 0,\n    \"volumeWeightCalculationMode\": {},\n    \"estimatedTotal\": {\n        \"subtotal\": 0,\n        \"taxableAmount\": 0,\n        \"tax\": 0,\n        \"finalTotal\": 0\n    },\n    \"estimator\": {\n        \"name\": \"string\",\n        \"mobileNumber\": \"string\",\n        \"branchId\": \"string\",\n        \"regionId\": \"string\",\n        \"title\": \"string\"\n    },\n    \"salesAssignee\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"hasTripInfo\": true,\n    \"referralSource\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"allowInventoryUpdates\": true,\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\",\n    \"cancellationReason\": \"string\",\n    \"jobs\": [{\n        \"id\": \"string\",\n        \"jobNumber\": \"string\",\n        \"jobDate\": 0,\n        \"type\": {},\n        \"confirmed\": true,\n        \"jobAddresses\": [\"string\"],\n        \"jobDocuments\": [{\n            \"title\": \"string\",\n            \"type\": {},\n            \"isComplete\": true\n        }],\n        \"estimatedCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"actualCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"arrivalWindow\": {\n            \"id\": \"string\",\n            \"description\": \"string\",\n            \"startTime\": 0,\n            \"endTime\": 0,\n            \"isDefault\": true\n        },\n        \"totalTips\": 0,\n        \"crewMembers\": [\"string\"],\n        \"jobTime\": {\n            \"laborTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            },\n            \"billableHours\": 0,\n            \"travelTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            }\n        }\n    }],\n    \"payments\": [{\n        \"source\": {},\n        \"paymentType\": {},\n        \"amount\": 0,\n        \"takenByUser\": \"string\",\n        \"isOutstanding\": true,\n        \"paidAtUtc\": \"string\",\n        \"refundsJobPaymentId\": \"string\",\n        \"amountRefunded\": 0,\n        \"paymentCategory\": {}\n    }],\n    \"tripInfo\": {\n        \"isTripInfoApplied\": true,\n        \"pickupSpreadFirstAvailableDate\": 0,\n        \"pickupSpreadLastAvailableDate\": 0,\n        \"confirmedPickupDate\": 0,\n        \"preferredPickupTime\": 0,\n        \"preferredPickupTimeDurationMinutes\": 0,\n        \"deliverySpreadFirstAvailableDate\": 0,\n        \"deliverySpreadLastAvailableDate\": 0,\n        \"confirmedDeliveryDate\": 0,\n        \"preferredDeliveryTime\": 0,\n        \"preferredDeliveryTimeDurationMinutes\": 0\n    },\n    \"opportunityFiles\": [\"string\"],\n    \"photos\": [\"string\"],\n    \"opportunityDocuments\": [{\n        \"title\": \"string\",\n        \"type\": {},\n        \"isComplete\": true\n    }],\n    \"surveys\": [{\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"type\": {},\n        \"title\": \"string\",\n        \"startAtUtc\": \"string\",\n        \"durationMinutes\": 0,\n        \"notes\": \"string\",\n        \"isConfirmed\": true\n    }],\n    \"tasks\": [{\n        \"title\": \"string\",\n        \"customer\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"emailAddress\": \"string\",\n            \"phoneNumber\": \"string\",\n            \"phoneType\": {}\n        },\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"taskItemType\": {},\n        \"taskItemStatus\": {},\n        \"notes\": \"string\"\n    }],\n    \"tariff\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"createdAtUtc\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"quoteNumber\": 0,\n    \"customer\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    },\n    \"branch\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"phoneNumber\": \"string\"\n    },\n    \"contacts\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }],\n    \"opportunityType\": {},\n    \"type\": {},\n    \"serviceDate\": 0,\n    \"status\": {},\n    \"leadStatus\": \"string\",\n    \"moveSize\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"volume\": 0\n    },\n    \"volume\": 0,\n    \"weight\": 0,\n    \"volumeWeightCalculationMode\": {},\n    \"estimatedTotal\": {\n        \"subtotal\": 0,\n        \"taxableAmount\": 0,\n        \"tax\": 0,\n        \"finalTotal\": 0\n    },\n    \"estimator\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"mobileNumber\": \"string\",\n        \"branchId\": \"string\",\n        \"regionId\": \"string\",\n        \"title\": \"string\"\n    },\n    \"salesAssignee\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"moveCoordinator\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"hasTripInfo\": true,\n    \"referralSource\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"allowInventoryUpdates\": true,\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\",\n    \"cancellationReason\": \"string\",\n    \"jobs\": [{\n        \"id\": \"string\",\n        \"jobNumber\": \"string\",\n        \"jobDate\": 0,\n        \"type\": {},\n        \"confirmed\": true,\n        \"jobAddresses\": [\"string\"],\n        \"jobDocuments\": [{\n            \"id\": \"string\",\n            \"title\": \"string\",\n            \"type\": {},\n            \"isComplete\": true\n        }],\n        \"estimatedCharges\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"actualCharges\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"arrivalWindow\": {\n            \"id\": \"string\",\n            \"description\": \"string\",\n            \"startTime\": 0,\n            \"endTime\": 0,\n            \"isDefault\": true\n        },\n        \"totalTips\": 0,\n        \"crewMembers\": [\"string\"],\n        \"jobTime\": {\n            \"laborTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            },\n            \"billableHours\": 0,\n            \"travelTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            }\n        }\n    }],\n    \"payments\": [{\n        \"id\": \"string\",\n        \"source\": {},\n        \"paymentType\": {},\n        \"amount\": 0,\n        \"takenByUser\": \"string\",\n        \"isOutstanding\": true,\n        \"paidAtUtc\": \"string\",\n        \"refundsJobPaymentId\": \"string\",\n        \"amountRefunded\": 0,\n        \"paymentCategory\": {}\n    }],\n    \"tripInfo\": {\n        \"id\": \"string\",\n        \"isTripInfoApplied\": true,\n        \"pickupSpreadFirstAvailableDate\": 0,\n        \"pickupSpreadLastAvailableDate\": 0,\n        \"confirmedPickupDate\": 0,\n        \"preferredPickupTime\": 0,\n        \"preferredPickupTimeDurationMinutes\": 0,\n        \"deliverySpreadFirstAvailableDate\": 0,\n        \"deliverySpreadLastAvailableDate\": 0,\n        \"confirmedDeliveryDate\": 0,\n        \"preferredDeliveryTime\": 0,\n        \"preferredDeliveryTimeDurationMinutes\": 0\n    },\n    \"opportunityFiles\": [\"string\"],\n    \"photos\": [\"string\"],\n    \"opportunityDocuments\": [{\n        \"id\": \"string\",\n        \"title\": \"string\",\n        \"type\": {},\n        \"isComplete\": true\n    }],\n    \"surveys\": [{\n        \"id\": \"string\",\n        \"assignedTo\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"type\": {},\n        \"title\": \"string\",\n        \"startAtUtc\": \"string\",\n        \"durationMinutes\": 0,\n        \"notes\": \"string\",\n        \"isConfirmed\": true\n    }],\n    \"tasks\": [{\n        \"id\": \"string\",\n        \"title\": \"string\",\n        \"customer\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"emailAddress\": \"string\",\n            \"phoneNumber\": \"string\",\n            \"phoneType\": {}\n        },\n        \"assignedTo\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"taskItemType\": {},\n        \"taskItemStatus\": {},\n        \"notes\": \"string\"\n    }],\n    \"tariff\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"createdAtUtc\": \"string\"\n}"
     },
     {
       "method": "GET",
@@ -1606,7 +1631,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Opportunity details",
-      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"quoteNumber\": 0,\n    \"customer\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    },\n    \"branch\": {\n        \"name\": \"string\",\n        \"phoneNumber\": \"string\"\n    },\n    \"contacts\": [{\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }],\n    \"opportunityType\": {},\n    \"type\": {},\n    \"serviceDate\": 0,\n    \"status\": {},\n    \"leadStatus\": \"string\",\n    \"moveSize\": {\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"volume\": 0\n    },\n    \"volume\": 0,\n    \"weight\": 0,\n    \"volumeWeightCalculationMode\": {},\n    \"estimatedTotal\": {\n        \"subtotal\": 0,\n        \"taxableAmount\": 0,\n        \"tax\": 0,\n        \"finalTotal\": 0\n    },\n    \"estimator\": {\n        \"name\": \"string\",\n        \"mobileNumber\": \"string\",\n        \"branchId\": \"string\",\n        \"regionId\": \"string\",\n        \"title\": \"string\"\n    },\n    \"salesAssignee\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"hasTripInfo\": true,\n    \"referralSource\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"allowInventoryUpdates\": true,\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\",\n    \"cancellationReason\": \"string\",\n    \"jobs\": [{\n        \"id\": \"string\",\n        \"jobNumber\": \"string\",\n        \"jobDate\": 0,\n        \"type\": {},\n        \"confirmed\": true,\n        \"jobAddresses\": [\"string\"],\n        \"jobDocuments\": [{\n            \"title\": \"string\",\n            \"type\": {},\n            \"isComplete\": true\n        }],\n        \"estimatedCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"actualCharges\": [{\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"arrivalWindow\": {\n            \"id\": \"string\",\n            \"description\": \"string\",\n            \"startTime\": 0,\n            \"endTime\": 0,\n            \"isDefault\": true\n        },\n        \"totalTips\": 0,\n        \"crewMembers\": [\"string\"],\n        \"jobTime\": {\n            \"laborTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            },\n            \"billableHours\": 0,\n            \"travelTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            }\n        }\n    }],\n    \"payments\": [{\n        \"source\": {},\n        \"paymentType\": {},\n        \"amount\": 0,\n        \"takenByUser\": \"string\",\n        \"isOutstanding\": true,\n        \"paidAtUtc\": \"string\",\n        \"refundsJobPaymentId\": \"string\",\n        \"amountRefunded\": 0,\n        \"paymentCategory\": {}\n    }],\n    \"tripInfo\": {\n        \"isTripInfoApplied\": true,\n        \"pickupSpreadFirstAvailableDate\": 0,\n        \"pickupSpreadLastAvailableDate\": 0,\n        \"confirmedPickupDate\": 0,\n        \"preferredPickupTime\": 0,\n        \"preferredPickupTimeDurationMinutes\": 0,\n        \"deliverySpreadFirstAvailableDate\": 0,\n        \"deliverySpreadLastAvailableDate\": 0,\n        \"confirmedDeliveryDate\": 0,\n        \"preferredDeliveryTime\": 0,\n        \"preferredDeliveryTimeDurationMinutes\": 0\n    },\n    \"opportunityFiles\": [\"string\"],\n    \"photos\": [\"string\"],\n    \"opportunityDocuments\": [{\n        \"title\": \"string\",\n        \"type\": {},\n        \"isComplete\": true\n    }],\n    \"surveys\": [{\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"type\": {},\n        \"title\": \"string\",\n        \"startAtUtc\": \"string\",\n        \"durationMinutes\": 0,\n        \"notes\": \"string\",\n        \"isConfirmed\": true\n    }],\n    \"tasks\": [{\n        \"title\": \"string\",\n        \"customer\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"emailAddress\": \"string\",\n            \"phoneNumber\": \"string\",\n            \"phoneType\": {}\n        },\n        \"assignedTo\": {\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"taskItemType\": {},\n        \"taskItemStatus\": {},\n        \"notes\": \"string\"\n    }],\n    \"tariff\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"createdAtUtc\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"quoteNumber\": 0,\n    \"customer\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    },\n    \"branch\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"phoneNumber\": \"string\"\n    },\n    \"contacts\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"emailAddress\": \"string\",\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }],\n    \"opportunityType\": {},\n    \"type\": {},\n    \"serviceDate\": 0,\n    \"status\": {},\n    \"leadStatus\": \"string\",\n    \"moveSize\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"volume\": 0\n    },\n    \"volume\": 0,\n    \"weight\": 0,\n    \"volumeWeightCalculationMode\": {},\n    \"estimatedTotal\": {\n        \"subtotal\": 0,\n        \"taxableAmount\": 0,\n        \"tax\": 0,\n        \"finalTotal\": 0\n    },\n    \"estimator\": {\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"mobileNumber\": \"string\",\n        \"branchId\": \"string\",\n        \"regionId\": \"string\",\n        \"title\": \"string\"\n    },\n    \"salesAssignee\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"moveCoordinator\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"hasTripInfo\": true,\n    \"referralSource\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"allowInventoryUpdates\": true,\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\",\n    \"cancellationReason\": \"string\",\n    \"jobs\": [{\n        \"id\": \"string\",\n        \"jobNumber\": \"string\",\n        \"jobDate\": 0,\n        \"type\": {},\n        \"confirmed\": true,\n        \"jobAddresses\": [\"string\"],\n        \"jobDocuments\": [{\n            \"id\": \"string\",\n            \"title\": \"string\",\n            \"type\": {},\n            \"isComplete\": true\n        }],\n        \"estimatedCharges\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"actualCharges\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"chargeCategory\": 0,\n            \"description\": \"string\",\n            \"editableDescription\": \"string\",\n            \"sortOrder\": 0,\n            \"subtotal\": 0,\n            \"discountAmount\": 0,\n            \"totalCost\": 0\n        }],\n        \"arrivalWindow\": {\n            \"id\": \"string\",\n            \"description\": \"string\",\n            \"startTime\": 0,\n            \"endTime\": 0,\n            \"isDefault\": true\n        },\n        \"totalTips\": 0,\n        \"crewMembers\": [\"string\"],\n        \"jobTime\": {\n            \"laborTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            },\n            \"billableHours\": 0,\n            \"travelTime\": {\n                \"estimated\": 0,\n                \"actual\": 0\n            }\n        }\n    }],\n    \"payments\": [{\n        \"id\": \"string\",\n        \"source\": {},\n        \"paymentType\": {},\n        \"amount\": 0,\n        \"takenByUser\": \"string\",\n        \"isOutstanding\": true,\n        \"paidAtUtc\": \"string\",\n        \"refundsJobPaymentId\": \"string\",\n        \"amountRefunded\": 0,\n        \"paymentCategory\": {}\n    }],\n    \"tripInfo\": {\n        \"id\": \"string\",\n        \"isTripInfoApplied\": true,\n        \"pickupSpreadFirstAvailableDate\": 0,\n        \"pickupSpreadLastAvailableDate\": 0,\n        \"confirmedPickupDate\": 0,\n        \"preferredPickupTime\": 0,\n        \"preferredPickupTimeDurationMinutes\": 0,\n        \"deliverySpreadFirstAvailableDate\": 0,\n        \"deliverySpreadLastAvailableDate\": 0,\n        \"confirmedDeliveryDate\": 0,\n        \"preferredDeliveryTime\": 0,\n        \"preferredDeliveryTimeDurationMinutes\": 0\n    },\n    \"opportunityFiles\": [\"string\"],\n    \"photos\": [\"string\"],\n    \"opportunityDocuments\": [{\n        \"id\": \"string\",\n        \"title\": \"string\",\n        \"type\": {},\n        \"isComplete\": true\n    }],\n    \"surveys\": [{\n        \"id\": \"string\",\n        \"assignedTo\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"type\": {},\n        \"title\": \"string\",\n        \"startAtUtc\": \"string\",\n        \"durationMinutes\": 0,\n        \"notes\": \"string\",\n        \"isConfirmed\": true\n    }],\n    \"tasks\": [{\n        \"id\": \"string\",\n        \"title\": \"string\",\n        \"customer\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"emailAddress\": \"string\",\n            \"phoneNumber\": \"string\",\n            \"phoneType\": {}\n        },\n        \"assignedTo\": {\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"mobileNumber\": \"string\",\n            \"branchId\": \"string\",\n            \"regionId\": \"string\",\n            \"title\": \"string\"\n        },\n        \"taskItemType\": {},\n        \"taskItemStatus\": {},\n        \"notes\": \"string\"\n    }],\n    \"tariff\": {\n        \"id\": \"string\",\n        \"name\": \"string\"\n    },\n    \"createdAtUtc\": \"string\"\n}"
     },
     {
       "method": "GET",
@@ -1634,7 +1659,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Opportunity inventory",
-      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"createdAtUtc\": \"string\",\n    \"lastModifiedById\": \"string\",\n    \"lastModifiedFromApplication\": {},\n    \"densityFactor\": 0,\n    \"boxes\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"shortCode\": 0,\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"imageUrl\": \"string\",\n        \"quantity\": 0,\n        \"inventoryItemId\": \"string\"\n    }],\n    \"rooms\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"roomType\": \"string\",\n        \"items\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"description\": \"string\",\n            \"notes\": \"string\",\n            \"shortCode\": 0,\n            \"quantity\": 0,\n            \"volume\": 0,\n            \"weight\": 0,\n            \"width\": 0,\n            \"depth\": 0,\n            \"height\": 0,\n            \"type\": {},\n            \"inventoryItemId\": \"string\",\n            \"imageUrls\": [\"string\"]\n        }]\n    }],\n    \"lockStatus\": true\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"createdAtUtc\": \"string\",\n    \"lastModifiedById\": \"string\",\n    \"lastModifiedFromApplication\": {},\n    \"densityFactor\": 0,\n    \"boxes\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"shortCode\": 0,\n        \"notes\": \"string\",\n        \"volume\": 0,\n        \"weight\": 0,\n        \"imageUrl\": \"string\",\n        \"quantity\": 0,\n        \"inventoryItemId\": \"string\"\n    }],\n    \"rooms\": [{\n        \"id\": \"string\",\n        \"name\": \"string\",\n        \"description\": \"string\",\n        \"roomType\": \"string\",\n        \"items\": [{\n            \"id\": \"string\",\n            \"name\": \"string\",\n            \"description\": \"string\",\n            \"notes\": \"string\",\n            \"shortCode\": 0,\n            \"quantity\": 0,\n            \"volume\": 0,\n            \"weight\": 0,\n            \"overrideDefaultWeight\": true,\n            \"width\": 0,\n            \"depth\": 0,\n            \"height\": 0,\n            \"type\": {},\n            \"inventoryItemId\": \"string\",\n            \"imageUrls\": [\"string\"]\n        }]\n    }],\n    \"lockStatus\": true\n}"
     },
     {
       "method": "GET",
@@ -1869,7 +1894,7 @@
         "Response: 200 OK"
       ],
       "response_description": "Statuses",
-      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"customerName\": \"string\",\n    \"emailAddress\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceName\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"serviceDate\": 0,\n    \"salesPersonId\": \"string\",\n    \"salesPerson\": \"string\",\n    \"type\": {},\n    \"branchId\": \"string\",\n    \"branchName\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"status\": {},\n    \"lostReason\": \"string\",\n    \"moveSizeName\": \"string\",\n    \"createdAtUtc\": \"string\"\n}]"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"customerName\": \"string\",\n    \"emailAddress\": \"string\",\n    \"referralSource\": \"string\",\n    \"referralSourceName\": \"string\",\n    \"affiliateId\": \"string\",\n    \"affiliateName\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"serviceDate\": 0,\n    \"salesPersonId\": \"string\",\n    \"salesPerson\": \"string\",\n    \"type\": {},\n    \"branchId\": \"string\",\n    \"branchName\": \"string\",\n    \"originAddressFull\": \"string\",\n    \"originStreet\": \"string\",\n    \"originCity\": \"string\",\n    \"originState\": \"string\",\n    \"originZip\": \"string\",\n    \"destinationAddressFull\": \"string\",\n    \"destinationStreet\": \"string\",\n    \"destinationCity\": \"string\",\n    \"destinationState\": \"string\",\n    \"destinationZip\": \"string\",\n    \"moveSizeId\": \"string\",\n    \"status\": {},\n    \"lostReason\": \"string\",\n    \"badLeadReason\": \"string\",\n    \"moveSizeName\": \"string\",\n    \"createdAtUtc\": \"string\"\n}]"
     },
     {
       "method": "GET",
@@ -2026,7 +2051,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Call added to opportunity",
-      "response_schema_sample": "{\n    \"callType\": {},\n    \"outcome\": {},\n    \"callDateTime\": \"string\",\n    \"description\": \"string\",\n    \"fromNumber\": \"string\",\n    \"toNumber\": \"string\",\n    \"createdBy\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"callId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -2055,7 +2080,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Note added to opportunity",
-      "response_schema_sample": "{\n    \"notes\": \"string\",\n    \"createdBy\": \"string\"\n}"
+      "response_schema_sample": "{\n    \"noteId\": \"string\"\n}"
     },
     {
       "method": "POST",
@@ -2070,7 +2095,7 @@
       "doc_url": "https://developer.smartmoving.com/api-details#api=public-api-v1&operation=post-api-premium-opportunities-opportunityid-followups-followupid-mark-compl",
       "parameters": [
         {
-          "name": "followupId",
+          "name": "opportunityId",
           "location": "template",
           "required": true,
           "type_": "string",
@@ -2078,7 +2103,7 @@
           "description": null
         },
         {
-          "name": "opportunityId",
+          "name": "followupId",
           "location": "template",
           "required": true,
           "type_": "string",
@@ -2119,7 +2144,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Lead updated",
-      "response_schema_sample": "{\n    \"customerName\": \"string\",\n    \"moveDate\": \"string\",\n    \"utmInformation\": {\n        \"utmAdGroup\": \"string\",\n        \"utmCampaign\": \"string\",\n        \"utmContent\": \"string\",\n        \"utmCustomTracking\": \"string\",\n        \"utmKeyword\": \"string\",\n        \"utmMedium\": \"string\",\n        \"utmSource\": \"string\"\n    },\n    \"emailAddress\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"branchId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"serviceTypeId\": {},\n    \"moveSizeId\": \"string\",\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"fromExternalApi\": true\n}"
+      "response_schema_sample": "{\n    \"leadId\": \"string\"\n}"
     },
     {
       "method": "DELETE",
@@ -2179,7 +2204,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Item successfully deleted",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "POST",
@@ -2207,7 +2232,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Inventory submitted successfully",
-      "response_schema_sample": "{opportunityId}"
+      "response_schema_sample": null
     },
     {
       "method": "GET",
@@ -2263,7 +2288,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Success",
-      "response_schema_sample": "{\n    \"name\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"emailAddress\": \"string\",\n    \"address\": \"string\",\n    \"secondaryPhoneNumbers\": [{\n        \"phoneNumber\": \"string\",\n        \"phoneType\": {}\n    }]\n}"
+      "response_schema_sample": null
     },
     {
       "method": "PUT",
@@ -2299,7 +2324,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "OK",
-      "response_schema_sample": "{\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"opportunityId\": \"string\",\n    \"type\": {},\n    \"title\": \"string\",\n    \"assignedToId\": \"string\",\n    \"dueDateTime\": \"string\",\n    \"completedAtUtc\": \"string\",\n    \"notes\": \"string\",\n    \"completed\": true\n}"
     },
     {
       "method": "PATCH",
@@ -2336,7 +2361,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Notes updated successfully",
-      "response_schema_sample": "{\n    \"crewNotes\": \"string\",\n    \"customerNotes\": \"string\",\n    \"internalNotes\": \"string\",\n    \"accountingNotes\": \"string\",\n    \"dispatcherNotes\": \"string\"\n}"
+      "response_schema_sample": null
     },
     {
       "method": "PUT",
@@ -2374,7 +2399,7 @@
         "Response: 404 Not Found"
       ],
       "response_description": "Updated stops",
-      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"isOrigin\": true,\n    \"isDestination\": true,\n    \"order\": 0,\n    \"addressFullAddress\": \"string\",\n    \"addressLat\": 0,\n    \"addressLng\": 0,\n    \"addressUnit\": \"string\",\n    \"propertyName\": \"string\",\n    \"propertyType\": {},\n    \"stopType\": {},\n    \"stairs\": 0,\n    \"hasElevator\": true,\n    \"notes\": \"string\",\n    \"street\": \"string\",\n    \"city\": \"string\",\n    \"state\": \"string\",\n    \"zip\": \"string\",\n    \"county\": \"string\"\n}]"
+      "response_schema_sample": "[{\n    \"id\": \"string\",\n    \"isOrigin\": true,\n    \"isDestination\": true,\n    \"order\": 0,\n    \"addressFullAddress\": \"string\",\n    \"addressLat\": 0,\n    \"addressLng\": 0,\n    \"addressUnit\": \"string\",\n    \"propertyName\": \"string\",\n    \"propertyType\": {},\n    \"stairs\": 0,\n    \"parkingDescription\": \"string\",\n    \"hasElevator\": true,\n    \"notes\": \"string\"\n}]"
     },
     {
       "method": "PUT",
@@ -2402,7 +2427,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Lead updated",
-      "response_schema_sample": "{\n    \"customerName\": \"string\",\n    \"branchId\": \"string\",\n    \"referralSourceId\": \"string\",\n    \"moveDate\": \"string\",\n    \"utmInformation\": {\n        \"utmAdGroup\": \"string\",\n        \"utmCampaign\": \"string\",\n        \"utmContent\": \"string\",\n        \"utmCustomTracking\": \"string\",\n        \"utmKeyword\": \"string\",\n        \"utmMedium\": \"string\",\n        \"utmSource\": \"string\"\n    },\n    \"emailAddress\": \"string\",\n    \"phoneNumber\": \"string\",\n    \"phoneType\": {},\n    \"salesPersonId\": \"string\",\n    \"serviceTypeId\": {},\n    \"moveSizeId\": \"string\",\n    \"originAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    },\n    \"destinationAddress\": {\n        \"fullAddress\": \"string\",\n        \"street\": \"string\",\n        \"unit\": \"string\",\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"zip\": \"string\",\n        \"lat\": 0,\n        \"lng\": 0,\n        \"country\": \"string\"\n    }\n}"
+      "response_schema_sample": "{\n    \"leadId\": \"string\"\n}"
     },
     {
       "method": "PUT",
@@ -2462,7 +2487,7 @@
         "Response: 400 Bad Request"
       ],
       "response_description": "Item successfully updated",
-      "response_schema_sample": "{\n    \"notes\": \"string\",\n    \"volume\": 0,\n    \"weight\": 0,\n    \"quantity\": 0,\n    \"quantityNotGoing\": 0\n}"
+      "response_schema_sample": "{\n    \"id\": \"string\",\n    \"name\": \"string\",\n    \"quantity\": 0\n}"
     },
     {
       "method": "PATCH",
@@ -2491,7 +2516,7 @@
         "Response: 500 Internal Server Error"
       ],
       "response_description": "Opportunity updated successfully",
-      "response_schema_sample": "{\n    \"moveSizeId\": \"string\",\n    \"salesPersonId\": \"string\",\n    \"branchId\": \"string\",\n    \"opportunityType\": {},\n    \"volume\": 0,\n    \"weight\": 0,\n    \"isBinding\": true,\n    \"depositAmount\": 0,\n    \"referralSourceId\": \"string\",\n    \"affiliateId\": \"string\",\n    \"customField01\": \"string\",\n    \"customField02\": \"string\",\n    \"customField03\": \"string\"\n}"
+      "response_schema_sample": null
     }
   ]
 }

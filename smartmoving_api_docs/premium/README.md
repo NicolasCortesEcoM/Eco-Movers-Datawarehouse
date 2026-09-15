@@ -19,6 +19,10 @@
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
 
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
+
 ### Responses
 
 - **Response: 200 OK**
@@ -54,7 +58,7 @@
 
 **Method:** `GET`  
 **Path:** `https://api-public.smartmoving.com/v1/api/premium/tariffs/{tariffId}/materials[?Page][&PageSize]`  
-**Description:** Get all your tariff's packing materials information.  
+**Description:** Get all your tariff’s packing materials information.  
 
 **Tags:** `premium`
 
@@ -65,6 +69,10 @@
 | `tariffId` | template | -... Yes | `string` |  |  |
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 
@@ -108,7 +116,7 @@
 
 **Method:** `GET`  
 **Path:** `https://api-public.smartmoving.com/v1/api/premium/room-types[?Page][&PageSize]`  
-**Description:** Get all the room types that are stored in your company's inventory configuration.  
+**Description:** Get all the room types that are stored in your company’s inventory configuration.  
 
 **Tags:** `premium`
 
@@ -118,6 +126,10 @@
 |------|----|----------|------|---------|-------------|
 | `Page` | query | No | `integer` |  |  |
 | `PageSize` | query | No | `integer` |  |  |
+
+### Optional / Filter Parameters
+
+- **`Page`** / **`PageSize`** — standard pagination; omit for page 1 with the default page size.
 
 ### Responses
 

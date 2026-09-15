@@ -9,30 +9,38 @@ paths:
   /api/ping:
     get:
       summary: /api/ping - GET
-      description: ping
+      description: Not Found
       operationId: _api_ping___get
-      tags: []
+      tags:
+      - ping
       parameters: []
       responses:
         '200':
           description: OK
-  /api/premium/opportunities/opportunityid/attachments:
+  /api/premium/opportunities/{opportunityId}/attachments:
     post:
       summary: Add attachment to opportunity
-      description: Not Found
+      description: "Attaches a file to an opportunity. File must be of type '.doc',\
+        \ '.docx', '.xls', '.xlsx', '.pdf', '.txt', '.csv', '.png', '.jpeg', or '.jpg'.\
+        \ The\r\n                       file content must be a Base64 encoded byte\
+        \ array. The documents category does not accept image files."
       operationId: add_attachment_to_opportunity
-      tags: []
-      parameters: []
+      tags:
+      - opportunities
+      - premium
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
         '200':
-          description: Success
-      requestBody:
-        content:
-          application/json:
-            example:
-              base64Contents: string
-              fileName: string
-              category: {}
+          description: File attached to opportunity
+        '201':
+          description: Created
+        '400':
+          description: Bad Request
   /api/premium/opportunities/{opportunityId}/inventory/rooms/{roomId}:
     post:
       summary: Add inventory to an opportunity
@@ -78,16 +86,9 @@ paths:
         content:
           application/json:
             example:
-              items:
-              - id: string
-                name: string
-                description: string
-                notes: string
-                volume: 0
-                weight: 0
-                quantity: 0
-                quantityNotGoing: 0
-                saveToMaster: false
+            - id: string
+              name: string
+              quantity: 0
   /api/premium/opportunities/{opportunityId}/Estimated/jobs/{jobId}/materials:
     post:
       summary: Add materials to job
@@ -118,9 +119,9 @@ paths:
         content:
           application/json:
             example:
-              materials:
-              - quantity: 0
-                materialId: string
+            - id: string
+              quantity: 0
+              materialId: string
   /api/premium/opportunities/{opportunityId}/jobs/{jobId}/confirm:
     post:
       summary: Confirm a job
@@ -150,10 +151,6 @@ paths:
           description: OK
         '400':
           description: Bad Request
-      requestBody:
-        content:
-          application/json:
-            example: '{opportunityId}'
   /api/premium/lead/{id}/convert:
     put:
       summary: Convert lead to opportunity
@@ -179,34 +176,7 @@ paths:
         content:
           application/json:
             example:
-              customerId: string
-              referralSourceId: string
-              tariffId: string
-              branchId: string
-              moveDate: string
-              moveSizeId: string
-              salesPersonId: string
-              serviceTypeId: {}
-              originAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
-              destinationAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
+              opportunityId: string
   /api/premium/customers:
     post:
       summary: Create a customer
@@ -222,15 +192,7 @@ paths:
       requestBody:
         content:
           application/json:
-            example:
-              name: string
-              phoneNumber: string
-              phoneType: {}
-              emailAddress: string
-              address: string
-              secondaryPhoneNumbers:
-              - phoneNumber: string
-                phoneType: {}
+            example: string
   /api/premium/leads:
     post:
       summary: Create a lead
@@ -253,45 +215,7 @@ paths:
         content:
           application/json:
             example:
-              firstName: string
-              lastName: string
-              fullName: string
-              phoneNumber: string
-              extension: string
-              phoneType: string
-              email: string
-              moveDate: string
-              leadCost: 0
-              originStreet: string
-              originCity: string
-              originState: string
-              originZip: string
-              originAddressFull: string
-              destinationStreet: string
-              destinationCity: string
-              destinationState: string
-              destinationZip: string
-              destinationAddressFull: string
-              bedrooms: string
-              notes: string
-              referralSource: string
-              referralSourceId: string
-              affiliate: string
-              affiliateId: string
-              moveSize: string
-              moveSizeId: string
-              serviceType: string
-              branchId: string
-              opportunityType: string
-              trackingParameters: string
-              userOptIn: true
-              utmAdGroup: string
-              utmCampaign: string
-              utmContent: string
-              utmCustomTracking: string
-              utmKeyword: string
-              utmMedium: string
-              utmSource: string
+              leadId: string
   /api/premium/opportunity:
     post:
       summary: Create an opportunity
@@ -315,46 +239,7 @@ paths:
         content:
           application/json:
             example:
-              tariffId: string
-              salesPersonId: string
-              customerId: string
-              referralSourceId: string
-              affiliateId: string
-              branchId: string
-              moveDate: string
-              moveSizeId: string
-              serviceTypeId: {}
-              utmInformation:
-                utmAdGroup: string
-                utmCampaign: string
-                utmContent: string
-                utmCustomTracking: string
-                utmKeyword: string
-                utmMedium: string
-                utmSource: string
-              originAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
-              destinationAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
-              customField01: string
-              customField02: string
-              customField03: string
+              opportunityId: string
   /api/premium/opportunities/{opportunityId}/followups:
     post:
       summary: Create follow-up
@@ -371,7 +256,7 @@ paths:
           type: string
       responses:
         '200':
-          description: Success
+          description: Created
         '201':
           description: Created
         '400':
@@ -380,6 +265,8 @@ paths:
         content:
           application/json:
             example:
+              id: string
+              opportunityId: string
               type: {}
               title: string
               assignedToId: string
@@ -433,23 +320,18 @@ paths:
           type: string
       responses:
         '200':
-          description: Success
+          description: Created
         '201':
           description: Created
         '404':
           description: Not Found
         '400':
           description: Bad Request
-      requestBody:
-        content:
-          application/json:
-            example:
-              serviceType: {}
   /api/premium/opportunities/{opportunityId}/rooms:
     post:
       summary: Create rooms
       description: Add new rooms to your lead or opportunity, and use it to load your
-        job-s inventory.
+        job’s inventory.
       operationId: create_rooms
       tags:
       - opportunities
@@ -471,7 +353,8 @@ paths:
         content:
           application/json:
             example:
-            - name: string
+            - id: string
+              name: string
               roomTypeId: string
   /api/premium/opportunities/{opportunityId}/followups/{followupId}:
     delete:
@@ -495,9 +378,6 @@ paths:
       responses:
         '200':
           description: OK
-          content:
-            application/json:
-              example: '{opportunityId}'
         '400':
           description: Bad Request
     get:
@@ -562,6 +442,8 @@ paths:
         content:
           application/json:
             example:
+              id: string
+              opportunityId: string
               type: {}
               title: string
               assignedToId: string
@@ -591,9 +473,6 @@ paths:
       responses:
         '200':
           description: OK
-          content:
-            application/json:
-              example: '{opportunityId}'
         '404':
           description: Not Found
         '400':
@@ -1133,7 +1012,7 @@ paths:
         in: query
         required: false
         schema:
-          type: ''
+          type: string
         description: 'Filter by status: Active or Inactive'
       - name: BranchId
         in: query
@@ -1388,6 +1267,7 @@ paths:
                 moveSizeId: string
                 status: {}
                 lostReason: string
+                badLeadReason: string
                 moveSizeName: string
                 createdAtUtc: string
         '400':
@@ -1476,6 +1356,7 @@ paths:
                   moveSizeId: string
                   status: {}
                   lostReason: string
+                  badLeadReason: string
                   moveSizeName: string
                   createdAtUtc: string
   /api/premium/leads/sales/{salesPersonId}:
@@ -1543,6 +1424,7 @@ paths:
                   moveSizeId: string
                   status: {}
                   lostReason: string
+                  badLeadReason: string
                   moveSizeName: string
                   createdAtUtc: string
   /api/lost-reasons:
@@ -1619,7 +1501,7 @@ paths:
   /api/premium/tariffs/{tariffId}/materials:
     get:
       summary: Get materials by tariff id
-      description: Get all your tariff-s packing materials information.
+      description: Get all your tariff’s packing materials information.
       operationId: get_materials_by_tariff_id
       tags:
       - premium
@@ -1706,7 +1588,7 @@ paths:
   /api/customers/{customerId}/opportunities:
     get:
       summary: Get opportunities by customer Id
-      description: Get opportunities by customer Id
+      description: Get a customer's opportunities. Optionally filter by branch.
       operationId: get_opportunities_by_customer_id
       tags:
       - basic
@@ -1727,6 +1609,11 @@ paths:
         required: false
         schema:
           type: integer
+      - name: branchId
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: Page result of Opportunities
@@ -1774,7 +1661,7 @@ paths:
         required: false
         schema:
           type: boolean
-        description: List of job-s addresses/stops, returned in the order they were
+        description: List of job’s addresses/stops, returned in the order they were
           stored going from Origin, to Destination.
       - name: IncludeTasks
         in: query
@@ -1821,10 +1708,12 @@ paths:
                   phoneNumber: string
                   phoneType: {}
                 branch:
+                  id: string
                   name: string
                   phoneNumber: string
                 contacts:
-                - name: string
+                - id: string
+                  name: string
                   emailAddress: string
                   phoneNumber: string
                   phoneType: {}
@@ -1834,6 +1723,7 @@ paths:
                 status: {}
                 leadStatus: string
                 moveSize:
+                  id: string
                   name: string
                   description: string
                   volume: 0
@@ -1846,12 +1736,16 @@ paths:
                   tax: 0
                   finalTotal: 0
                 estimator:
+                  id: string
                   name: string
                   mobileNumber: string
                   branchId: string
                   regionId: string
                   title: string
                 salesAssignee:
+                  id: string
+                  name: string
+                moveCoordinator:
                   id: string
                   name: string
                 hasTripInfo: true
@@ -1872,11 +1766,13 @@ paths:
                   jobAddresses:
                   - string
                   jobDocuments:
-                  - title: string
+                  - id: string
+                    title: string
                     type: {}
                     isComplete: true
                   estimatedCharges:
-                  - name: string
+                  - id: string
+                    name: string
                     chargeCategory: 0
                     description: string
                     editableDescription: string
@@ -1885,7 +1781,8 @@ paths:
                     discountAmount: 0
                     totalCost: 0
                   actualCharges:
-                  - name: string
+                  - id: string
+                    name: string
                     chargeCategory: 0
                     description: string
                     editableDescription: string
@@ -1911,7 +1808,8 @@ paths:
                       estimated: 0
                       actual: 0
                 payments:
-                - source: {}
+                - id: string
+                  source: {}
                   paymentType: {}
                   amount: 0
                   takenByUser: string
@@ -1921,6 +1819,7 @@ paths:
                   amountRefunded: 0
                   paymentCategory: {}
                 tripInfo:
+                  id: string
                   isTripInfoApplied: true
                   pickupSpreadFirstAvailableDate: 0
                   pickupSpreadLastAvailableDate: 0
@@ -1937,11 +1836,14 @@ paths:
                 photos:
                 - string
                 opportunityDocuments:
-                - title: string
+                - id: string
+                  title: string
                   type: {}
                   isComplete: true
                 surveys:
-                - assignedTo:
+                - id: string
+                  assignedTo:
+                    id: string
                     name: string
                     mobileNumber: string
                     branchId: string
@@ -1954,7 +1856,8 @@ paths:
                   notes: string
                   isConfirmed: true
                 tasks:
-                - title: string
+                - id: string
+                  title: string
                   customer:
                     id: string
                     name: string
@@ -1962,6 +1865,7 @@ paths:
                     phoneNumber: string
                     phoneType: {}
                   assignedTo:
+                    id: string
                     name: string
                     mobileNumber: string
                     branchId: string
@@ -2010,7 +1914,7 @@ paths:
         required: false
         schema:
           type: boolean
-        description: List of job-s addresses/stops, returned in the order they were
+        description: List of job’s addresses/stops, returned in the order they were
           stored going from Origin, to Destination.
       - name: IncludeTasks
         in: query
@@ -2057,10 +1961,12 @@ paths:
                   phoneNumber: string
                   phoneType: {}
                 branch:
+                  id: string
                   name: string
                   phoneNumber: string
                 contacts:
-                - name: string
+                - id: string
+                  name: string
                   emailAddress: string
                   phoneNumber: string
                   phoneType: {}
@@ -2070,6 +1976,7 @@ paths:
                 status: {}
                 leadStatus: string
                 moveSize:
+                  id: string
                   name: string
                   description: string
                   volume: 0
@@ -2082,12 +1989,16 @@ paths:
                   tax: 0
                   finalTotal: 0
                 estimator:
+                  id: string
                   name: string
                   mobileNumber: string
                   branchId: string
                   regionId: string
                   title: string
                 salesAssignee:
+                  id: string
+                  name: string
+                moveCoordinator:
                   id: string
                   name: string
                 hasTripInfo: true
@@ -2108,11 +2019,13 @@ paths:
                   jobAddresses:
                   - string
                   jobDocuments:
-                  - title: string
+                  - id: string
+                    title: string
                     type: {}
                     isComplete: true
                   estimatedCharges:
-                  - name: string
+                  - id: string
+                    name: string
                     chargeCategory: 0
                     description: string
                     editableDescription: string
@@ -2121,7 +2034,8 @@ paths:
                     discountAmount: 0
                     totalCost: 0
                   actualCharges:
-                  - name: string
+                  - id: string
+                    name: string
                     chargeCategory: 0
                     description: string
                     editableDescription: string
@@ -2147,7 +2061,8 @@ paths:
                       estimated: 0
                       actual: 0
                 payments:
-                - source: {}
+                - id: string
+                  source: {}
                   paymentType: {}
                   amount: 0
                   takenByUser: string
@@ -2157,6 +2072,7 @@ paths:
                   amountRefunded: 0
                   paymentCategory: {}
                 tripInfo:
+                  id: string
                   isTripInfoApplied: true
                   pickupSpreadFirstAvailableDate: 0
                   pickupSpreadLastAvailableDate: 0
@@ -2173,11 +2089,14 @@ paths:
                 photos:
                 - string
                 opportunityDocuments:
-                - title: string
+                - id: string
+                  title: string
                   type: {}
                   isComplete: true
                 surveys:
-                - assignedTo:
+                - id: string
+                  assignedTo:
+                    id: string
                     name: string
                     mobileNumber: string
                     branchId: string
@@ -2190,7 +2109,8 @@ paths:
                   notes: string
                   isConfirmed: true
                 tasks:
-                - title: string
+                - id: string
+                  title: string
                   customer:
                     id: string
                     name: string
@@ -2198,6 +2118,7 @@ paths:
                     phoneNumber: string
                     phoneType: {}
                   assignedTo:
+                    id: string
                     name: string
                     mobileNumber: string
                     branchId: string
@@ -2262,6 +2183,7 @@ paths:
                     quantity: 0
                     volume: 0
                     weight: 0
+                    overrideDefaultWeight: true
                     width: 0
                     depth: 0
                     height: 0
@@ -2346,7 +2268,7 @@ paths:
   /api/referral-sources:
     get:
       summary: Get referral sources
-      description: Get all of your account-s referral sources, with the option to
+      description: Get all of your account’s referral sources, with the option to
         retrieve all of them or only your public ones (users on public lead forms
         you might have embedded on your website). If desired, you can also include
         your active lead providers in the response.
@@ -2394,7 +2316,7 @@ paths:
   /api/premium/room-types:
     get:
       summary: Get room types
-      description: Get all the room types that are stored in your company-s inventory
+      description: Get all the room types that are stored in your company’s inventory
         configuration.
       operationId: get_room_types
       tags:
@@ -2544,6 +2466,7 @@ paths:
                 moveSizeId: string
                 status: {}
                 lostReason: string
+                badLeadReason: string
                 moveSizeName: string
                 createdAtUtc: string
   /api/customers/{customerId}/storage-accounts:
@@ -2715,13 +2638,7 @@ paths:
         content:
           application/json:
             example:
-              callType: {}
-              outcome: {}
-              callDateTime: string
-              description: string
-              fromNumber: string
-              toNumber: string
-              createdBy: string
+              callId: string
   /api/premium/opportunities/{opportunityId}/communication/notes:
     post:
       summary: Log notes in an opportunity
@@ -2749,8 +2666,7 @@ paths:
         content:
           application/json:
             example:
-              notes: string
-              createdBy: string
+              noteId: string
   /api/premium/opportunities/{opportunityId}/followups/{followupId}/mark-complete:
     post:
       summary: Mark follow-up completed
@@ -2760,12 +2676,12 @@ paths:
       - opportunities
       - premium
       parameters:
-      - name: followupId
+      - name: opportunityId
         in: path
         required: true
         schema:
           type: string
-      - name: opportunityId
+      - name: followupId
         in: path
         required: true
         schema:
@@ -2812,45 +2728,7 @@ paths:
         content:
           application/json:
             example:
-              customerName: string
-              moveDate: string
-              utmInformation:
-                utmAdGroup: string
-                utmCampaign: string
-                utmContent: string
-                utmCustomTracking: string
-                utmKeyword: string
-                utmMedium: string
-                utmSource: string
-              emailAddress: string
-              phoneNumber: string
-              phoneType: {}
-              branchId: string
-              referralSourceId: string
-              salesPersonId: string
-              serviceTypeId: {}
-              moveSizeId: string
-              originAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
-              destinationAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
-              fromExternalApi: true
+              leadId: string
     put:
       summary: Update lead
       description: Update a lead by its ID and easily modify its details
@@ -2873,44 +2751,7 @@ paths:
         content:
           application/json:
             example:
-              customerName: string
-              branchId: string
-              referralSourceId: string
-              moveDate: string
-              utmInformation:
-                utmAdGroup: string
-                utmCampaign: string
-                utmContent: string
-                utmCustomTracking: string
-                utmKeyword: string
-                utmMedium: string
-                utmSource: string
-              emailAddress: string
-              phoneNumber: string
-              phoneType: {}
-              salesPersonId: string
-              serviceTypeId: {}
-              moveSizeId: string
-              originAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
-              destinationAddress:
-                fullAddress: string
-                street: string
-                unit: string
-                city: string
-                state: string
-                zip: string
-                lat: 0
-                lng: 0
-                country: string
+              leadId: string
   /api/premium/opportunities/{opportunityId}/inventory/rooms/{roomId}/items/{inventoryItemId}:
     delete:
       summary: Remove opportunity inventory
@@ -2952,9 +2793,6 @@ paths:
       responses:
         '200':
           description: Item successfully deleted
-          content:
-            application/json:
-              example: '{opportunityId}'
         '400':
           description: Bad Request
     put:
@@ -3003,11 +2841,9 @@ paths:
         content:
           application/json:
             example:
-              notes: string
-              volume: 0
-              weight: 0
+              id: string
+              name: string
               quantity: 0
-              quantityNotGoing: 0
   /api/premium/opportunities/{opportunityId}/inventory/submit:
     post:
       summary: Request inventory review
@@ -3029,10 +2865,6 @@ paths:
           description: Inventory submitted successfully
         '400':
           description: Bad Request
-      requestBody:
-        content:
-          application/json:
-            example: '{opportunityId}'
   /api/premium/customers/search:
     get:
       summary: Search customers by name, email address or phone number
@@ -3083,18 +2915,6 @@ paths:
           description: Success
         '400':
           description: Bad Request
-      requestBody:
-        content:
-          application/json:
-            example:
-              name: string
-              phoneNumber: string
-              phoneType: {}
-              emailAddress: string
-              address: string
-              secondaryPhoneNumbers:
-              - phoneNumber: string
-                phoneType: {}
   /api/premium/opportunities/{opportunityId}/jobs/{jobId}/notes:
     patch:
       summary: Update job notes
@@ -3122,15 +2942,6 @@ paths:
           description: Not Found
         '500':
           description: Internal Server Error
-      requestBody:
-        content:
-          application/json:
-            example:
-              crewNotes: string
-              customerNotes: string
-              internalNotes: string
-              accountingNotes: string
-              dispatcherNotes: string
   /api/premium/opportunities/{opportunityId}/jobs/{jobId}/stops:
     put:
       summary: Update job stops
@@ -3172,15 +2983,10 @@ paths:
               addressUnit: string
               propertyName: string
               propertyType: {}
-              stopType: {}
               stairs: 0
+              parkingDescription: string
               hasElevator: true
               notes: string
-              street: string
-              city: string
-              state: string
-              zip: string
-              county: string
   /api/premium/opportunities/{opportunityId}:
     patch:
       summary: Update opportunity properties
@@ -3203,23 +3009,6 @@ paths:
           description: Bad Request
         '500':
           description: Internal Server Error
-      requestBody:
-        content:
-          application/json:
-            example:
-              moveSizeId: string
-              salesPersonId: string
-              branchId: string
-              opportunityType: {}
-              volume: 0
-              weight: 0
-              isBinding: true
-              depositAmount: 0
-              referralSourceId: string
-              affiliateId: string
-              customField01: string
-              customField02: string
-              customField03: string
 components:
   securitySchemes:
     ApiKeyAuth:
