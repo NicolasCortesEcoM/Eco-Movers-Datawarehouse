@@ -148,10 +148,10 @@ Yelp Tacoma,Yelp - Tacoma,,Yelp,TRUE,Yelp,Yelp,,,,,,,
 Yelp Woodinville,Yelp - Woodinville,,Yelp,TRUE,Yelp,Yelp,,,,,,,
 Yelp Lakewood,Yelp - Lakewood,,Yelp,TRUE,Yelp,Yelp,,,,,,,
 PNW Google Ads,PNW Google Ads,Paid Search,Google,TRUE,PNW Google Ads,PNW Google Ads,,,,,,,"Nicolas 2026-09-15: cuenta Google Ads dedicada (PNW Moving, id 1776272460); todas sus campanas mapean aqui via dim_ad_campaign_map."
-Snapchat,,,Snapchat,FALSE,Snapchat,Snapchat,,,,,,,Nicolas 2026-09-15: NO esta en la lista de fuentes de marketing -> organica. Confirmar si debe volver a TRUE.
-Thumbtack,,,Thumbtack,FALSE,Thumbtack,Thumbtack,,,,,,,Nicolas 2026-09-15: NO esta en la lista de fuentes de marketing -> organica. Confirmar si debe volver a TRUE.
-Youtube Ads,,,Youtube Ads,FALSE,Youtube Ads,YouTube Ads,,,,,,,Nicolas 2026-09-15: NO esta en la lista de fuentes de marketing -> organica. Confirmar si debe volver a TRUE.
-USA Homelisting,,,USA Homelisting,FALSE,USA Homelisting,USA Homelisting,,,,,,,Nicolas 2026-09-15: NO esta en la lista de fuentes de marketing -> organica. Confirmar si debe volver a TRUE.
+Snapchat,,,Snapchat,FALSE,Snapchat,Snapchat,,,,,,,Nicolas 2026-09-15: not in the marketing list -> organic.
+Thumbtack,,Paid Directory,Thumbtack,TRUE,Thumbtack,Thumbtack,,,,,,,"Nicolas 2026-09-15: marketing source, currently paused (no leads) - stays is_paid so it is measured when it resumes."
+Youtube Ads,,Paid Video,Google,TRUE,Youtube Ads,YouTube Ads,,,,,,,"Nicolas 2026-09-15: marketing source, currently paused (no leads) - stays is_paid so it is measured when it resumes."
+USA Homelisting,,Paid Directory,USA Homelisting,TRUE,USA Homelisting,USA Homelisting,,,,,,,"Nicolas 2026-09-15: marketing source, currently paused (no leads) - stays is_paid so it is measured when it resumes."
 Google,Google Organic,Paid Search,Google,FALSE,Google,Google Organic,Mixed,,,,FALSE,AMBIGUOUS,⚠ Agregar geo al referral source en CRM — muy amplio
 Bing,Bing (genérico),Organic,Bing,FALSE,Bing,Bing Organic,Local,,,,FALSE,AMBIGUOUS,⚠ Consolidar con 'Bing Ads' — mismo canal
 Eco Commercial,Eco Commercial — Organic,Paid Search,Google,FALSE,Eco Commercial,Eco Commercial,LD,,,,FALSE,NEEDS_SPLIT,⚠ ¿Paid o orgánico? Validar en CRM — puede ser alias de Eco Commercial Ads
@@ -182,8 +182,8 @@ GBP Everett,GBP — Everett,GBP,Google,FALSE,GBP Everett,Google Business Profile
 GBP Bellevue Commercial,GBP — Bellevue Commercial,GBP,Google,FALSE,GBP Bellevue Commercial,Google Business Profile,,,,,,,"Nicolas 2026-09-15: perfil comercial, desde 2026-08."
 Yelp Gig Harbor,Yelp - Gig Harbor,,Yelp,TRUE,Yelp,Yelp,,,,,,,Nicolas 2026-09-15: variante Yelp -> marketing.
 Affiliate - Snoball,Snoball,Referral Program,Snoball,TRUE,Snoball,Snoball,,,,,,,"Nicolas 2026-09-15: misma fuente que Snoball Referral - Customer, escrita como afiliado."
-OpenAI Ads,OpenAI Ads,,OpenAI,FALSE,OpenAI Ads,OpenAI Ads,,,,,,,Nicolas 2026-09-15: aparece en el mapeo de campanas (Seattle - Tacoma). NO esta en la lista de marketing -> organica; confirmar.
-Angi Ads,Angi Ads,,Angi,FALSE,Angi,Angi,,,,,,,Nicolas 2026-09-15: 1 lead. NO esta en la lista de marketing -> organica; confirmar.
+OpenAI Ads,OpenAI Ads,Paid AI,OpenAI,TRUE,OpenAI Ads,OpenAI Ads,,,,,,,"Nicolas 2026-09-15: marketing source, currently paused (no leads) - stays is_paid so it is measured when it resumes."
+Angi Ads,Angi Ads,Paid Directory,Angi,TRUE,Angi,Angi,,,,,,,"Nicolas 2026-09-15: marketing source, currently paused (no leads) - stays is_paid so it is measured when it resumes."
 Smart Scout,Smart Scout,,,FALSE,Smart Scout,Smart Scout,,,,,,,Nicolas 2026-09-15: 6 leads desde 2026-09-10; origen por confirmar.
 Copilot,AI Referral (Copilot),AI,Microsoft,FALSE,Copilot,Copilot,,,,,,,"Nicolas 2026-09-15: asistente de IA, como ChatGPT."
 Affiliate - Broadstone Vin,,,,FALSE,Affiliate,Affiliate,,,,,,,Nicolas 2026-09-15: afiliado nuevo.

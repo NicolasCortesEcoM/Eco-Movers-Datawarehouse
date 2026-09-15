@@ -1,1510 +1,269 @@
-# Implementation Status - the official project guide
+# Implementation Status - the plan of record
 
-> **How to use this document.** This is the single reference for where we are, what is missing, and
-> what comes next. Whenever something is completed, mark it (`[x]`) and add the date. **Next Immediate
-> Step** always reflects the next action. Architecture lives in `CLAUDE.md`,
-> `smartmoving_sync_strategy.md`, and `decisions/`; this file is the progress board and the plan of record.
+> **How to use this document.** The single reference for where the warehouse is, what is
+> done, what is open, and what comes next. Mark items done with the date; keep "Next
+> actions" current. Architecture lives in `CLAUDE.md`, `ARCHITECTURE.md`,
+> `crm_sync_contract.md` and `decisions/`; task-level detail for the 2026-09 audit lives
+> in `AUDIT_PLAN.md`. This file is deliberately condensed: completed work is a line, not
+> a story. Rewritten in English on 2026-09-15.
 
-**Current phase:** Phase 1 - SmartMoving -> Postgres.
-**Current workstream:** completing Phase 1 publication and operational hardening.
-**Where that stands:** all six report types land with row-count validation; All Jobs is
-requested by a Playwright browser bot because it cannot be scheduled natively; Lost
-Leads is modelled through `core.opportunities`; five serving contracts are published.
-The quote-backfill drain is now scheduled inside `report_ingest` (once per burst, 300
-per instance, before the dbt build). The main open items are
-`serving.opportunities_v1` and modelling the landed Cancellations and Payments reports.
-**Last updated:** 2026-09-14.
-
-⚠️ **2026-09-09 — two corrections that changed the numbers, both recorded in
-[`AUDIT_PLAN.md`](AUDIT_PLAN.md):**
-
-- **A5. `core.opportunities` was missing 13,196 rows**, and they were the leads that
-  never converted. Every API opportunity path finds an opportunity through its *jobs*,
-  so bad leads (88% missing), in-progress leads (72%) and lost leads (39%) were absent
-  while closed and completed ones were at 100%. They were missing from the conversion
-  denominator, so every rate in the sales layer read high. Fixed with **zero API calls**:
-  the lead's `id` is the opportunity GUID, so `/api/leads` became an arm of the
-  observation layer. `core.opportunities` 58,678 → **71,874**; booked unchanged.
-- **A2. `report_ingest` crash-looped on out-of-memory for 24 h.** Unbounded batch,
-  per-row inserts, and cleanup behind the dbt build so a crash re-fed itself. Now one
-  report per execution, set-based landing, cleanup before the build, alias-filtered
-  queue, and unusable mail archived out of the inbox.
-**Active workstream board:** [`AUDIT_PLAN.md`](AUDIT_PLAN.md) - the 2026-09-07 warehouse
-audit and the sales KPI layer, at task granularity. This file stays the plan of record for
-the project as a whole; that one is one workstream inside it and is updated in the same
-commit as the work it describes.
+**Last updated:** 2026-09-15
 **Repository:** `https://github.com/NicolasCortesEcoM/Eco-Movers-Datawarehouse`
+(branch `warehouse-audit-and-sales-kpis`, PR to `main` pending)
 
 ---
 
-## DONDE ESTAMOS - 2026-09-10
+## 1. Where we are
 
-**Fase 1: SmartMoving -> Postgres.** La ingesta corre sola de punta a punta. Seis
-contratos publicos estan publicados. Lo que queda es el contrato general de
-oportunidades, cerrar el goteo de quotes sin resolver, y la capa de marketing.
+**Phase 1 (SmartMoving -> Postgres) is complete and operating.** Six serving contracts
+published, five ingestion mechanisms running unattended, an external heartbeat watching
+all of them. **Phase 2 has started** with the first non-CRM source: Google Ads cost is
+in production and attributed per lead.
 
-### El almacen ahora mismo
+### The warehouse today
 
-| Tabla | Filas | Que es |
+| Table | Rows | Grain |
 |---|---:|---|
-| `core.opportunities` | 71.914 | Una fila por oportunidad. **60 columnas.** |
-| `core.jobs` | 63.576 | Una fila por trabajo. 100 columnas. |
-| `core.lines_of_business` | 63.576 | Linea de negocio de cada trabajo |
-| `core.leads` | 36.932 | Una fila por lead recibido |
-| `core.opportunity_charges` | 10.209 | Cargos estimados y reales |
-| `core.payments` | 3.037 | **Nuevo 2026-09-10.** Todo pago recibido, via reporte |
-| `core.opportunity_payments` | 2.006 | Pagos embebidos en el payload del API |
-| `core.agents` | 68 | Roster de vendedores |
-| `core.branches` | 8 | Sucursales, con su zona horaria |
+| `core.opportunities` | 71,914 | one per opportunity (= lead), 60 columns |
+| `core.jobs` | 63,576 | one per job, 100 columns |
+| `core.lines_of_business` | 63,576 | line of business per job |
+| `core.leads` | 36,932 | one per lead received |
+| `core.opportunity_charges` | 10,209 | estimated and actual charges |
+| `core.payments` | 3,037 | every payment received (scheduled report) |
+| `core.opportunity_payments` | 2,006 | payments embedded in the API payload |
+| `core.agents` | 68 | sales roster |
+| `core.branches` | 8 | branches with time zone |
+| `raw_google_ads.campaign_daily` | 413 | Google Ads cost per (account, campaign, day), $39,181 |
 
-⚠️ `core` contiene tambien `workspace_tasks`, `workspace_projects` y
-`workspace_departments` (13.283 filas). **No son del almacen**: otra aplicacion del
-grupo escribe ahi. Se reportan, no se tocan. Ver la seccion D del `AUDIT_PLAN.md`.
+Coverage on 71,914 opportunities: lead date 97%, assigned agent 97%, line of business
+100%, lost reason 95.6%, marketing channel and campaign family 98.9%, quote number 81%
+(the rest drains at ~500/month), cancellation date 1,476 of 6,331 (report window starts
+2026-01-02).
 
-Cobertura de los campos que mas importan, sobre 71.914 oportunidades:
+`core` also holds `workspace_tasks`, `workspace_projects`, `workspace_departments`
+(13,283 rows) written by another application. Reported, never touched.
 
-| Campo | Cobertura | Nota |
-|---|---|---|
-| Fecha de llegada del lead | 69.803 (97%) | |
-| Vendedor asignado | 69.811 (97%) | era 41% en agosto |
-| Linea de negocio | 100% | ninguna queda sin clasificar |
-| Motivo de perdida | 95,6% | via `dim_status_map` |
-| Canal de marketing | 98,9% | via `dim_referral_source` |
-| **Familia de campana** | **98,9%** | **nuevo:** `referral_campaign_group` |
-| Numero de cotizacion | 58.453 (81%) | el resto espera al drenaje de quotes |
-| Fecha de cancelacion | 1.476 de 6.331 canceladas | ventana del reporte, desde 2026-01-02 |
+### Serving contracts (`serving_catalog.md` is the contract)
 
-### Contratos publicados en `serving`
-
-| Vista | Filas | Grano |
+| View | Rows | Grain |
 |---|---:|---|
-| `sales_agent_daily_v1` | 12.748 | cohorte: agente x linea x dia de llegada del lead |
-| `lead_source_daily_v1` | 11.181 | cohorte: canal x linea x dia de llegada del lead |
-| `cancellations_daily_v1` | 1.007 | **periodo**: agente x linea x dia de cancelacion |
-| `pipeline_current_v1` | 636 | foto de ahora, una fila por oportunidad viva |
-| `jobs_upcoming_v1` | 409 | trabajos proximos |
-| `leads_today_v1` | 12 | leads de hoy |
+| `opportunities_v1` | 68,231 | one per in-scope opportunity, 39 columns |
+| `sales_agent_daily_v1` | 12,748 | cohort: agent x line x lead-received day |
+| `lead_source_daily_v1` | 11,181 | cohort: channel x line x lead-received day |
+| `cancellations_daily_v1` | 1,007 | period: agent x line x cancellation day |
+| `pipeline_current_v1` | 636 | snapshot of live opportunities |
+| `jobs_upcoming_v1` / `leads_today_v1` | 409 / 12 | operational |
 
-### De donde sale cada dato
+### Where each fact comes from
 
-Cinco fuentes, y cada una hace algo que las otras no pueden:
-
-| Fuente | Coste | Que aporta |
+| Source | Cost | Contributes |
 |---|---|---|
-| **Webhooks** | Gratis | El estado, en segundos |
-| **Reportes programados** | Gratis | Cobertura masiva: dinero, direcciones, vendedor, cancelaciones, pagos |
-| **`GET /api/leads`** | ~1 llamada / 200 leads | **La identidad de todo lead que no convirtio.** Ver abajo |
-| **Barrido del API** | ~1 llamada / 200 clientes | Identidad de lo que si convirtio |
-| **Detalle del API** | 1 llamada por oportunidad | Profundidad, solo cuando un webhook lo justifica |
+| Webhooks | free | status, within seconds |
+| Scheduled reports (6) | free | money, addresses, agent, cancellations, payments |
+| `GET /api/leads` | 1 call / 200 | identity of every lead that never converted |
+| API sweep | 1 call / 200 | identity of what did convert |
+| API detail | 1 call / opportunity | depth, only when a webhook justifies it |
+| Google Ads API | free (Explorer, 2,880 ops/day) | campaign cost per day |
 
-⚠️ **`/api/leads` no es una fuente de leads: es una fuente de OPORTUNIDADES.** El `id`
-del lead **es** el GUID de la oportunidad. Durante meses tres documentos de este repo
-afirmaban lo contrario y eso costo **13.196 oportunidades ausentes de `core`**, casi
-todas leads que nunca convirtieron - es decir, ausentes del denominador de toda tasa de
-conversion. Corregido el 2026-09-09 con cero llamadas al API. La regla vive ahora en
-`CLAUDE.md`, seccion *Identity resolution*, y la evidencia en `AUDIT_PLAN.md` A5.
-
-El detalle esta en [`crm_sync_contract.md`](crm_sync_contract.md), que manda sobre
-cualquier otro documento en estas cuestiones.
-
-### Como se actualiza (sin tocar nada a mano)
-
-```
-Llega el correo con el reporte a un alias *reporting@
-        v
-report_ingest lo detecta (barrido Gmail cada 2 min, filtrado por alias)
-        v
-Aterriza UN reporte por ejecucion, en una sola sentencia
-        v
-Verifica que el numero de filas cuadre con lo que anuncia el correo
-        v
-Manda el correo a la papelera  <-- ANTES del build, a proposito
-        v
-Quedan mas reportes en cola?  SI -> termina aqui, sin reconstruir
-                              NO -> drena 300 quotes/instancia -> dbt build
-        v
-core y serving quedan al dia
-```
-
-Cada paso de ese orden se pago con una caida; las razones estan en
-`deploy/n8n_report_ingest_setup.md` y en `AUDIT_PLAN.md` A2, A6.
-
-Ademas: `dbt_build_reports` corre de noche como red de seguridad, y
-`pipeline_heartbeat` (cron en el droplet, fuera de n8n) pregunta cada 30 minutos
-cuando triunfo por ultima vez cada mecanismo y alerta por silencio. Es lo unico que
-detecto la caida del 2026-09-09.
+Cadence, quota and what each mechanism cannot do: `crm_sync_contract.md` (authoritative).
+Freshness is watched by `pipeline_heartbeat.py` (cron, 6 mechanisms) - the only alert
+that can see a job that never ran.
 
 ---
 
-## ESTADO POR FASE - 2026-09-10
+## 2. Status by phase
 
-| Fase | Estado | Que falta |
+| Phase | Status | Remaining |
 |---|---|---|
-| **Auditoria A1-A6** | ✅ Completa | - |
-| **KPIs de ventas (B0-B4)** | ✅ Completa | `opportunities_v1` sigue pendiente (ver Fase B abajo) |
-| **Fase A - Cancellations y Payments** | ✅ **Completa 2026-09-10** | - |
-| **Fase B - Contrato general** | ✅ **Completa 2026-09-14** | `serving.opportunities_v1` publicado, 68.231 filas |
-| **Fase C - Marketing y publicidad** | 🔵 En progreso | **Google Ads en produccion y CPL/CPA/CER publicados en `marts.fct_campaign_spend_daily` (2026-09-14)**. $9.026 atribuidos, $30.155 en la cola `mart_unmapped_ad_spend`. Falta (Nicolas): mapear 5 campanas de PNW Moving, anadir 3 child accounts. Luego Meta y Bing |
-| **Fase D - Reportes nuevos** | ⏳ Pendiente | 13 reportes programables disponibles y sin usar |
-| **Limpieza C4-C8, D** | ⏳ Parcial | C4 cerrado por la Fase A; C5-C8 abiertos |
+| Audit A1-A8 (2026-09) | done | A2 root cause not proven under a large historical burst (see §5) |
+| Sales KPIs B0-B4 | done 2026-09-14 | - |
+| Phase A - Cancellations and Payments in core | done 2026-09-10 | ZIP and reason marts, documented not built (§4.3) |
+| Phase B - `serving.opportunities_v1` | done 2026-09-14 | - |
+| **Phase C - Marketing** | **in progress** | 3 more Google Ads accounts (blocked: no access yet), Meta and Bing credentials |
+| Phase D - 13 unused schedulable reports | pending | see §4.2 |
+| Phase E - QuickBooks (Intuit Developer API) | scoped, not started | see §3 |
+| Tech debt C5-C8 | open | see §4.6 |
 
 ---
 
-## LO ULTIMO QUE SE HIZO - 2026-09-07
+## 3. Scope
 
-### El sesgo del 60% del embudo, y como se cerro sin tocar el modelo de identidad
+**Phase 1 - SmartMoving (complete).** Two instances (`ld`, `local`), one entity. Raw
+stores payloads exactly as received; all typing and business logic in dbt. A lead and an
+opportunity are the same record (the lead `id` IS the opportunity GUID); no fuzzy
+lead-to-opportunity match may ever be built. Out of scope: notes, follow-ups, interaction
+history, audit activity, inventory lines, document URLs, Premium per-job calls.
 
-`core.opportunities` esta keyeada en el GUID del API. Los reportes keyean en `Quote #`.
-El puente es `int_opportunity_quote_crosswalk`, y estaba construido **solo desde el
-API** - que esta anclado en la fecha de servicio de un job. Una oportunidad que nunca
-tuvo job agendado es inalcanzable por el sweep a cualquier ancho de ventana.
+**Phase 2 - remaining sources.** Each follows `CLAUDE.md` "Adding a new source" to the
+letter: API docs, a client with ledger and budget, a dlt resource with composite PK and
+merge, `raw_<source>`, staging, core, a row in `crm_sync_contract.md`.
 
-Medido el 2026-09-07: **9.196 de 15.437 quotes de Lead Status (59,6%) no tenian GUID**,
-y el hueco esta sesgado hacia lo que nunca genera un job:
+- **Google - ad platforms and Cloud.**
+  - Auth is a **Google Cloud service account** in project `ecomovers-datawarehouse`,
+    key stored base64 in `.env`, decoded in memory. Since 2026-09-09 the Google Ads API
+    access level belongs to the Cloud project (Explorer granted 2026-09-14); the
+    developer token is sent but ignored. Any further Google API (Analytics, Business
+    Profile, Search Console) reuses the same service account and project.
+  - **Google Ads** (live): manager `2797921560` -> child accounts discovered every run;
+    one child today (`PNW Moving`, 1776272460). Three more child accounts join when the
+    manager grants access; each needs one `--account <id> --from 2023-01-01` backfill.
+  - **Meta Ads, Bing Ads**: same mould, a client and a resource each, one more union arm
+    in `int_ad_spend_daily`. Platforms without an API (Yelp, Nextdoor...) use the email
+    lane through `report_ingest`. Guide: `marketing_ads_integration_guide.md`.
+- **QuickBooks** via the **Intuit Developer API** (QuickBooks Online Accounting API,
+  OAuth 2.0 from an Intuit Developer app). Target entities: invoices, payments,
+  customers, accounts, expenses, and the profit-and-loss / balance-sheet reports, into
+  `raw_quickbooks`. Purpose: realised revenue and cost next to the CRM's estimated and
+  invoiced figures, and true marketing ROI (spend from ad platforms, revenue from the
+  books). Prerequisites Nicolas owns: an Intuit Developer account and app (client id,
+  secret, redirect URI), the company realm id, and one OAuth consent by a QuickBooks
+  admin (refresh token, 100-day rolling). Crosswalk `quickbooks customer <-> CRM
+  customer` is explicit, never inferred. Not started; no code exists yet.
+- Later: Paylocity (employee identity anchor), RingCentral (calls; 92% of dialled
+  numbers match a CRM phone, measured 2026-09-07).
 
-| Estado en el reporte | En core | Invisible |
-|---|---:|---:|
-| Booked / Closed / Completed | 3.135 | 2.516 |
-| Lost | 2.291 | 4.323 |
-| Bad lead | 81 | 1.463 |
-
-Es decir: **core reportaba 50,2% de conversion contra un 36,6% real.** Sobreestimada
-13,6 puntos, todos los meses, estructuralmente.
-
-**Lo que se hizo.** `GET /api/opportunities/quote/{n}` resuelve exactamente esa
-poblacion - verificado contra 8 quotes sin resolver (incluyendo con cero jobs y sin
-fecha de servicio) y luego contra un lote real de 50: **50 de 50 resueltas, cero 404**.
-No es Premium y devuelve el mismo payload que la llamada de detalle, asi que aterriza
-en `raw_smartmoving.opportunities_enriched`, la tabla que ya existia, y el crosswalk lo
-recoge solo. **Cero modelos nuevos de dbt.**
-
-Nuevo job: `python run.py --job quote_backfill --instance all --dest postgres --budget N`.
-Elige las quotes sin resolver de mas nuevas a mas viejas, gasta como mucho `--budget`
-llamadas por instancia, y anota cada intento en `raw_smartmoving.quote_resolution_attempts`
-para no volver a pagar por una quote que no existe. Mecanismo y coste:
-[`crm_sync_contract.md`](crm_sync_contract.md) seccion 2a.
-
-**Por que este camino y no hacer el GUID nullable**, que era el plan inicial: las 2.032
-filas sin quote en `core` resultaron ser **todas** solo-webhook - un GUID y un entero de
-estado, sin nombre, sin agente, sin fecha. Son las mismas oportunidades que las filas de
-reporte sin resolver, y sin clave compartida **no se pueden unir en SQL**. Meter las
-filas de reporte con clave sintetica habria anadido hasta 2.032 filas **duplicadas**
-justo sobre la poblacion que se queria arreglar. El backfill las disuelve en vez de
-duplicarlas: el lote de 50 bajo las shells de 2.032 a 1.990.
-
-**Estado:** probado de punta a punta, `dbt build` PASS=222 ERROR=0. Falta drenar las
-~9.150 quotes restantes y programarlo en n8n.
-
-### Un defecto encontrado de paso
-
-`marts.mart_unmatched_report_rows` no es fiable como indicador. Hay **dos programaciones
-distintas de Lead Status escribiendo en la misma tabla**: la generacion de las 03:0x
-cubre 1/1/2026 hasta hoy (~15.400 filas) y todas las demas cubren ~90 dias (~5.200). El
-modelo filtra por "ultima generacion", asi que su conteo oscila entre ~3.000 y ~9.100
-segun la hora a la que se consulte. La capa de observacion no esta afectada - acumula
-entre generaciones. Detalle en [`DATABASE.md`](DATABASE.md).
+**Phase 3 - applications on `serving`; Phase 4 - analytical offload only on the
+`CLAUDE.md` trigger.** Unchanged.
 
 ---
 
-## LO ANTERIOR - 2026-08-25
+## 4. Open items
 
-### La fecha de servicio estaba mal, y se arreglo
+### 4.1 Phase C - marketing, what remains
 
-`Closed` tenia fecha de servicio solo en el **22%** de los casos. Un trabajo cerrado ya ocurrio,
-asi que ese numero no podia ser correcto.
+Done: `dim_referral_source.campaign_group` (178 -> 190 sources, 59 families);
+`is_paid` = "is a marketing source", list fixed by Nicolas 2026-09-15 (Google Ads all
+variants incl. PNW Google Ads and Eco Commercial, Google Guarantee, Bing Ads, Meta,
+Yelp all variants, Great Guys, Move Buddha, Snoball, plus the paused YouTube Ads,
+OpenAI Ads, Angi Ads, Thumbtack, USA Homelisting; everything else organic - `PNW` is
+PNW Moving's organic source); `fct_campaign_daily` (two levels, per-lead split
+ready); Google Ads extraction (`pipeline/ads_pipeline/`, `run_ads.py`,
+`raw_google_ads`, `stg_google_ads__*`, n8n `ads_google_daily` 06:00 PT, heartbeat);
+`dim_ad_campaign_map` (6 rows, all PNW Moving campaigns -> `PNW Google Ads`);
+`int_ad_spend_daily` -> `fct_campaign_spend_daily` (CPL, CPA, CER, per-lead split,
+`unassigned` line for spend on days without a lead) + `mart_unmapped_ad_spend`;
+reconciliation test attributed + unmapped = raw on every build. Verified to the cent
+against the Google Ads UI on two days.
 
-**La causa:** en SmartMoving la fecha no vive en la oportunidad, vive en el TRABAJO. El barrido
-del API alcanza 13.157 oportunidades y no devuelve fecha para ninguna, mientras que las 13.157
-tienen un trabajo que si la tiene. El dato estaba en el almacen; la oportunidad nunca miraba sus
-propios trabajos.
+**Rule (Nicolas, 2026-09-10):** cost splits per lead, not per the campaign's nominal
+line - $100 and 3 leads (1 LD, 2 Local) gives $33.33 / $66.67. Commercial is measured by
+its own campaigns, not by line. **Consumers aggregate by month; never average daily CPLs.**
 
-Ahora la fecha se resuelve por autoridad, no por novedad:
+Remaining, in order:
+1. **Nicolas**: access to the other three Google Ads child accounts (waiting on the
+   manager). They appear on the next run; I backfill each and pre-fill
+   `dim_ad_campaign_map` from Nicolas's name reference (guide §6) for confirmation.
+2. **Nicolas**: Meta Business System User token (guide §3). Then `meta_ads.py`, its
+   resource, one union arm. Meta is the second marketing source (1,331 leads in 2026,
+   13% booked vs 32% for Google) - the CPA that changes decisions most.
+3. Bing Ads (593 leads) and Google LSA (499) by the same mould.
+4. `serving.campaign_spend_daily_v1` when a consumer exists (rule: no consumer, no
+   serving view; the mart is queryable from Metabase now).
 
-1. El reporte Lead Status - el CRM la calcula el mismo y elige el trabajo relevante
-2. La fecha del API a nivel de oportunidad
-3. La mas temprana de sus trabajos
+### 4.2 Phase D - the 13 unused schedulable reports
 
-| Estado | Antes | Ahora |
+Zero quota: schedule in the SmartMoving UI to a `*reporting@` alias, add the report to
+`REPORTS` in `Resolve Report Metadata`, the rest of the lane exists. By value:
+`sales-person-activity-details` (feeds the sales KPIs), `outstanding-balances` (AR),
+`refunds` (net revenue), `affiliates` (72 of 190 sources are affiliates),
+`storage-accounts` + `storage-jobs-report` (326 storage payments in `core.payments` have
+no context), `opportunities-by-move-date`, `crew-ratings`, `customer-service-tickets`.
+
+### 4.3 Cancellations, next slice (documented, not built - by request)
+
+By origin ZIP (ZIP lives on `core.jobs` / `core.leads`, not on opportunities; a rate
+needs the booked count of the same ZIP as denominator) and by reason (seven clean
+reasons already on `cancellation_reason`). No new source needed.
+
+### 4.4 The quote drain
+
+2,349 Lead Status quotes without a GUID (2026-09-14, all `local`). Drains itself: 300
+per instance per report burst inside `report_ingest`, before the dbt build. **Permanent,
+not a backfill** - ~500 non-converting leads/month never enter through the sweep. It
+adds enrichment (quote number, estimate, time to first contact, lost subcategory), not
+lead count.
+
+### 4.5 Seeds only Nicolas can finish
+
+`dim_agent` (65 rows, 34 DRAFT) and `dim_agent_assignment` (75 rows, 41 DRAFT) were
+drafted from lead evidence on 2026-09-14; `is_within_assignment` went 58% -> 99.3%.
+Review the DRAFT rows. `dim_lob_branch`: decided 2026-09-14, `Long Distance Team` is
+local.
+
+### 4.6 Tech debt
+
+| # | What | Where |
 |---|---|---|
-| Closed | 22,4% | **94,0%** |
-| Cancelled | 22,6% | **94,3%** |
-| Lost | 26,6% | **88,5%** |
-| BadLead | 22,6% | 54,4% |
-| LeadInProgress | 0% | 0% |
-
-Los dos ultimos siguen bajos **a proposito**: un bad lead a menudo nunca tuvo fecha, y un lead en
-progreso todavia no la tiene acordada con el cliente.
-
-De donde sale cada fecha, ahora visible en la columna `service_date_source`:
-
-| Fuente | Cuantas | % |
-|---|---|---|
-| Heredada del trabajo | 9.549 | 63,7% |
-| Reporte Lead Status | 3.141 | 20,9% |
-| API | 473 | 3,2% |
-| Sin fecha | 1.835 | 12,2% |
-
-Validacion util: donde el reporte Y el trabajo tienen fecha, coinciden en **2.943 de 3.141
-(93,7%)**. Las 198 que difieren son justo los casos donde el CRM elige un trabajo distinto - por
-eso el reporte manda cuando existe.
-
-### Se elimino lo redundante
-
-Habia 11 modelos que nadie leia. Se borraron tres:
-
-- **`dim_lob_map`** - duplicado. Se creo `dim_lob_branch` sin advertir que ya existia otra tabla
-  para lo mismo. Dos tablas para la misma decision es la peor forma de redundancia: tarde o
-  temprano alguien edita la que no es.
-- **`int_opportunity_status_latest`** - la capa de observacion hace lo mismo desde que existe.
-- **`int_opportunity_attachment_counts`** - construido y nunca usado.
-
-Se conservan `dim_sales_team` y `dim_referral_source` (Fase 2, marketing) y las vistas de staging
-de contactos/encuestas/cuadrillas/direcciones: son vistas, no ocupan espacio, y son el acceso
-tipado a datos reales que ya estan cargados.
-
-### La cascada ya es automatica
-
-Antes: los reportes llegaban 6 veces al dia y dbt corria una sola vez, a las 03:05. Todo lo que
-entraba durante el dia esperaba hasta 20 horas.
-
-Ahora `report_ingest` reconstruye dbt en cuanto verifica que las filas cuadran. Una reconstruccion
-completa tarda unos 25 segundos.
+| C5 | Booked report join duplicated between `int_opportunity_observations` and `bkd_extra`; the only report without an `int_report_*_latest` | both files |
+| C6 | `--max-pages` not propagated to `--job jobs` or dims; silent truncation at 50 pages | `sm_pipeline/source.py` |
+| C7 | `--ids` + `--quotes` together emit two resources with one name; rejected in `run.py` only | `run.py` |
+| C8 | `dbt_build_reports` cron documented four ways | several |
+| - | 8 declared sources nobody reads (`opportunities_enriched__*`) | `_smartmoving__sources.yml` |
+| - | Heartbeat repeats instead of escalating (14 identical alerts in 6.5 h) | `pipeline_heartbeat.py` |
+| - | `report_ingest`: quarantine an email that fails row-count verification N times instead of retrying it every 2 minutes forever (the A2/A6/A7 pattern) | `deploy/n8n_report_ingest_setup.md` |
+| - | Workflow `Cancelled Opportunity` (`fSs1rIV9Ik0m0824`, not ours) has API keys in plaintext | n8n |
 
 ---
 
-## LO QUE SIGUE ABIERTO - actualizado 2026-09-10
+## 5. Incidents worth remembering (root causes still relevant)
 
-Ordenado por lo que desbloquea, no por dificultad. **La accion siguiente es la 1.**
-
-### 1. ✅ HECHO 2026-09-14 - `serving.opportunities_v1`
-
-Publicado, estrecho a proposito: 39 de las 60 columnas de `core`. 68.231 filas
-(excluye borradas y `is_in_scope = false`). Catalogado con la advertencia de que el
-resultado se lee de los flags, no de las fechas. Ampliar es un cambio aditivo de una
-linea; recortar obligaria a v2.
-
-### 2. NEXT ACTION - Fase C, lo que queda
-
-Hecho:
-- `dim_referral_source.campaign_group`: 178 fuentes -> 59 familias.
-- `core.opportunities.referral_campaign_group` al 98,9%.
-- **`marts.fct_campaign_daily`** (2026-09-14): grano
-  `(entity, campaign_group, campaign, linea, dia)`, 15.500+ filas, reconcilia exacto con
-  `fct_lead_source_daily`. Lleva `campaign_day_leads_total` y `line_share_pct` en cada
-  fila, de modo que cuando llegue el gasto la atribucion es
-  `gasto x leads_received / campaign_day_leads_total` y suma de vuelta al gasto exacto.
-  Verificado: Google Ads King, agosto 2026, 159 Local / 8 LD -> 95,2% / 4,8%.
-
-**Guia completa de integracion en [`marketing_ads_integration_guide.md`](marketing_ads_integration_guide.md)**:
-credenciales por plataforma, la consulta exacta, el cliente y el recurso dlt como copia
-del patron SmartMoving, el carril de correo para plataformas sin API, y el checklist.
-
-**Extraccion de Google Ads - EN PRODUCCION desde 2026-09-14:**
-
-- Explorer access concedido al proyecto de Cloud (desde 2026-09-09 el nivel es del
-  proyecto, no del developer token). Manager `NicolasCortesGoogleAds` → child
-  `PNW Moving` (1776272460).
-- Backfill completo: **413 campaign-days, $39.181, 6 campanas, 2024-08-16 → hoy**. No
-  hay datos de 2023: la cuenta no tenia campanas. Hueco mayo 2025 → julio 2026 (la
-  cuenta estuvo parada). Prueba de un dia y doble corrida sin duplicar, superadas;
-  el cuadre al centavo contra la UI (2026-09-13: $37.01) lo confirma Nicolas.
-- `ads_google_daily` publicado; `google_ads` es el sexto mecanismo del heartbeat.
-- Observacion para el mapeo: las campanas de la plataforma se llaman
-  `Movers | Pierce County`, `Movers | King County`, `Movers | Full`, `DM | Movers |
-  Brand`, `PNW Video Campaign`; el CRM dice `Google Ads King`, `Google Ads Snohomish`.
-  No coinciden solas - exactamente lo que `dim_ad_campaign_map` existe para resolver.
-
-*(Lo construido, tal como quedo antes de la aprobacion:)*
-
-- Credenciales: cuenta de servicio GCP + developer token del Manager `2797921560`, en
-  `.env` (JSON en base64, decodificado en memoria); el `.json` se elimino del repo y
-  `.gitignore` bloquea claves GCP. `sync_droplet.py` las lleva al droplet.
-- `pipeline/ads_pipeline/google_ads.py` (cliente: ledger, budget, retry, descubrimiento
-  de child accounts bajo el Manager), `pipeline/ads_pipeline/source.py` (recursos
-  `accounts` y `campaign_daily`, PK `(platform, account_id, campaign_id, date)`, merge,
-  ventana 30 dias, backfill por tramos de 92 dias), `pipeline/run_ads.py` (CLI).
-  Probado en DuckDB con fila sintetica: tipos correctos, doble corrida sin duplicar.
-- `sql/40_raw_google_ads.sql` aplicado; `stg_google_ads__accounts` y
-  `stg_google_ads__campaign_daily` construyen y pasan tests (vacios) en el droplet.
-- n8n `ads_google_daily` (06:00 PT) creado **inactivo**.
-- **Estado medido desde portatil y droplet**: la cuenta de servicio autentica y ve el
-  Manager; toda lectura de datos devuelve `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION`.
-- **Que cambia cuando lleguen las otras tres child accounts: nada en codigo.** Se
-  descubren solas en la siguiente corrida; cada una necesita un backfill de una vez
-  con `--account <id> --from 2023-01-01`. Cada fila lleva `account_id` y esta en la PK,
-  asi que un Campaign ID repetido entre cuentas nunca se confunde.
-
-Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
-
-0. ~~Solicitar Explorer access~~ **Hecho 2026-09-14.** Ahora: anadir las otras tres child
-   accounts al Manager (aparecen solas) y correr `run_ads.py --platform google_ads --dest
-   postgres --account <id> --from 2023-01-01` una vez por cuenta. Tras la
-   aprobacion: `run_ads.py --list-accounts`, prueba de 1 dia cuadrada al centavo contra
-   la UI, doble corrida, backfill `--from 2023-01-01`, publicar `ads_google_daily`,
-   anadir `google_ads` al heartbeat (umbral 30 h).
-
-1. **`dim_ad_campaign_map`** - seed. Nicolas lo construye con los nombres reales de las
-   plataformas. Forma requerida:
-
-   | columna | que es | ejemplo |
-   |---|---|---|
-   | `platform` | `google_ads`, `meta_ads`, `bing_ads` | `google_ads` |
-   | `platform_campaign_name` | el nombre EXACTO que emite la plataforma | *(el que salga del export)* |
-   | `platform_campaign_id` | el id de la plataforma, si lo hay - mas estable que el nombre | |
-   | `campaign` | nuestra campana, = `dim_referral_source.source_clean` | `Google Ads — Snohomish` |
-   | `valid_from`, `valid_to` | por si una campana de plataforma cambia de destino | |
-   | `notes` | | |
-
-   ⚠️ **Este es el punto dificil de toda la fase, no el coste.** Los nombres no van a
-   coincidir solos, y una campana de plataforma que no este en el seed dejara su gasto
-   sin atribuir - visible, nunca perdido, pero sin atribuir. Preferir el id de plataforma
-   al nombre cuando exista: los nombres se renombran, los ids no.
-
-2. **`raw_google_ads`, `raw_meta_ads`, `raw_bing_ads`** con coste diario por campana.
-   Fase 2 del roadmap: cada una necesita su cliente con presupuesto bajo `pipeline/`,
-   su recurso dlt con PK compuesta, y su fila en `crm_sync_contract.md`. Seguir el orden
-   de "Adding a new source" de `CLAUDE.md` al pie de la letra.
-3. ~~`marts.fct_campaign_spend_daily`~~ **Hecho 2026-09-14.** `int_ad_spend_daily` (union
-   de plataformas + mapeo por id con vigencia) → `fct_campaign_spend_daily` (reparto por
-   lead; `cost_per_lead`, `cost_per_valid_lead`, `cost_per_acquisition`,
-   `cost_efficiency_ratio`) + `mart_unmapped_ad_spend` (la cola). Test de
-   reconciliacion al centavo en cada build.
-
-   **Corregido 2026-09-15 tras revision de Nicolas** (contaba 61 leads donde el CRM
-   tiene 156): el CRM guarda `PNW Google Ads ` CON espacio final (179 leads) y sin el
-   (124); ambas caian en la misma fila del seed pero, con `source_clean` vacio, la
-   etiqueta usaba la cadena cruda y la fuente se partia en dos. Arreglado en
-   `core.opportunities` (la etiqueta cae al `referral_source_raw` del seed, nunca al de
-   la oportunidad); cinco fuentes tenian el mismo defecto. Y por decision de Nicolas
-   **las seis campanas de la cuenta PNW Moving van a `PNW Google Ads`** - es una cuenta
-   dedicada; en otras cuentas cada campana tendra su propia fuente. Resultado: 100% del
-   gasto atribuido, $0 sin mapear.
-
-   **Fuentes de marketing fijadas por Nicolas (2026-09-15)** en `dim_referral_source.is_paid`:
-   Google Ads (todas), Google Guarantee, Bing Ads, Meta (Facebook/Instagram/Meta Ads), Yelp
-   (todas), Great Guys, Move Buddha, Snoball. Todo lo demas es organico - `PNW` es la fuente
-   organica de PNW Moving y no recibe gasto. Cambios: Snoball paso a marketing; Snapchat,
-   Thumbtack, Youtube Ads y USA Homelisting pasaron a organico (marcados "confirmar");
-   12 fuentes nuevas del CRM anadidas (GBP Kirkland con 157 leads, GBP Everett, Yelp Gig
-   Harbor, OpenAI Ads, Smart Scout, Copilot, afiliados). 2026 YTD: 5.602 leads de
-   marketing en 9 familias, 10.211 organicos.
-
-   **Lo que dicen los numeros correctos (PNW Google Ads, $39.181):**
-   - CPL historico **$86-$200**, CPA $280-$650, CER 0.10-0.41 (2024-10 → 2025-04).
-   - En los meses fuertes solo el 6-13% del gasto cae en dias sin lead; el "63%" de
-     la primera lectura era el bug. Aun asi: agregar por mes, nunca promediar CPLs
-     diarios.
-   - **2026-08: $1.999 / 3 leads = CPL $666, CPA $1.999.** Pendiente de aclarar con
-     Nicolas si los 431 leads del source `PNW` (2024-08..12) y los 15 de 2026-08 son la
-     misma fuente que `PNW Google Ads` antes de leerlo como deterioro. **Respondido: `PNW`
-     es organico. El CPL de $666 en 2026-08 es real.**
-4. Vista `serving.campaign_daily_v1` cuando haya un consumidor.
-
-**REGLA DE REPARTO DEL COSTE, definida por Nicolas el 2026-09-10 y no negociable:** el
-coste se reparte **por lead, no por la linea de negocio nominal de la campana**. Si
-`Google Ads King County` gasto $100 en un periodo y trajo 4 leads - 2 Local y 2 Long
-Distance - entonces $50 van a Local y $50 a Long Distance, aunque la campana se considere
-"de Local". El reparto es proporcional a los leads que cada linea recibio desde ese
-source, sumando **ambas instancias**.
-
-**Comercial queda fuera de ese reparto.** Se mide por rendimiento de sus campanas propias
-(`Bing Ads Commercial`, `Eco Commercial (Google Ads)`), no por linea de negocio.
-
-⚠️ El seed ya guarda `pct_ld`, `pct_local` y `pct_commercial` por fuente, y una nota que
-dice *"Meta Ads: 56% LD - no asignar todo el spend a Local"*. Esos porcentajes son un
-historico; la regla de arriba manda sobre ellos.
-
-### 3. Fase D - los 13 reportes programables sin usar
-
-Disponibles en `smartmoving_scheduble_reports/` y ya con forma conocida. Entran por el
-mismo carril y **cuestan cero cuota**: se programan en la UI de SmartMoving hacia un
-alias `*reporting@`, se anaden a `REPORTS` en el nodo `Resolve Report Metadata`, y el
-resto del flujo ya existe.
-
-Por valor:
-
-| Reporte | Para que |
-|---|---|
-| `sales-person-activity-details` | Alimenta directo los KPIs de ventas ya construidos |
-| `outstanding-balances` | Cuentas por cobrar - exactitud del ingreso |
-| `refunds` | Ingreso neto real |
-| `affiliates` | Marketing: 72 de las 178 fuentes son afiliados |
-| `storage-accounts` + `storage-jobs-report` | Si almacenaje va a ser linea propia. Ya hay 326 pagos de storage en `core.payments` sin contexto |
-| `opportunities-by-move-date` | Grano alternativo, util para forecast |
-| `crew-ratings`, `customer-service-tickets` | Calidad operativa |
-
-### 4. Siguiente fase de cancelaciones (documentada, no implementada)
-
-Pedida explicitamente el 2026-09-10 y deliberadamente no construida todavia. Los datos ya
-estan; falta el modelado. Detalle completo en `AUDIT_PLAN.md`.
-
-- **Por ZIP de origen.** El ZIP vive en `core.jobs.origin_zip` y `core.leads.origin_zip`,
-  no en `core.opportunities`. ⚠️ Una tasa por ZIP necesita **tambien los reservados de ese
-  ZIP**: sin denominador, un ZIP con 2 cancelaciones de 2 trabajos se ve igual que uno con
-  2 de 200.
-- **Por motivo.** Siete motivos limpios ya en `cancellation_reason`. No necesita ninguna
-  fuente nueva.
-
-### 5. El goteo de quotes sin resolver
-
-**2.349 quotes** del reporte Lead Status sin GUID (medido 2026-09-14 tras el drenaje; todas en `local`, `ld` esta al 100%). **Ya se drena solo**: 300 por instancia
-por rafaga dentro de `report_ingest`, unas 3.600 llamadas/dia, ~4 dias para el backlog y
-despues ~500/mes de mantenimiento.
-
-⚠️ **No es un backfill, es un mecanismo permanente.** Cada mes entran ~500 leads que el
-barrido nunca vera porque no convierten. Si alguien lo apaga, el hueco vuelve a crecer al
-mismo ritmo.
-
-Nota: esto ya **no** afecta al conteo de leads - eso lo cerro el brazo de `/api/leads`.
-Lo que anade el drenaje es el enriquecimiento: numero de cotizacion, ingreso estimado,
-tiempo a primer contacto y subcategoria de perdida.
-
-### 6. Los seeds que solo Nicolas puede completar
-
-- **`dim_agent`**: 34 de 65 nombres del CRM no estan en el roster.
-- **`dim_agent_assignment`**: construido para 2026, asi que `is_within_assignment` sale
-  `false` en el 42% de los leads historicos por falta de ventanas de validez, no porque el
-  routing este mal. **Extender las fechas hacia 2023 vale tanto como completar los
-  nombres.** Hasta entonces, no segmentar por esa columna.
-- **`dim_lob_branch`**: hay un cambio sin commitear que pasa `Long Distance Team` de
-  `long_distance` a `local` y **contradice la nota de su propia fila**. Afecta a 1.169
-  jobs. Decidir y actualizar la nota, o revertir.
-
-### 7. Deuda tecnica abierta (C5-C8)
-
-| # | Que | Donde |
-|---|---|---|
-| C5 | El join del reporte Booked esta duplicado entre `int_opportunity_observations` y el CTE `bkd_extra`. Es el unico reporte sin su `int_report_*_latest`; los otros tres ya lo tienen | ambos ficheros |
-| C6 | `--max-pages` no se propaga a `--job jobs` ni a los dims: truncan en silencio a 50 paginas | `pipeline/sm_pipeline/source.py` |
-| C7 | `--ids` y `--quotes` juntos emiten dos recursos con el mismo nombre. Nada lo rechaza | `run.py` |
-| C8 | El cron de `dbt_build_reports` esta documentado de cuatro formas distintas | varios |
-| - | 8 fuentes declaradas sin ningun modelo que las lea (`opportunities_enriched__*`) | `_smartmoving__sources.yml` |
-| - | El heartbeat repite en vez de escalar: 14 alertas identicas en 6,5 h es como se silencia un canal | `scripts/pipeline_heartbeat.py` |
-
-### 8. A2 - la causa raiz que sigue sin cerrar
-
-`report_ingest` se cayo 24 h el 2026-09-08 por memoria. **Los sintomas estan
-arreglados** - un correo por ejecucion, aterrizaje en una sentencia, limpieza antes del
-build, cola filtrada por alias, correos no procesables archivados, 4 GB de swap - y el
-flujo lleva estable desde entonces.
-
-Lo que no esta demostrado es que no vuelva a pasar bajo una rafaga historica grande. La
-proxima carga masiva de reportes es la prueba real.
-
-**2026-09-14 - segunda caida del mismo carril, distinta causa.** Desde el 2026-09-12
-22:00 UTC `report_ingest` fallo en cada barrido (1.262 ejecuciones en error) sobre el
-mismo correo: un Lead Status de `local` anunciaba 4.499 filas y aterrizaban 4.498,
-porque dos filas compartian `Quote #` y `ON CONFLICT DO NOTHING` descartaba una. El
-correo nunca salia del inbox, asi que bloqueaba todo reporte mas antiguo y ningun
-rebuild de dbt salio de este flujo en dos dias (solo el nocturno). Arreglado en
-`Build Landing Rows`: una clave natural repetida dentro del mismo fichero se sufija con
-su posicion (`<quote>#000123`), de modo que toda fila aterriza y el conteo cuadra. dbt
-une por el `Quote #` de `row_data`, nunca por `row_key`, asi que nada aguas abajo lo
-ve. Publicado en n8n y en `deploy/n8n_report_ingest_nodes.json`.
+- **2026-07-22..08-08 - extraction silently dead 17 days.** `platform_rw` lacked
+  `CREATE ON DATABASE`, so dlt's merge staging dataset failed *after* the API calls were
+  spent; the SSH node piped the exit code away. Fixes: the grant, and every n8n SSH
+  command is `out=$(...); rc=$?; ...; exit $rc` with a Code node asserting `rc`.
+- **2026-08-13 - 550 false deletions.** Two schedules with different sweep windows;
+  absence-based deletion rejected presence proofs older than 2 days since. Never pass
+  `--from-offset/--to-offset` to a scheduled run.
+- **2026-08-08 - `.env` quoting.** The droplet `.env` single-quotes values for `source`;
+  a parser that kept the quotes gave Postgres the user `'platform_rw'`. Both parsers
+  strip matched quotes.
+- **2026-09-08 (A2) - `report_ingest` OOM crash loop 24 h.** Unbounded IMAP batch,
+  per-row inserts, cleanup behind the build. Now: one email per execution, set-based
+  landing, cleanup first, alias-filtered Gmail query, unusable mail archived, 4 GB swap.
+  Not yet proven under a large historical burst.
+- **2026-09-09 (A5) - 13,196 opportunities missing** because three docs said leads and
+  opportunities were different records. The lead id is the GUID; `/api/leads` is now an
+  observation arm. Every conversion rate had been reading high.
+- **2026-09-12..14 (A7) - one email blocked the lane two days**, 1,262 failed
+  executions: two rows shared a `Quote #` and `ON CONFLICT DO NOTHING` dropped one, so
+  the count never matched. Repeated natural keys are now position-suffixed. Third
+  occurrence of "one bad email retried forever" (A2, A6, A7) - hence the quarantine item.
+- **2026-09-14 (A8) - `report_bot` lost `ld` All Jobs** on a blank sign-in page; login
+  now reloads up to three times.
+- **2026-09-15 - campaign labels split on whitespace.** `PNW Google Ads ` (trailing
+  space) and `PNW Google Ads` read as two campaigns; the label now falls back to the
+  seed's canonical string, never the opportunity's raw one. Five sources were affected.
+- **A1 - retention would have deleted 2023-2025 history on 2026-09-17**: the historical
+  backfill landed all generations on one calendar day. `_is_historical_backfill` marker,
+  excluded from pruning.
 
 ---
 
-## Current Workstream - Scope
+## 6. Key facts and decisions
 
-Enrich leads and opportunities with **addresses, emails, names, estimates**, and everything the
-scheduled report workbooks carry. Raw stores payloads **exactly as received**; all typing and business
-logic lives in dbt.
-
-⚠️ **CORRECTED 2026-09-09: a lead and an opportunity are the SAME record.** This section
-used to say they were separate and that no lead -> opportunity join would be built. The
-lead's `id` from `GET /api/leads` **is** the opportunity GUID - 23,717 byte-identical ids
-plus six live `GET /api/opportunities/{id}` confirmations. `/api/leads` is now an arm of
-`int_opportunity_observations`. See `CLAUDE.md` *Identity resolution* and `AUDIT_PLAN.md`
-A5. The fuzzy email/phone/date match this phase deferred was never needed and must not be
-built.
-
-Note that the *lost-leads* report keys on `Quote #`, so despite its name it enriches
-**opportunities**, not leads.
-
-**Refresh cadence:** defined in [`crm_sync_contract.md`](crm_sync_contract.md) section 6. Webhooks carry near-real-time status at zero quota cost.
-
-### Explicitly out of scope for now
-Notes, follow-ups, customer interaction history, audit activity, inventory item lines, document URLs,
-and Premium per-job calls. These are all reachable later; none is required for the field set above.
-
-### Three facts that frame the work
-
-1. **Leads are already maximally enriched by the API.** `GET /api/leads/{id}` returns byte-for-byte the
-   same 28 fields as a list row - **never call it in a loop.** Name, email, phone, and both origin and
-   destination street/city/state/zip already land in `raw_smartmoving.leads`. What remains is *modeling*,
-   not extraction. Leads carry no money and no `quoteNumber`; that is an API limit, not a pipeline gap.
-   **What they DO carry is the opportunity GUID, in the `id` field** - which is why the
-   modeling that remained turned out to be worth 13,196 opportunities.
-2. **`opportunities_enriched` and its 10 child tables are already in raw and completely unmodeled.**
-   Estimates, charges, payments, job addresses, contacts, and the custom `leadStatus` are sitting in
-   Postgres today with zero dbt models reading them. This is the largest available win at **zero API cost**.
-3. **Quota is not the binding constraint.** The measured model in
-   [`crm_sync_contract.md`](crm_sync_contract.md) section 7 lands at roughly 6% of the available
-   calls. That buys *deeper* change detection, not less - and it is why the sweep window is wide.
+- SmartMoving quota 125k/month **per instance**; ~120 calls/min short-window limit.
+  `Include*` flags cost nothing; `GET /api/leads/{id}` is byte-identical to a list row
+  (never loop it); `PageSize` caps at 200; no `modifiedSince` anywhere - hence the
+  hash-diff sweep. No lead-created webhook: leads are polling-only.
+- Timestamps `timestamptz` UTC; report `*at Utc` columns are NOT UTC (`DATABASE.md`).
+- `serving` is materialised as tables on purpose: `apply_rls` filters on `BASE TABLE`.
+- The droplet (`143.198.150.5`) is the environment; deploy with
+  `python deploy/sync_droplet.py` (packs the tree, installs `pipeline/requirements.txt`,
+  runs seed + build + RLS). Secrets only in `.env`, never on disk elsewhere.
+- Google Ads API access level is a property of the Cloud project, not of the developer
+  token (since 2026-09-09). Explorer = 2,880 ops/day; a daily run uses ~2.
+- Self-hosted Postgres stays until the `CLAUDE.md` trigger fires.
 
 ---
 
-## Working rule: the droplet is the environment
+## 7. Next actions
 
-**We do not work locally.** Every structural change - a dbt model, a seed, a file in `sql/` - is
-applied to the droplet in the same session it is made. Nothing is live for consumers yet, and the
-point of the rule is that "going live" should be a permissions change rather than a migration.
-
-One command does it:
-
-```bash
-python deploy/sync_droplet.py          # sync + dbt seed + build + test, under flock
-python deploy/sync_droplet.py --sql    # also replay sql/*.sql (idempotent DDL)
-```
-
-See [deploy/README.md](deploy/README.md). **Evidence of completion must come from querying the
-droplet**, not from a local build.
-
-> The failure this prevents actually happened: on 2026-08-07 the report ingestion landed 4,801
-> verified rows on the droplet while the droplet was still running the pre-Phase-2 dbt project.
-> Everything was green locally and nothing there consumed the report.
-
----
-
-## Droplet structural audit - 2026-08-08
-
-Ran against the droplet, not local. Two blocking defects found, both fixed.
-
-### FIXED - extraction was silently dead for 17 days
-
-`platform_rw` had **no CREATE privilege on the database**. dlt's merge write disposition loads
-through a transient staging dataset (`raw_smartmoving_staging`) that it creates per run, so
-schema-level grants are not enough. Every extraction failed at the LOAD step with
-`permission denied for database datawarehouse` - **after the API calls had already been spent**.
-Quota burned, nothing landed.
-
-Evidence it had been failing since 2026-07-22: `opportunities_enriched`, `leads` and every `dim_*`
-table carried a 17-day-old `_sm_extracted_at`, while `webhook_events` (which n8n writes directly,
-bypassing dlt) was current to the minute.
-
-Fixed with `GRANT CREATE ON DATABASE datawarehouse TO platform_rw`, added to
-`sql/00_bootstrap.sql` so a rebuild does not reintroduce it. Verified by a full extract -> load
-cycle: `LOADED and contains no failed jobs`, dims now stamped 2026-08-08, and
-`raw_smartmoving_staging` exists.
-
-### The reason nobody noticed: the pipe-swallows-exit-code bug, again
-
-`run.py ... | tail -25` reported **exit 0 while dlt was raising `PipelineStepFailed`**. A pipeline
-returns its LAST stage's status. This is the same defect found in the dbt SSH command the same day,
-and **every existing n8n workflow that pipes `run.py` output has it**. Any workflow that pipes must
-use `out=$(cmd 2>&1); rc=$?; echo "$out" | tail -N; exit $rc`.
-
-> This is the failure mode worth internalising: the pipeline was broken for 17 days, the schedules
-> were green, and the only visible symptom was data that quietly stopped moving.
-
-### Verified sound
-
-| Check | Result |
-|---|---|
-| RLS from the consumer's side | Connected **as `app_read`**: reads `serving` + `core`, **denied** on `raw_smartmoving`, `staging`, `marts`, and denied on write |
-| RLS policies | `rls_entity` on all 8 `core` + `serving` tables, via `core.current_role_can_see(entity_id)` |
-| Rule 8 (UTC) | No naked `timestamp` anywhere except two `*_local` columns, which is the convention's sanctioned form |
-| Rule 5 (idempotent merges) | 0 duplicate business keys across `opportunities_enriched`, `leads`, `customers_service_window`, `dim_branches`, `dim_users` |
-| Report landing tables | Real composite PKs `(source_instance_id, report_generated_at, row_key)` |
-| Grain | `core.opportunities` 2,169/2,169 - `jobs` 835/835 - `charges` 1,579/1,579 |
-
-### Known, accepted, not defects
-
-- **dlt raw tables have a unique index on `_dlt_id` only**, not on the business key. Idempotency
-  comes from dlt's merge logic rather than a database constraint. Zero duplicates observed, but
-  there is no database-level guard if that logic ever regresses.
-- **`entity_id` is absent from dlt CHILD tables.** dlt stamps only the root row; children carry
-  `_dlt_root_id` and the staging models join back. Deliberate.
-- **`raw_smartmoving.report_ingest_errors` has no `entity_id`.** It is an operational log of emails
-  that could not be attributed to an instance - an `entity_id` there would be a guess.
-- ~~**Money is `double precision` in raw/staging**, cast to `numeric` before `core`; do not SUM money
-  in `staging`.~~ **FIXED 2026-08-13** (architecture audit). Money is still `double precision` in
-  **raw** - correct under ELT, raw preserves the payload - but every monetary column is now cast to
-  `numeric` at the **staging** boundary, which is what staging is for. The redundant casts in
-  `core.opportunity_charges` / `core.opportunity_payments` were removed. Money is safe to aggregate
-  from staging onward, so the rule nobody could enforce is now a property of the schema.
-- **43,338 webhook events, all with `processed_at` null.** Not a backlog in the harmful sense: dbt
-  reads `webhook_events` directly, so the free status feed works and contributes 35,442
-  observations. `processed_at` is the *enrichment worker's* marker, and that worker has never run.
-
----
-
-## The sweep was the bottleneck, not the quota - 2026-08-08
-
-The single most consequential correction so far, and it came from the business side, not the code.
-
-`GET /api/customers?IncludeOpportunityInfo=true` returns the opportunity **GUID and quote number**
-for every row - 685/685 on `ld`, 514/514 on `local`. That makes the *sweep*, not the per-opportunity
-detail call, the cheap way to build the crosswalk that lets report rows attach to opportunities.
-
-It had never been used that way because the sweep and the detail call were welded together in
-`--job enrich`: widening the window dragged one detail call per opportunity with it, so the window
-stayed pinned at 37 days and the crosswalk starved. `--sweep-only` separates them.
-
-**Measured, both instances, 730-day window:**
-
-| | Before | After | Cost |
+| # | Action | Owner | Blocked on |
 |---|---|---|---|
-| Report resolution | 10.2% | **41.0%** | |
-| Crosswalk entries | 1,199 | **13,157** | |
-| `core.opportunities` | 2,169 | **14,014** | |
-| …with a customer | 708 | **13,157** | |
-| …with money | 691 | **2,679** | |
-| Webhook-only shells | 1,461 | **857** | |
-| `core.leads` | 48 | **2,708** | |
-| **Total API calls** | | | **81** |
-
-A previously-proposed backfill of 1,461 targeted detail calls was **cancelled** - the sweep does
-more, for ~5% of the cost.
-
-**The structural limit this exposed, now recorded in the contract:** the sweep is *job-anchored*.
-All 14,572 opportunities it returned have at least one job; none had zero. An opportunity that never
-got a job scheduled is unreachable by the sweep at any window width - bad leads resolve at only
-**5.6%** for exactly this reason. That population is what the reports exist to cover, which is the
-strongest argument for treating reports as the backbone rather than a supplement.
-
-> **Open, deliberately not papered over:** 2,458 report rows remain unmatched with no clean
-> explanation - service dates inside the swept span, non-lead statuses. Job-anchoring explains bad
-> leads and some lost opportunities, not all of it. One focused investigation is owed. Nothing is
-> blocked: those rows surface in `marts.mart_unmatched_report_rows`.
-
----
-
-## Architecture audit - 2026-08-13
-
-A full read of the repository against the Phase 1 objective: one reliable source other teams consume
-without calling a vendor API, as fresh as each source allows, replacing the Google Sheets.
-
-**Verdict: no structural change is warranted.** The layering, the observation layer, the per-field
-resolution, the instance/entity split and the contract-with-a-checker pattern are the right shapes for
-this problem and should not be redesigned. What the audit found was documentation drift and one real
-typing weakness - fixed below - plus a short list of things that are missing rather than wrong.
-
-### Fixed in this pass
-
-| Finding | What was wrong | Fix |
-|---|---|---|
-| **Money typing** | Money reached `staging` as `double precision`; the `numeric` cast happened in `core`. Correct results today, but it made "do not SUM money in staging" a rule people had to remember rather than a property of the schema. | Cast moved to the staging boundary in all four models that carry money; redundant `core` casts removed; the rule is now written in `CLAUDE.md` under **Conventions -> Money**. |
-| **Stale freshness targets** | `serving_catalog.md` promised both published views a target several times tighter than the one the contract actually sets for jobs and leads (section 8 has the numbers; they are not repeated here). The catalog is what a consuming team would cite as our SLA, so it was publishing a commitment the pipeline does not meet. | Catalog now names the entity and links to `crm_sync_contract.md` section 8 instead of restating a number. |
-| **The checker could not see that class of drift** | `check_sync_contract.py` guarded sweep windows and quota estimates, but not freshness targets - which is why the drift above survived. | Three freshness patterns added to `SINGLE_SOURCE_FACTS`. Verified the guard fires on a planted violation, not just that it passes. |
-| **Rule 6 contradicted `decisions/0003`** | `CLAUDE.md` rule 6 said "no consumer reads `core`"; ADR 0003 deliberately relaxes exactly that, and the implementation follows the ADR. A non-negotiable rule was being negotiated elsewhere. | Rule 6 now states the bounded exception and links to the ADR. |
-| **`raw_*` looked single-loader** | The layer table implied dlt loads all of raw. n8n writes `webhook_events` and every `report_*` table directly, by design. | Documented in the layer table - both loaders, and why each is right for its path. |
-| **`intermediate/` was invisible** | The dbt folder is `models/intermediate/` but the schema is `marts`. Nothing said so, so the observation layer was hard to locate in Postgres. | Noted in the layer table. |
-| **Stale `status` column note** | The catalog still described status labels as `status_<int>` placeholders "pending a full enum mapping". That mapping shipped with `dim_opportunity_status`. | Catalog now lists the real labels, warns that `status_<int>` would be a bug, and points at `status_model.md` for the Completed/Closed trap. |
-| **Stale repo-layout entries** | `CLAUDE.md` still called the dimension CSVs "future dbt seeds" (they have been loaded seeds since P2), pointed rule 2 at the back-compat shim rather than the real client, and told a new-source author to update a freshness table that no longer exists in that file. `IMPLEMENTATION_STATUS.md` itself was not listed. | All four corrected; step 8 of "Adding a new source" now points at the contract. |
-
-**Verification (local dev warehouse, 2026-08-13).** `dbt build` **PASS=204 WARN=0 ERROR=0** - the same
-figure as the droplet run on 2026-08-08, so the money retyping changed no test outcome. Money
-reconciles exactly across the change: charges `2,576,064.42` / 1,579 rows, payments `159,122.95` / 41
-rows, opportunities `2,313,887.88` / 708 rows - identical before and after, to the cent. All 10
-monetary columns in `staging` now report `numeric` in `information_schema`; none is left as
-`double precision`. `scripts/check_sync_contract.py` exits 0, and the three new freshness patterns were
-confirmed to fire against a planted violation rather than merely passing.
-
-> **Not yet on the droplet.** This pass was verified locally only. Per the working rule above, run
-> `python deploy/sync_droplet.py` and confirm `PASS=204` from the droplet before treating it as done.
-
-### Open, unchanged by this pass
-
-- **`marts.mart_enrichment_candidates` (P6) does not exist.** `pipeline/README.md` and `source.py`
-  both describe it as the third change detector and "the real fix" for the sweep's blindness to money
-  and `leadStatus`. Until it lands, an opportunity that changes money outside the enrichment allowlist
-  and outside the hot window waits on the **cold TTL** to be re-read. That is a deliberate,
-  documented backstop - but it is the largest remaining freshness gap in the system.
-- **The exit-code sweep is not finished.** The 2026-08-08 audit established that *every* n8n workflow
-  piping `run.py` hides failures. The migration doc carries the correct shape; the sweep itself is
-  step 1 of Next Immediate Step and is what turns a 17-day silent outage into a visible one.
-- **Seed consumers are now explicit.** `dim_referral_source` feeds
-  `core.opportunities` and `fct_lead_source_daily`; `dim_sales_team` is the only loaded
-  seed without a current model consumer. `dim_lob_map` was removed because it
-  duplicated `dim_lob_branch`.
-- **`raw_*` has no database-level uniqueness on the business key**, only on `_dlt_id`. Idempotency
-  rests entirely on dlt's merge logic. Zero duplicates observed across every table checked, but rule 5
-  ("composite primary keys, idempotent loads") is currently enforced by application behaviour rather
-  than by a constraint. Adding `UNIQUE (source_instance_id, id)` on the dlt root tables would make it
-  structural. Cheap; not yet done.
-
----
-
-## Reports connected to dbt - current state (updated 2026-09-08)
-
-All six reports now land and are row-count verified. Four have dbt models; two remain
-preserved in raw JSONB for future modelling.
-
-| Report | Grain | Connected? | Why |
-|---|---|---|---|
-| **Lead Status** | opportunity | ✅ | The denominator. Every lead and opportunity received in a period, with the authoritative status and its lost/cancelled subcategory. |
-| **All Jobs** | job | ✅ | The richest source in the warehouse - job GUID, structured addresses, the full ACTUAL cost breakdown, lifecycle dates. Nothing else has any of it. |
-| **Booked Opportunities** | opportunity | ✅ thin | `Invoiced Amount` is the opportunity-grain realised-revenue total. |
-| **Lost Leads** | opportunity | ✅ | Supplies loss reason, lost date and time to first contact through `int_report_lost_leads_latest` into `core.opportunities`. |
-| **Cancellations** | opportunity | Raw only | Landed and verified; no staging/core model yet. |
-| **Payments** | opportunity, job or storage account | Raw only | Landed and verified; its future model must preserve the target discriminator. |
-
-### The design decision worth understanding
-
-The observation layer exists to resolve **disagreement between sources**. That
-machinery earns its complexity only where sources overlap.
-
-All Jobs contributes ~60 fields that **no other source has**. Routing those through
-`int_job_observations` would mean adding ~60 nullable columns to every other arm, so
-each could contribute NULL to all of them, to resolve a conflict that cannot occur.
-So the split is by whether a conflict is *possible*, not by which table a field is in:
-
-- `job_number`, `service_date` overlap with the API → observation arm, `pick_latest`
-- everything else is All Jobs alone → `int_report_all_jobs_latest`, joined directly
-
-Same reasoning for `invoiced_amount` on the opportunity side.
-
-### The `at Utc` suffix means THREE different things in All Jobs
-
-Measured, not assumed, and the first version got it wrong silently:
-
-| Column | Actual format | Handling |
-|---|---|---|
-| `Start/End Time Utc` | `6/20/2026 8:45:00 AM -07:00` - **explicit offset** | Unambiguous instant. crm_timezone must NOT be applied. |
-| `Completed/Closed at Utc` | `6/20/2026` - **bare date** | Local business date, renamed `*_date_local`. |
-| `Created/Booked at Utc`, `Job Date` | bare date | Local business date. |
-
-Treating the first two as crm_timezone wall clocks parsed **0 of 6,897 rows** and
-raised no error at all. Offsets also *vary* between rows (`-06:00` and `-07:00`
-both occur), so a fixed instance timezone would have been wrong even where it parsed.
-
-⚠️ `AT TIME ZONE '<offset>'` is **not** the fix: PostgreSQL reads a bare offset string
-with POSIX sign convention, inverted. Measured: `8:45 AM -07:00 AT TIME ZONE '-07:00'`
-yields `01:45` UTC, not `15:45`. The `rpt_ts_offset` macro subtracts the offset
-arithmetically instead; verified against `-07:00`, `+02:00` and a `-08:00` case that
-crosses midnight into the next year.
-
-### What landed in core
-
-| | Before | After |
-|---|---|---|
-| `core.jobs` | 835 | **17,636** |
-| …with structured origin city | 0 | **6,869** |
-| …with actual costs | 0 | **2,903** ($5,504,267.64) |
-| …with start/completed dates | 0 | **2,821 / 2,874** |
-| `core.opportunities.invoiced_amount` | did not exist | **1,153 rows, $2,263,449.86 realised revenue** |
-
-Grain intact: 14,337 / 14,337 opportunities, 17,636 / 17,636 jobs. Droplet
-**PASS=207 ERROR=0**.
-
----
-
-## Full eight-report run - 2026-08-13
-
-Historical test of the first four report types across both instances: **seven of eight
-landed with zero ingest errors**. The test proved the common email ingestion path, but
-it did not prove that All Jobs could be scheduled natively. The current production
-design uses the Playwright browser bot because SmartMoving does not expose native
-scheduling for All Jobs.
-
-| Report | `ld` | `local` |
-|---|---|---|
-| Lead Status | *missing* | 4,810 |
-| All Jobs | 925 | 5,972 |
-| Booked Opportunities | 171 | 1,972 |
-| Lost Leads | 321 | 2,121 |
-
-### FIXED - only the first report per execution was being verified
-
-The IMAP trigger does **not** deliver one email per execution: seven reports arrived
-across five runs, several sharing a run. The verification nodes read `.first()`, so
-exactly one report per execution was row-count checked.
-
-Landing was never affected - `Build Landing Rows` is pairing-aware - so the failure
-mode was silent by construction: a truncated report would land short, nothing would
-fail, and no alert would fire. `Collect Reports To Verify` now emits one item per
-distinct `(instance, target_table, report_generated_at)` and the check runs per report.
-
-### Sync quality after the full cascade
-
-| | Before today | Now |
-|---|---|---|
-| Report resolution | 41.0% | **69.5%** (6,681 of 9,611) |
-| `core.opportunities` | 14,014 | 14,329, **$11.66M** |
-| …with money | 2,971 | **3,398** |
-| `core.leads` | 2,708 | **2,866** |
-| `serving.jobs_upcoming_v1` | 28 | **241** |
-| `serving.leads_today_v1` | 0 | **13** |
-
-### Lead enrichment: the sparse city is the source, not the model
-
-`core.leads.origin_city` covers only 21% of leads, which looks like a modelling gap.
-It is not. SmartMoving's web-form capture frequently records **only a postcode**:
-1,614 leads have an `origin_address_full` that is a bare five-digit ZIP with no city.
-
-`origin_zip` covers **74%** and is already exposed in both `core.leads` and
-`serving.leads_today_v1`. The location data is there; the city name is what the source
-never had. A ZIP -> city/state seed would lift city coverage to match the ZIP's at zero
-API cost - worth doing, but it is an addition, not a repair.
-
-### Budgets cut
-
-`opps_sweep` 300 -> **100** per instance; `nightly_reconciliation` 500 -> **200**, its
-leads pass 200 -> **60**. The reasoning changed, not the arithmetic: with All Jobs
-landing, the reports now carry money, addresses and actuals, so buying the
-**11,032-opportunity** enrichment backlog through the detail call is no longer the
-right trade. It gets absorbed gradually instead.
-
----
-
-## API workflow tests - 2026-08-13
-
-Ran every extraction workflow manually from n8n, against the live API, to find
-failures before they run on a schedule. One was completely broken.
-
-| Workflow | Result |
-|---|---|
-| `weekly_dims` | ✅ both instances LOADED, 15 s |
-| `leads_poll` | ✅ both instances LOADED, 4 s |
-| `opps_sweep` | ✅ both instances LOADED (budget-capped, which is the designed behaviour) |
-| `Enrichment_worker` | ❌ **crashed on every invocation** → fixed → ✅ both instances LOADED |
-| `nightly_reconciliation` | running at time of writing |
-
-### FIXED - the webhook enrichment path was dead on arrival
-
-Every `--ids` invocation crashed before a single API call:
-
-```
-TypeError: issubclass() arg 1 must be a class
-  dlt/common/typing.py:444 in is_subclass
-```
-
-dlt inspects each parameter's type hint to decide what it may inject from config, and
-on **dlt 1.29.1** a *parameterised generic inside a Union* makes that inspection raise.
-`opp_ids: tuple[str, ...] | None` is such a hint. Confirmed by calling dlt's own
-`get_all_types_of_class_in_union` on the droplet:
-
-| Hint | Result |
-|---|---|
-| `tuple[str, ...] \| None` | **FAIL** - `TypeError` |
-| `float \| None` | OK (`float` is a real class) |
-| `bool` | OK |
-
-Annotated `Any` instead. This is why the enrichment worker had never processed an
-event: not the allowlist, not the credentials - the process died at import-time
-argument binding. It ran on an older dlt, which is why it was believed to work.
-
-**The worker now drains correctly:** 55,120 low-value events marked processed without
-spending a call, leaving exactly the 1,858 allowlist events (686 `job-closed`,
-353 `job-finalized`, 819 `payment-made`) to enrich at 150 per run.
-
----
-
-## Activation test - 2026-08-13
-
-Activated `report_ingest` to run the ld-vs-local attribution test. Mixed result: the
-attribution question is **answered**, and two new problems surfaced.
-
-### PASSED - instance attribution works
-
-A Lost Leads report arriving at `ld.reporting@` landed **321 rows attributed to `ld`**,
-8 columns constant on every row. The independent confirmation is the quote-number
-range: 12276, 12288 - five digits, the `ld` range. `local` quote numbers are six
-(132156-136966). This was the last unverified silent-failure mode in the chain.
-
-`local` still needs the same confirmation from its own report.
-
-### FIXED - the IMAP trigger was reading the whole inbox
-
-The trigger filtered on `["UNSEEN"]` alone. **The mailbox is a working inbox** -
-~38,000 messages, ~14,500 unread - not the dedicated reports account the design
-assumed. Activating it made n8n parse Google, Asana, RingCentral and Paylocity mail
-as SmartMoving reports: 39 junk rows in `report_ingest_errors`, one Slack alert each,
-in minutes, with 14,500 messages still ahead of it.
-
-Filter is now `["UNSEEN", ["FROM", "no-reply@smartmoving.com"]]`. The 39 junk rows
-were deleted, along with a stale 2026-08-07 false positive, so the table is back to
-0 - which is what makes "any row here means a report was NOT ingested" a usable alert.
-
-### The droplet is saturated by an unrelated workload
-
-`load average 61.83 on 4 cores`, from eleven `chrome` / `chrome-headless` processes
-plus `uvicorn`. **None of it is ours** - no `run.py`, no `dbt` running. It took n8n
-(502) and SSH (timeout) down together, and it is why two report downloads timed out
-at 120 s while the same Azure blob answered a direct `curl` in 0.8 s.
-
-This is a production risk independent of the warehouse: the database, the
-orchestrator and the pipeline share four cores with a browser-automation service that
-can starve them. Worth separating or resizing before consumers depend on this.
-
-Disk improved on its own: 90% -> 49%.
-
-### Not retried, and why
-
-n8n's IMAP trigger does not re-fetch a message it has already fetched, even one still
-marked unread. The two Booked Opportunities emails (one per alias) were fetched during
-the unfiltered activation, failed on download while the box was saturated, and will
-not be picked up again. They need re-sending from SmartMoving.
-
----
-
-## Next Immediate Step
-
-**Migrate the n8n workflows.** Extraction is healthy again and the model is corrected, but nothing is
-running on a schedule: the 6 workflows are drafts, still pointing at the old host path, and still
-using the command shape that hides failures. Until they run, every number above is a snapshot that
-will go stale exactly as it did on 2026-07-22.
-
-Follow [deploy/n8n_workflow_migration.md](deploy/n8n_workflow_migration.md).
-
-Then, in order:
-
-1. **Migrate the 6 draft n8n workflows** to the new host path and the exit-code-safe command shape -
-   see [deploy/n8n_workflow_migration.md](deploy/n8n_workflow_migration.md). Then publish them.
-2. **Schedule the reports in the SmartMoving UI** (H2). Lead Status first: it is the denominator.
-   Both per-instance aliases are live as of 2026-08-08.
-3. **Remove the temporary `reporting@ecomoversmoving.com` alias** from `Resolve Report Metadata`
-   once a report has arrived on each per-instance alias, and clear the one stale row in
-   `report_ingest_errors` before that table is wired to an alert.
-4. **The other three report staging models** + the Playwright bot for All Jobs.
-
-### Report arm wired into core - DONE 2026-08-08
-
-`report_lead_status` is now a real source, priority 5. On the droplet, **`PASS=204 WARN=0 ERROR=0`**.
-
-| | |
-|---|---|
-| Observations contributed | 489 |
-| Opportunities where the report is the freshest source | **472** |
-| Opportunities that gained a money value they did not have | **657 -> 691** (total `2,313,887.88` -> `2,387,834.19`) |
-| `pipeline_status` | now carries the lost/cancelled **subcategory** (`Lost price too high`, `Cancelled price was to high`) that the platform int cannot express |
-| Grain | 2,169 / 2,169 - unchanged |
-| `serving.jobs_upcoming_v1` | unchanged |
-
-**Resolution rate is 10.2% (489 of 4,801), and that is expected.** The Lead Status export spans
-three months of received dates; the API sweep is keyed on **service** date and only reaches
-opportunities that have a job at all, so
-most report rows describe opportunities the API has never been asked about. That history at zero
-quota is the point. The unmatched rows are surfaced in `marts.mart_unmatched_report_rows` with a
-reason, never dropped. The number to watch is `no_quote_number` (currently 0) - a rise there means
-the export shape changed.
-
-> **A correction to how this layer was documented.** `int_opportunity_observations` said adding a
-> source was "a `union all` arm and nothing else". That is false: `core.opportunities` resolves
-> each field against an explicit list of source branches, so an arm added without a matching
-> `pick_latest` branch builds green, passes every test, and contributes **nothing**. That is
-> exactly what happened on the first attempt - the arm landed 489 observations and `core` did not
-> change by a single value. Both files now say so.
-
-### Two empirical findings that shaped the arm
-
-- **The report's `Status` cannot be mapped to the platform int.** On matched rows, 185 read
-  `Closed` while the API says `status_code = 4` (Booked), and `Cancelled service no longer needed`
-  maps to **both** 4 and 20. The arm therefore contributes the string to `pipeline_status` and
-  leaves `status_code` null - the API owns the int.
-- **`Estimated Revenue` -> `estimated_final_total`, on the strength of the column's name alone.**
-  Every opportunity in the warehouse has `estimated_tax = 0`, so subtotal and final total are
-  identical and the data cannot distinguish them. Re-check when a taxed opportunity first appears:
-  if the mapping is wrong, it is wrong by exactly the tax on every report-sourced figure.
-
-> Local read access when needed: SSH tunnel in **Windows PowerShell** (not WSL),
-> `ssh -L 5433:localhost:5432 <droplet_ssh_user>@<droplet_ssh_host>` (values in laptop `.env`);
-> the laptop connects to `127.0.0.1:5433`. Port 5432 is not exposed publicly, by design.
-
-### dbt on the droplet - DONE 2026-08-07
-
-`deploy/sync_droplet.py` created and run. **`PASS=198 WARN=0 ERROR=0 SKIP=0` on the droplet**,
-identical to local. Verified by querying the droplet directly:
-
-| | |
-|---|---|
-| dbt objects | **38** (6 `core` tables, 7 `marts`, 2 `serving`, 16 staging views, 7 seeds) |
-| `core` row counts | opportunities 2,093 - jobs 835 - charges 1,579 - payments 41 - branches 8 - leads 48 |
-| Report staging | 4,801 rows, **4,801 with quote / status / received_at / revenue** - no parse gaps |
-| Timezone | `crm_timezone` resolves to `America/Los_Angeles`; `8/7/2026 7:16 AM` wall clock stores as `14:16Z` and renders back to `07:16` Pacific |
-| RLS | enabled on all 8 `core` + `serving` tables; `core.entity_access` correctly exempt |
-| `app_read` | `raw_smartmoving` USAGE = **false**, `core` + `serving` = true |
-
-Deployment lives at **`/home/datawarehouse_user/datawarehouse`**, not `/opt/datawarehouse` as every
-earlier draft of the docs said: `/opt` on this droplet is mode 700 owned by another application's
-service user, and claiming space there would mean loosening permissions on a directory that is not
-ours. `sql/00_bootstrap.sql` is excluded from the routine sync - it needs a superuser and ran once
-at provisioning.
-
----
-
-## Known Bugs - FIXED 2026-08-05 (Phase 1)
-
-| # | File | Defect | Fix |
-|---|---|---|---|
-| 1 | `pipeline/sm_pipeline/source.py` | Change-hash covered only `(status, serviceDate, job ids/dates)` - all sweep-visible. A re-quote, charge edit, payment, or `leadStatus` CMET->**Booked** never triggered re-enrichment. | Hash widened to everything the sweep returns, **plus** a tiered staleness TTL. The structural blind spot is closed by the Phase 6 report queue. |
-| 2 | `source.py` | `seen_ids` was `setdefault`-ed and appended every run, never reset. After run 2, `prior - seen` was permanently empty -> **soft-delete detection silently dead**; state grew unboundedly. | Presence now tracked as a per-record `seen` timestamp; state pruned at 120 days. |
-| 3 | `source.py` | The sliding window caused **false deletions** - anything aging past the window start looked "disappeared", and two schedules using *different* windows thrashed each other. Every schedule now shares one window. | Deletion is gated on the record's service span overlapping the window of the sweep being evaluated. |
-| 4 | `source.py` | `BudgetExceeded` mid-sweep soft-deleted every unseen opportunity. The hash was banked *before* `enrich_one` succeeded, so a failed detail call was never retried. | Only a sweep that paginates to completion is recorded as complete; watermarks are written only after a successful call. |
-| 5 | `pipeline/sm_pipeline/client.py` | `get()` raised on any 4xx. An `opportunity-deleted` webhook -> `--ids <deleted>` -> 404 -> whole run died, taking every other batched id with it. | `get(..., allow_missing=True)` returns `None` on 404; the caller records a `detail_404` marker. |
-| 6 | `source.py` | **Found during testing.** The original design assumed "dlt extracts resources in yield order, so `seen_ids` is fully populated when the deletions resource runs". **This is false** - dlt interleaves resources round-robin; a resource yielded last routinely runs before the sweep beside it has finished. Any within-run presence diff was a coin flip. | Deletion is evaluated against the last sweep *recorded complete in state*, making it independent of extraction order. |
-
-**Bug 1 could not be fixed with a better hash.** The sweep returns only `{id, quoteNumber, status}` plus
-`{job id, jobNumber, serviceDate, type}` - no widening surfaces money or `leadStatus`. The tiered TTL
-bounds the blindness; the report-driven fingerprint queue (Phase 6) closes it properly.
-
-**Two behaviours worth knowing:**
-- **Deletion detection can lag by one run** when the deletions resource happens to be scheduled before
-  the sweep completes. This is by design and safe - the `opportunity-deleted` webhook drives the
-  immediate `detail_404` path, and sweep-disappearance is only a backstop.
-- **A reappearing opportunity is force-re-enriched**, even if its hash and TTL say otherwise. Downstream
-  decides "present again" by comparing `_sm_snapshot_at` to `_deleted_at`, so clearing the marker without
-  a fresh snapshot would leave it looking deleted until its TTL happened to expire.
-
----
-
-## Timezone Semantics - the report `*at Utc` columns are NOT UTC
-
-**The vendor's column names lie.** Every report column suffixed `at Utc` renders in **the timezone the
-CRM instance is configured with** - Pacific for this company today. The *API*'s `createdAtUtc` is
-genuinely UTC. Same-looking name, two different meanings, and they will be silently unioned in the
-observation layer if nobody stops it.
-
-This must generalize: future companies will run CRM instances in other timezones.
-
-1. **CRM timezone is an instance-level property, distinct from `core.branches.timezone`.** A branch's
-   timezone is where it physically operates; the CRM timezone is how that instance's UI and exports
-   render every timestamp. They can differ, and branches within one instance can span zones. Add
-   `crm_timezone` (IANA) to the `dim_instance` seed and to `pipeline/sm_pipeline/instances.py`.
-   **Never hardcode Pacific** - resolve per `source_instance_id` on every report cast.
-2. **Timestamp columns** (`Start Time Utc`, `End Time Utc`, `Completed at Utc`, `Closed at Utc`,
-   `Date Received`) - parse in the instance's `crm_timezone`, store as true `timestamptz` in UTC per
-   CLAUDE.md rule 8.
-3. **Date-only columns** (`Created at Utc`, `Booked at Utc`, `Job Date`, `Lost Date`, `Move Date`) are
-   already **local business dates** - never timezone-convert them. Suffix them `_local`
-   (`booked_date_local`). Do not name a column `booked_at_utc`: it is neither UTC nor a timestamp.
-4. **Observation-layer hazard:** report `Created at Utc` (CRM-local date) and API `created_at_utc` (true
-   UTC timestamp) are *different facts*. Never place them in the same `pick_latest` branch list.
-5. Cross-source validation must be **timezone-aware**. An off-by-one here shifts every daily booked
-   metric by a day.
-
----
-
-## Enrichment Field Inventory - what each source contributes
-
-| Field group | Source | Cost |
-|---|---|---|
-| Lead name, email, phone, origin + destination street/city/state/zip, referral, sales person, branch, move size, status, lost/bad reason, created | `GET /api/leads` list row | ~1-2 calls/day/instance. **Already landing.** |
-| Opportunity `leadStatus` (business pipeline status), `estimatedTotal` (subtotal/tax/final), customer contacts, branch, tariff, move size, volume, weight, referral, estimator, sales assignee | `GET /api/opportunities/{id}` + all 10 `Include*` flags | 1 call/changed opportunity. Flags are **free**. **Already landing.** |
-| Charge lines (estimated + actual), payments, surveys, job addresses (flat strings), crew | Same call, child tables | Free with the above. **Already landing.** |
-| **Every lead and opportunity received in a period WITH its outcome** - authoritative `Status` incl. lost/cancelled reason, received-at, quote-sent, time-to-contact, estimated revenue, referral source. **The denominator for any conversion rate.** | **`lead-status.xlsx` scheduled report** | **Zero quota. The most important report in the set.** |
-| **Structured** origin/destination (unit, street, city, state, zip, type - 14 cols), full estimated + actual financial breakdown (~42 cols), lifecycle timestamps, crew names, mileage, `move_date_is_tbd` | `all-jobs.xlsx` scheduled report | **Zero quota.** |
-| `invoiced_amount`, `move_coordinator`, `booked_date` | `booked-opportunities-by-date-booked.xlsx` | **Zero quota.** |
-| `lost_date`, `est_dollar_amount`, `time_to_first_contact` | `lost-leads-opportunities-details.xlsx` | **Zero quota.** |
-| Live opportunity status between runs | Webhook status ledger (Tier 0) | **Zero quota.** Already live. |
-
-**Not obtainable, and why:** lat/lng, stairs, elevator, parking, materials, and job notes exist only via
-`GET /api/premium/opportunities/{id}/jobs/{jobId}` - **1 call per job**, the most expensive endpoint in
-the API. Deliberately skipped; the reports give structured addresses without it.
-
----
-
-## Historical dependency plan — retained for decision history
-
-```
-P0  probes + deploy dbt + on-run-end RLS        <- blocks everything
- |- P1  source.py bug fixes                      (parallel)
- \- P2  seeds + core.branches + crm_timezone
-     \- P3  enriched staging + quote crosswalk
-         \- P4  observation layer + core rewrite
-             |- P5  reports (needs H1, H2)
-             |   \- P6  enrichment candidates queue
-             \- P7  serving
-                 \- P8  schedules + catalog
-```
-
-- **P1 - Fix `source.py`.** Replace `opp_hashes`/`seen_ids`/`prior_ids` with one `st["opps"]` map holding
-  hash, last-enrichment time, service date, `leadStatus`, and a soft-delete marker. `seen` becomes a
-  run-scoped set, never state. Widen the hash to *everything the sweep returns*. Add a tiered staleness
-  TTL (24 h for `[today-3, today+21]`, 14 d elsewhere - a flat 24 h across the whole window would be
-  calls/month). Gate deletions on the service date being inside *this* sweep's window; add a `sweep_ok`
-  flag; move hash writes to after a successful call; add `allow_missing=True` for 404s.
-- **P2 - Seeds and timezone authority.** Load the five `OLD_TABLES/SCRDLA - *.csv` files as dbt seeds
-  (strip the Spanish notes row 2 from two of them - it would load as data). Add `crm_timezone` to
-  `dim_instance`. Build `core.branches` - the timezone authority CLAUDE.md mandates. Replace the three
-  hardcoded `'America/Los_Angeles'` literals. **Move RLS into an `on-run-end` hook**: at 5 builds/day,
-  "run `sql/10_apply_rls.sql` manually" is not viable, and between the `drop table` and the manual `psql`
-  **`app_read` sees every entity's rows**.
-- **P3 - Staging for the enriched data.** One model per raw table; charges as a single model with an
-  `estimated`/`actual` discriminator. Plus `int_opportunity_quote_crosswalk` - `(instance, quote_number)
-  -> external_opportunity_id`, the bridge every report needs.
-- **P4 - Observation layer, API arms only.** Build it before reports so Phase 5 adds `union all` arms
-  with **zero rework of core**.
-- **P5 - Reports.** n8n IMAP flow -> `report_*` landing -> staging -> new observation arms.
-  **Lead Status is the priority report**, and its landing table (`sql/33`), source declaration, cast
-  macros and staging model are already built ahead of schedule - only the n8n IMAP flow is missing.
-- **P6 - Report-driven enrichment queue.** The real fix for bug 1.
-- **P7 - Serving.** Additive columns on both existing views; two new views.
-- **P8 - Schedules.** Align n8n with [`crm_sync_contract.md`](crm_sync_contract.md) section 6.
-
-### Design correction to sync strategy 12.3 - BUILT AND PROVEN (2026-08-05)
-
-The sketched row-level `select distinct on (...) order by observed_at desc` is **wrong for this source
-mix and was not built.** It returns one whole row from one source, but the sources are
-*complementary*: the reports know `invoiced_amount`, `move_coordinator`, `booked_date` and structured
-addresses; the API knows `leadStatus`, `estimated_total__*` and charge lines. A row-level winner nulls
-out everything the winner does not know.
-
-**Measured, not argued: 177 of 657 opportunities (27%) have a sweep observation MORE RECENT than their
-enrichment.** The sweep carries no money. Row-level resolution would have silently wiped
-`estimated_final_total` on all 177. Per-field resolution keeps all 177 - verified zero wiped, total
-reconciles to the cent.
-
-Implemented as the `pick_latest` macro. The null-skip also defuses a second trap: the sweep re-stamps
-its extraction timestamp 5x/day even when nothing changed, so it would always out-timestamp an older
-enrichment. Correct for fields it knows, harmless elsewhere because it contributes NULL there.
-
-Recorded as [decisions/0005](decisions/0005-latest-observation-wins-is-per-field.md).
-
----
-
-## Open Questions
-
-### Probes
-
-| | Probe | Result |
-|---|---|---|
-| P1 | Does `_dlt_list_idx` exist on the charge/address child tables? | **ANSWERED - yes**, on every child table, and unique per parent (1458/1458, 1469/1469). Used as `charge_seq` / `address_seq`. |
-| P2 | `quote_number` type on both sides | **ANSWERED - they differ.** `bigint` on `opportunities_enriched`, `character varying` on the sweep child. Normalised to text in staging; without that cast the crosswalk silently returns nothing. |
-| P3 | Does the report's `Job Id` GUID equal `external_job_id`? | **Still open** - needs a real report file. Note `opportunities_enriched__jobs.id` and the sweep's job ids overlap 765/765, so the internal job identity is consistent. |
-| P4 | True opportunity count in a full sweep | **Partially answered** from the dev warehouse: 708 opportunities in the sweep, 657 enriched (51 not yet). Re-measure on the droplet after the P1 pipeline fixes run. |
-
-### The status model (read [status_model.md](status_model.md) before counting anything)
-
-Settled 2026-08-05. There are three status fields and only one is authoritative.
-
-- **`status` (integer) is THE field every metric counts on.** Nine values:
-  `0 NewLead, 1 LeadInProgress, 3 Opportunity, 4 Booked, 10 Completed, 11 Closed, 20 Cancelled,
-  30 Lost, 50 BadLead`. Now in the seed **`dim_opportunity_status`** with labels and boolean flags.
-  Leads and opportunities share this enum, so "booked" means one thing everywhere.
-  Two rules that are easy to get wrong: **Completed and Closed both count as booked** (they passed
-  through booking), and **BadLead is the only status excluded from a conversion denominator**.
-- **`leadStatus` (string) is a CRM pipeline label - context, never a metric.** Modeled as
-  `pipeline_status`. It does not track the outcome: a `status=30` (Lost) opportunity can read
-  `'Booked'` here.
-- **The report `Status` string is authoritative AND carries the reason** (`Lost price too high`).
-  Maps through `dim_status_map` at 99% coverage to the same `status_category` vocabulary, so counts
-  agree from either side.
-
-**Delivered:** `dim_opportunity_status` seed; `core.jobs` and `core.leads` now expose
-`*_status_label`, `*_status_category` and real boolean `is_booked / is_lost / is_cancelled /
-is_completed / is_bad_lead / is_open`; hardcoded `case` label logic removed. Conversion rate is now a
-one-liner. Flags load as booleans (not 0/1) so `where is_booked` works without `= 1`.
-
-> **Contract note - `serving.jobs_upcoming_v1.status` values changed.** Same 15 columns, same type,
-> but placeholders became real names: `status_20` -> `Cancelled`, `status_30` -> `Lost`,
-> `status_3` -> `Opportunity`. This is a fix, not a feature, and it is safe now because no consumer
-> app exists yet (roadmap Phase 3 has not started). Had one existed this would have needed a v2.
-
-### Findings that CORRECT the existing docs
-
-- **The two endpoints do NOT use different status codings.** `smartmoving_api_findings.md` and
-  `smartmoving_sync_strategy.md` both warn that the sweep and the detail endpoint code `status`
-  differently and that "only 4=Booked is stable". Measured across all 657 enriched opportunities the
-  two agree **100%** (4=4, 30=30, 20=20, 3=3, 10=10, 50=50, 11=11). No defensive reconciliation needed.
-  The genuinely separate namespace is `status` int vs `leadStatus` string - a `status=30` row can carry
-  `leadStatus='Booked'`.
-- **`lead_status` is dirty in a way that silently breaks counting.** Both `'Booked'` (283) and
-  `'Booked '` (51) occur in the same column. Untrimmed they group as two statuses and booked counts run
-  **15% low**. Trimmed once at the staging boundary.
-- **`__contacts` and `__opportunity_documents` DO exist** (18 and 455 rows) - earlier notes said they
-  did not. The enriched parent has 48 columns, not 44; `move_coordinator__*`, `cancellation_reason`,
-  `affiliate_*` and `trip_info__is_trip_info_applied` are all present.
-- **Job addresses are not an origin/destination pair.** Measured: 84 jobs have 1 address, 645 have 2,
-  29 have 3, 2 have 4. "Last one is the destination" is wrong for 115 jobs. Confirms that structured
-  addresses must come from the report.
-
-### Human decisions
-
-- ~~H1 - How does n8n learn `source_instance_id` from an email?~~ **RESOLVED 2026-08-06.** Two
-  dedicated aliases, mapped exactly (no fuzzy matching) in the `report_ingest` workflow:
-  `ld.reporting@ecomoversmoving.com` -> `ld`, `local.reporting@ecomoversmoving.com` -> `local`.
-  An email whose recipient matches neither lands in `report_ingest_errors`; it is never guessed.
-  > **TEMPORARY TEST ALIAS - REMOVE BEFORE GO-LIVE.** `reporting@ecomoversmoving.com` (generic, no
-  > instance in the name) is currently mapped to `local` purely to validate the flow end to end.
-  > A generic mailbox cannot identify an instance, so any later report sent there would be silently
-  > attributed to `local`. Delete that entry from the `Resolve Report Metadata` node once the two
-  > per-instance aliases are configured in the SmartMoving UI.
-- ~~**H2 - Report schedules in the SmartMoving UI.**~~ **CORRECTED.** Lead Status,
-  Booked Opportunities, Lost Leads, Cancellations and Payments can use SmartMoving's
-  native schedule. **All Jobs cannot.** `report_bot_all_jobs` controls a real browser,
-  logs into the SmartMoving web application, sets the All Jobs date window and clicks
-  Run Report so SmartMoving emails it. The bot only produces the email; the common
-  `report_ingest` workflow downloads, validates and lands the workbook. Current times
-  live only in `crm_sync_contract.md` section 6.
-- **H3 - RESOLVED.** The report `*at Utc` columns are CRM-configured-timezone, not UTC. See
-  "Timezone Semantics" above.
-- ~~H4 - `dim_status_map` keying~~ **RESOLVED 2026-08-05.** The seed keys on the **scheduled-report
-  `Status` string** (enum name + lost/cancelled subcategory), not on `leadStatus`. Measured coverage
-  against the Lead Status export: **99% of 5,278 rows**. No two-step lookup needed - a single
-  `norm_text` join on both sides is sufficient. The one gap, `Cancelled no availability` (5 rows), was
-  added to both the seed and the source sheet.
-- ~~H7 - `dim_status_map` covers only 2 of 8 statuses~~ **WITHDRAWN - I had this wrong.** I was
-  matching the seed against `leadStatus`, which is not what it maps. `leadStatus` is a CRM pipeline
-  label (context only, never a metric); the authoritative field is the `status` **integer**. See
-  [status_model.md](status_model.md).
-- ~~H6 - `dim_referral_source` duplicate `Affiliate - Adrian`~~ **RESOLVED 2026-08-05.** The near-empty
-  stub was a strict subset of the populated row; removed from both the seed and the source sheet.
-  Confirmed correct by the user. 10 fully-blank rows also dropped on load.
-- **H8 - `charge_category` needs a verified mapping.** Charge lines carry an int enum (observed
-  1,2,3,4,7,9,10; names suggest labour / transportation / materials / warehouse / valuation / storage /
-  shuttle). Deliberately left unlabelled - inventing names for unverified codes is how wrong business
-  logic gets baked in. Needs a seed read off the SmartMoving UI before any charge-category reporting.
-- **H5 - Retire the legacy `local` API consumer** (45% of that instance's quota). Not urgent at current
-  volumes, but it is what buys real headroom.
-
-### Workbook facts that shape the parser
-- `all-jobs.xlsx` has **no `Quote #`** - but `Job Number` is `<quote>-<seq>` (`131118-2`), giving a second,
-  independent path to the opportunity. Free crosswalk validation.
-- All report dates are `M/D/YYYY` **strings**, not Excel serials -> `to_date(x,'MM/DD/YYYY')`, never a
-  bare `::date` (that depends on `DateStyle`).
-- **Empty cells are physically omitted from the XLSX row XML.** The parser must materialise every declared
-  header as `null`, or `row_data` shape varies row-to-row and schema-drift detection breaks.
-- Sheet names differ (`jobs` for all-jobs, `data` for the rest) -> read sheet **index 0**, never a name.
-- Report `Status` / `Opportunity Status` are the **pipeline string**, the same namespace as `leadStatus` -
-  never merge them with the platform int.
-- `report_generated_at` must come from the email's RFC-2822 `Date:` header (fallback IMAP INTERNALDATE),
-  **never `now()`** - ingest delay would make a stale report falsely out-rank fresher API data.
-
----
-
-## Target Schedule and Quota
-
-**Moved to [`crm_sync_contract.md`](crm_sync_contract.md) sections 5-7.**
-
-The schedule, the quota model and the enrichment-trigger allowlist now live in exactly
-one file. They used to be restated here, in `smartmoving_sync_strategy.md`,
-`pipeline/README.md` and `serving_catalog.md`, and the four copies disagreed about both
-cadence and cost. `scripts/check_sync_contract.py` fails the build if they reappear.
-
-Still true and specific to this status document: the webhook enrichment worker is the
-only line item that can run away, so it keeps a per-run `--budget` **and** a daily
-ledger gate reading `scripts/api_call_log.jsonl`. Cheap sweeps and leads polls are
-never paused.
-
-## Completed
-
-### Repository (2026-08-05)
-- [x] Pushed to `https://github.com/NicolasCortesEcoM/Eco-Movers-Datawarehouse`.
-- [x] `.gitignore` excludes `smartmoving_scheduble_reports/` (live customer PII), `scripts/api_call_log.jsonl`,
-      `.playwright-mcp/`, `dbt/target/`, `dbt/logs/`, `dbt/.user.yml`, `**/__pycache__/`. Files left on disk, not deleted.
-- [x] All droplet/SSH/webhook values replaced with placeholders in docs; real values only in `.env`
-      (`droplet_ssh_host`, `droplet_ssh_user`, `n8n_docker_gateway`, `smartmoving_webhook_url`, `reporting_webhook_url`).
-
-### RAW Layer + Enrichment (validated end-to-end)
-- [x] dlt extraction: `leads`, `customers_service_window` (thin sweep), 11 dimensions - `pipeline/sm_pipeline/source.py`
-- [x] **Diff-driven enrichment** `--job enrich`: customers sweep as change detector -> only changed
-      opportunities call `GET /api/opportunities/{id}` with all 10 `Include*` flags. Output:
-      `raw_smartmoving.opportunities_enriched` plus child tables.
-- [x] dlt-state watermark persists in the destination; unchanged reruns cost only the sweep, 0 enrichment calls.
-- [x] Targeted enrichment `--ids a,b,c` (no sweep), the webhook worker entrypoint.
-- [x] Soft-delete for disappeared opportunities -> `raw_smartmoving.opportunity_deletions` (**see bug 2** - currently inert).
-- [x] 429 rate-limit handling with `Retry-After` retry plus proactive `pace` around 1.6 calls/sec.
-- [x] Seed: **178 ld opps + 479 local opps**, all with estimates; 1,458 charges, 1,469 addresses, 41 payments.
-- [x] Idempotency verified: ld rerun = 2 calls (sweep only), 0 duplicates.
-
-### Landing Tables
-- [x] `sql/20_webhook_events.sql` - append-only webhook log + deadletter, dedupe by hash.
-- [x] `sql/30_report_landing.sql` - `report_all_jobs`, precedence by `report_generated_at`, JSONB fidelity.
-- [x] `sql/31_report_booked_lost.sql` - `report_booked_opportunities` + `report_lost_leads`, same contract.
-
-### Transformations + Contracts
-- [x] dbt: staging -> core (`jobs`, `leads`) -> serving. 34/34 tests green.
-- [x] `serving.jobs_upcoming_v1` and `serving.leads_today_v1` published and cataloged.
-- [x] RLS by `entity_id` (`sql/10_apply_rls.sql`), cross-entity isolation verified.
-
-### Droplet - Migrated And Live (2026-07-22)
-- [x] `datawarehouse` database created; `sql/00_bootstrap.sql` applied.
-- [x] `platform_rw` and `app_read` created; both connect successfully.
-- [x] Laptop -> droplet SSH tunnel verified in Windows PowerShell.
-- [x] **Local -> droplet migration via Python/psycopg2** (`pg_dump` unavailable): 34 `raw_smartmoving`
-      tables, **18,637 rows**, API quota = 0. dlt state preserved. Droplet runs **PG 14**, so
-      `NULLS DISTINCT` was removed from reflected DDL.
-- [x] `dbt build` on the droplet: **34/34 green**; `serving.jobs_upcoming_v1` = 641 rows.
-- [x] `sql/10_apply_rls.sql` on the droplet, made resilient to redundant non-owner GRANTs.
-- [ ] Point `.env` (`postgres_*`) at the droplet through the tunnel for the next pipeline runs.
-- [ ] **Daily `pg_dump`/backup to Spaces/S3.** Early priority - if the droplet dies without a backup, the warehouse is lost.
-
-### n8n Webhook Log - Live (2026-07-22)
-- [x] `Datawarehouse Postgres` credential (host `<n8n_docker_gateway>`, value in laptop `.env`).
-- [x] Workflow `Reporting_datawarehouse` (id `KswuBX6pyuAAziEj`). The old `Cancelled Opportunity`
-      workflow (`fSs1rIV9Ik0m0824`) remains untouched and separate.
-- [x] Both instances send 17 events with `x-sm-instance: ld|local` plus shared `x-sm-secret`.
-- [x] Verified with real traffic: 160 events captured, both instances. API cost = 0.
-
-### Enrichment Orchestration - Built As Drafts (2026-07-22)
-- [x] **Tier 0 - status ledger without API calls.** `stg_smartmoving__webhook_opportunity_status` +
-      `int_opportunity_status_latest`. **136 live opps by status, API cost = 0.** 8 tests OK.
-- [x] **Worker `Enrichment_worker`** (id `XPBsZoF7goshMuz8`) every 5 min: unprocessed high-value events ->
-      debounce to distinct `--ids` by instance -> SSH `run.py --ids ... --budget 200` -> mark processed or
-      deadletter after 5 attempts. A parallel branch drains low-value events without spending quota.
-- [x] **Schedules:** `leads_poll` (id `lA0spX6AFyc3iNAg`), `opps_sweep` (id `eFQUiMawRkEMJoyX`),
-      `weekly_dims` (id `p6fjQ24sIBHRSWfM`), `nightly_reconciliation` (id `Sve0TiQArFuEcAXX`).
-- [ ] Deploy the pipeline on the host, confirm the SSH credential, publish the 6 workflows.
-
-### Historical checklist snapshot — superseded by the current status at the top
-- [ ] **P0** Deploy dbt to the droplet; run the four probes; `on-run-end` RLS hook.
-- [x] **P1** Fix the six `source.py` / `client.py` bugs (2026-08-05). New CLI flags
-      `--hot-ttl-hours` (24), `--cold-ttl-hours` (336), `--refresh-stale-hours`. State migrates itself
-      from the legacy `{opp_hashes, seen_ids, prior_ids}` layout on first run. Verified against a fake
-      API through a real dlt pipeline: 15 scenarios green, covering rerun idempotency, narrow windows,
-      mid-sweep failure, genuine disappearance, reappearance, 404 handling, legacy migration, TTL
-      tiering, and state pruning. **Not yet run against the live API or the droplet.**
-- [x] **P2** Seeds, `core.branches`, `crm_timezone`, hardcoded timezones removed (2026-08-05).
-      6 seeds in `dbt/seeds/` (the five `OLD_TABLES/SCRDLA - *.csv` plus `branch_timezone`);
-      Spanish column notes preserved as `_seeds.yml` descriptions instead of a phantom data row.
-      New: `core.branches` (timezone authority, carries `timezone` + `crm_timezone` + the only free
-      geocoded address in the API), `stg_smartmoving__branches`, macros `norm_text`, `entity_today`,
-      `apply_rls`. RLS now runs as an `on-run-end` hook. **Verified against the local dev warehouse:
-      78/78 tests green (was 34), `serving.jobs_upcoming_v1` contract byte-identical (same 15 columns),
-      RLS re-enabled on all 5 core+serving tables with `entity_access` correctly excluded.**
-      Generalization proven end-to-end by temporarily setting one branch to `Pacific/Auckland` and
-      confirming derived local dates moved with it, then reverting.
-- [x] **P3** Enriched staging + quote crosswalk (2026-08-05). 8 staging models + 2 intermediate;
-      all 13 raw enriched tables accounted for (8 modeled, 4 rolled into attachment counts, 1 parent).
-      **146/146 tests green** (was 78). Verified against the dev warehouse: **zero row loss** on every
-      model, estimated charge total and opportunity total reconcile to the cent
-      (2,317,448.20 / 2,313,887.88), crosswalk resolves 708 quotes with 0 unresolved and 0
-      quote-to-two-opportunities violations, and both serving contracts are unchanged (15 / 24 cols).
-      A column-by-column completeness audit flagged 12 apparent omissions; all 12 proved to be
-      renames, and 5 apparent value differences were all `nullif(x,'')` collapsing empty strings.
-- [x] **P4** Observation layer + `core.opportunities` + `core.jobs` rewrite (2026-08-05).
-      **198/198 tests green** (was 156). New: `pick_latest` macro,
-      `int_opportunity_observations` / `int_opportunity_latest_by_source`,
-      `int_job_observations` / `int_job_latest_by_source`, `core.opportunities` (708 rows - 657
-      enriched **plus 51 sweep-only that previously had no representation at all**),
-      `core.opportunity_charges`, `core.opportunity_payments`. `core.jobs` rebuilt off the
-      observation layer at the same 835-row grain; `int_opportunity_status_latest` is now a filter
-      over the shared observation model instead of duplicating the webhook parsing.
-      **Verified:** serving contracts structurally unchanged (15 / 24 cols); money reconciles to the
-      cent (2,313,887.88 core vs staging); charges 1,579 and payments 41 preserved.
-      **The design correction is empirically validated** - see the note below and
-      [decisions/0005](decisions/0005-latest-observation-wins-is-per-field.md).
-- [~] **P5** **n8n `report_ingest` workflow built (2026-08-06)** - id `3NRvDchKPT5RK4tn`; at this
-      historical snapshot it was inactive pending the IMAP credential. One IMAP route served the four then-configured reports: resolve instance
-      from the recipient alias -> resolve report type from the subject -> parse xlsx -> land `row_data`
-      verbatim as jsonb with `ON CONFLICT DO NOTHING`. `sql/32_report_ingest_errors.sql` created and
-      applied; `sql/31` also applied locally so dev matches the droplet.
-      Two node options do real work: `includeEmptyCells` fills blank cells so `row_data` keeps a stable
-      shape, and `readAsString` keeps every value as text, which is what the `rpt_*` cast macros expect.
-      **Architecture rule: the All Jobs bot only makes the email arrive.** It never parses or loads -
-      otherwise there would be two parsers and two landing contracts for the same report.
-      **Alerting (2026-08-06):** `datawarehouse_error_handler` (id `J1y2uCUFvCcNkZjZ`, published) posts
-      HARD failures to Slack `C075FDBFGHY` via `chat.postMessage`, mirroring the existing
-      Daily-Meetings error handler. `report_ingest` points at it via `errorWorkflow`. Separately, an
-      `Alert Unrecognised Report` node fires the moment an email cannot be resolved - those are
-      *handled* outcomes, not crashes, so the error trigger would never see them. Two failure classes,
-      two alerts, deliberately.
-      > ~~The Slack credential guess was wrong~~ **RESOLVED 2026-08-07.** The guessed credential
-      > (`Slack BOT n8n`) returned `channel_not_found` on `C075FDBFGHY` - that error means the TOKEN
-      > cannot see the channel (wrong workspace/bot), not that the channel is missing. Switched to
-      > **`EcoBot`**, which has access. Worth noting the general lesson: an alert path is not working
-      > until a real message has arrived, because a silent alerting failure manufactures confidence.
-      **Droplet (2026-08-06):** `report_ingest_errors` AND `report_lead_status` applied - the latter
-      had only ever been applied locally, so the droplet was missing the table the whole flow targets.
-      All five `report_*` tables now present.
-      **First real email tested 2026-08-07 - two design assumptions were WRONG.** The mailbox now
-      connects and the alias/instance/date resolution all work, but:
-      1. **The report is NOT attached.** SmartMoving emails a **download link** to Azure Blob Storage
-         (`.../report-exports/<guid>/lead-status.xlsx`); the message is plain `text/html` with no
-         multipart body. The file must be fetched over HTTP before it can be parsed.
-      2. **The subject is generic.** Every report arrives as *"Your SmartMoving Report is Ready!"*,
-         so it identifies nothing. The report type must come from the **filename in the download URL**
-         (`lead-status.xlsx`, `all-jobs.xlsx`, ...), which matches the sample exports exactly.
-      The email body also states *"containing N records"* (4,801 in the test), which gives a free
-      integrity check: compare rows landed against the count SmartMoving claims it sent, so a silent
-      truncation becomes visible.
-      The corrected `Resolve Report Metadata` node is applied and **verified against the real email**:
-      resolves `lead_status`, `report_lead_status`, the download URL, and `expected_records = 4801`.
-      Full node-by-node configuration is version-controlled at
-      [deploy/n8n_report_ingest_setup.md](deploy/n8n_report_ingest_setup.md); the Code node itself at
-      [deploy/n8n_report_ingest_resolve_node.js](deploy/n8n_report_ingest_resolve_node.js).
-      **END-TO-END GREEN 2026-08-07.** `Download Report File` (HTTP -> binary `data`),
-      the corrected `Extract Report Rows`, and the two row-count verification nodes were applied and
-      the full flow ran on the real email. `Assert Row Count Matches` returned
-      `expected_records: 4801, landed_records: 4801, verified: true`.
-      **Post-run database audit - every check passed:**
-      | Check | Result |
-      |---|---|
-      | Rows landed / distinct `row_key` | 4,801 / 4,801 - no duplicate Quote # |
-      | Header count per row | **16 on every single row** - `includeEmptyCells` works; 4,796 rows carry at least one empty-string cell that xlsx would otherwise have omitted |
-      | Headers vs `stg_smartmoving__report_lead_status` | all 16 consumed, none unmapped |
-      | Fallback `__nokey__` hashes | **0** - `Quote #` populated on every row |
-      | `report_generated_at` | `2026-08-07 14:22:10Z` from the `Date:` header, not `now()` |
-      | **Instance attribution** | **PROVEN.** All 6 report branches (Seattle, South Sound, Kirkland, Lynnwood, Bremerton, Long Distance Team) match `local` exactly; **0 match `ld`** (Main Office, South Sound LD). The one silent failure mode in the whole design is ruled out for this email. |
-      | `dim_status_map` coverage | **38/38 observed statuses mapped, 0 unmatched** |
-      | Received-at span | 2026-05-09 -> 2026-08-07 (~3 months) |
-      | Quote crosswalk | 455 of 479 `local` API opportunities found in the report; the other 24 fall outside the report's received-date span, as expected |
-      > **One stale row in `report_ingest_errors`** - the pre-fix run of this same email
-      > (`unrecognised report subject | email has no attachment`). It is a false positive: that
-      > `message_id` ingested successfully afterwards. Clear it before the table is wired to an alert,
-      > or the first real alert will be noise.
-      Remaining: schedule the reports in the SmartMoving UI, the dbt cascade workflow, and the
-      other three staging models.
-- [~] **P5** **Lead Status report done ahead of schedule (2026-08-05):** `sql/33_report_lead_status.sql`
-      landing table applied, source declared, `report_casts.sql` macros, and
-      `stg_smartmoving__report_lead_status`. **Validated by loading the real 5,278-row export into the
-      dev warehouse and running the actual parser**: every null has a documented cause (331 `0/0/0`
-      service-date sentinels, 1,543 blank Quote Sent, 134 blank + 3 `--` time-to-contact), 0
-      unexplained; status classified **5,278/5,278 with zero unmatched**; timezone conversion verified
-      (`12:16 AM` Pacific -> `07:16` UTC). Test PII was truncated from the dev table afterwards.
-      At that historical snapshot, P5 still required the n8n IMAP flow, three more
-      report types and their observation arms. See the current status at the top.
-- [ ] **P6** `mart_enrichment_candidates` + `enrichment_from_reports` workflow.
-- [ ] **P7** Historical proposal: additive columns on the original two serving
-      contracts plus new opportunity/job contracts. Superseded in part by the five
-      serving contracts listed in `serving_catalog.md`; `serving.opportunities_v1`
-      remains open.
-- [ ] **P8** Align schedules with the sync contract; update `serving_catalog.md`.
-- [ ] Complete the sweep `status` enum mapping (3/10/20/30/50).
-
-### Deferred, deliberately
-- [x] **Lead -> opportunity map. DONE 2026-09-09, and no fuzzy match was needed.** Sync strategy 10.1
-      proposed matching on email/phone/branch/date, and this item was deferred on the premise that
-      `/api/leads` returns no opportunity id. The premise was false: the lead's `id` IS the opportunity
-      GUID (23,717 byte-identical ids; six absent ones confirmed live against
-      `GET /api/opportunities/{id}`). `/api/leads` is now an arm of `int_opportunity_observations`.
-      `core.opportunities` 58,678 -> 71,874; booked unchanged at ~26,640, so the entire correction is in
-      the conversion denominator. See `AUDIT_PLAN.md` A5.
-- [ ] Notes, follow-ups, interaction history, inventory item lines, document URLs, Premium per-job calls.
-
----
-
-## Connection Architecture (established 2026-07-22)
-
-- **Droplet:** address in laptop `.env` as `droplet_ssh_host`, hostname `n8n`. **Postgres and n8n live on
-  the same machine.** n8n reaches Postgres through `localhost` from the host side, with no tunnels and no
-  public database port.
-- **Dedicated database:** `datawarehouse`, separate from the overtime app DB. Isolation is at database
-  level, not schema level. Schemas: `raw_smartmoving`, `staging`, `core`, `marts`, `serving`.
-- **Roles:** never connect apps as `postgres` or superuser.
-  - `platform_rw` - dlt + dbt. Owner of everything inside `datawarehouse`.
-  - `app_read` - consumer apps. `SELECT` only on `serving` + `core`, with RLS by `entity_id`.
-  - **Rule:** one role per access pattern, not per app. Entity isolation comes from RLS
-    (`core.entity_access`). Create a new role only when permissions differ.
-- **Laptop access:** SSH tunnel only; do not open port 5432.
-  ```bash
-  ssh -L 5433:localhost:5432 <droplet_ssh_user>@<droplet_ssh_host>
-  # values in laptop .env: droplet_ssh_user, droplet_ssh_host
-  # with the tunnel open, the laptop connects to localhost:5433 -> droplet Postgres
-  ```
-- **Backups:** pending, early priority. Self-hosted means backups are our responsibility.
-- **n8n runs in Docker; Postgres runs natively on the host.** Docker `localhost` points to the container.
-  - n8n network `n8n-docker-caddy_default`, gateway in laptop `.env` as `n8n_docker_gateway`.
-  - `ufw allow from 172.18.0.0/16 to any port 5432 proto tcp`, plus one `pg_hba.conf` line per role. PG 14.
-  - `ot-project-db-1` is the overtime project's Postgres 16 container, completely separate. Do not touch.
-
----
-
-## Key Facts And Decisions
-
-- **Quota:** 125k/month **per instance**. `local` was already around 45% from an existing app that should
-  be retired; `ld` around 6%.
-- **Short-window rate limit** around 120/min in addition to the monthly quota - see `smartmoving_api_findings.md`.
-- **`Include*` flags cost no extra quota.** Always request all 10 on the opportunity detail call.
-- **`GET /api/leads/{id}` is byte-identical to a list row.** Never call it.
-- **No lead-created webhook:** leads are always polling. A converted lead disappears from `/api/leads` but
-  continues as an opportunity through sweep + enrichment; raw keeps both halves.
-- **`PageSize` caps at 200**; requesting more silently returns 200. Date filters are integer `YYYYMMDD`.
-- **No `modifiedSince` filter exists anywhere** in the 65 endpoints. This is why the hash-diff sweep exists.
-- **Self-hosted droplet persistence** is correct for Phase 1. Move to Managed Postgres only on the
-  `CLAUDE.md` trigger: analytical queries compete with n8n, or history outgrows the operational DB.
-- **Audit workflow `Cancelled Opportunity`** (`fSs1rIV9Ik0m0824`) stays active, untouched, and unrelated.
-  It has API keys hardcoded in plaintext and should eventually use the `SM LD API` / `SM API LOCAL API`
-  credentials; pending, not urgent.
+| 1 | Grant access to the other three Google Ads child accounts | Nicolas | Google Ads manager |
+| 2 | Meta Business System User token | Nicolas | - |
+| 3 | Intuit Developer app + QuickBooks admin consent (Phase E prerequisites) | Nicolas | - |
+| 4 | Phase D: schedule `sales-person-activity-details`, `outstanding-balances`, `refunds`, `affiliates` | Nicolas (UI) + Claude (wire) | - |
+| 5 | Cancellations by ZIP and by reason (§4.3) | Claude | decision to build |
+| 6 | `report_ingest` quarantine after N failures (§4.6) | Claude | - |
+| 7 | Open the PR `warehouse-audit-and-sales-kpis` -> `main` | Nicolas | - |
