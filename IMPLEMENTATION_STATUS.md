@@ -380,6 +380,15 @@ Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
    dedicada; en otras cuentas cada campana tendra su propia fuente. Resultado: 100% del
    gasto atribuido, $0 sin mapear.
 
+   **Fuentes de marketing fijadas por Nicolas (2026-09-15)** en `dim_referral_source.is_paid`:
+   Google Ads (todas), Google Guarantee, Bing Ads, Meta (Facebook/Instagram/Meta Ads), Yelp
+   (todas), Great Guys, Move Buddha, Snoball. Todo lo demas es organico - `PNW` es la fuente
+   organica de PNW Moving y no recibe gasto. Cambios: Snoball paso a marketing; Snapchat,
+   Thumbtack, Youtube Ads y USA Homelisting pasaron a organico (marcados "confirmar");
+   12 fuentes nuevas del CRM anadidas (GBP Kirkland con 157 leads, GBP Everett, Yelp Gig
+   Harbor, OpenAI Ads, Smart Scout, Copilot, afiliados). 2026 YTD: 5.602 leads de
+   marketing en 9 familias, 10.211 organicos.
+
    **Lo que dicen los numeros correctos (PNW Google Ads, $39.181):**
    - CPL historico **$86-$200**, CPA $280-$650, CER 0.10-0.41 (2024-10 → 2025-04).
    - En los meses fuertes solo el 6-13% del gasto cae en dias sin lead; el "63%" de
@@ -387,7 +396,8 @@ Falta, en orden - **y los pasos 0 y 1 son de Nicolas**:
      diarios.
    - **2026-08: $1.999 / 3 leads = CPL $666, CPA $1.999.** Pendiente de aclarar con
      Nicolas si los 431 leads del source `PNW` (2024-08..12) y los 15 de 2026-08 son la
-     misma fuente que `PNW Google Ads` antes de leerlo como deterioro.
+     misma fuente que `PNW Google Ads` antes de leerlo como deterioro. **Respondido: `PNW`
+     es organico. El CPL de $666 en 2026-08 es real.**
 4. Vista `serving.campaign_daily_v1` cuando haya un consumidor.
 
 **REGLA DE REPARTO DEL COSTE, definida por Nicolas el 2026-09-10 y no negociable:** el
