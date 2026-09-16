@@ -285,6 +285,15 @@ models:
         data_tests: [not_null, unique]
       - name: entity_id
         data_tests: [not_null]
+      - name: transaction_kind
+        description: >
+          payment (amount > 0), refund (money returned), bounce (a Check/E-Check that
+          exactly offsets an earlier payment - NSF return, not a refund), zero. Net cash
+          is sum(payment_amount) regardless; refund reporting must exclude bounces.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['payment', 'refund', 'bounce', 'zero']
       - name: payment_target
         description: What the payment is against.
         data_tests:

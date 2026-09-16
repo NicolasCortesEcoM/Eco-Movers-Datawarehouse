@@ -191,6 +191,21 @@ mover", 9% price; win-back 2%. Open: no cancellation has a payment on record (de
 not taken, or refunds leave the report - the Refunds report answers it). Serving views
 when a consumer needs them; the marts are readable from Metabase now.
 
+**Payments audit, refunds and outstanding balances - done 2026-09-15.** Audit on the
+accumulated `core.payments` (36,890 rows): identical same-day pairs (11) are real split
+payments - they reconcile to the invoice to the cent - except 4 whose total is exactly
+twice the invoice (duplicate entries, flagged `is_exact_double`); negatives carry no
+marker, so `transaction_kind` classifies them by shape: 32 `bounce` (E-Check that
+exactly reversed an earlier payment, 26 re-collected later) vs 1,524 `refund`;
+overpaid opportunities 40 of 25,680. `marts.fct_refunds_daily` (DAILY base so weekly and
+monthly are GROUP BYs; refunds exclude bounces; collected on the same row for rates) and
+`marts.fct_outstanding_balances` (one row per unsettled opportunity: invoice = sum of the
+jobs' actual cost - the opportunity's own figure is null for 301 ld closed opps -, net
+paid from the report or the API, `population` and `balance_kind`, aging from the
+completed/service date). First reading: $689K open on 301 invoiced opportunities, 75% of
+it 90+ days and mostly commercial / Bill-To-Account customers that settle outside the
+CRM - QuickBooks closes that gap. Refund rate 2026: 0.5-1.5% of collected per month.
+
 **Booking survival and first-contact speed - done 2026-09-15.**
 `int_booking_detail` (booking date from job > Booked report > webhook > lead date as a
 measured proxy, source on the row) -> `fct_booking_survival` (share alive N days after

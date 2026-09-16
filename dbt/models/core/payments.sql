@@ -57,6 +57,9 @@ select
 
     p.payment_date_local,
     p.payment_amount,
+    p.transaction_kind,
+    p.is_full_reversal,
+    p.reversed_payment_key,
     p.dup_seq,
     p.first_observed_at,
     p.last_observed_at,

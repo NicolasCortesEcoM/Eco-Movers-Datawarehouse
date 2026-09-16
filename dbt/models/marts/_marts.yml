@@ -438,3 +438,50 @@ models:
         data_tests: [not_null, unique]
       - name: bookings
         data_tests: [not_null]
+
+  - name: fct_refunds_daily
+    description: >
+      Money returned to customers next to money collected, one row per (entity, line,
+      branch, payment method, day). DAILY base so weekly and monthly refund reports are
+      GROUP BYs, never new models. refund_amount excludes bounces (Check/E-Check that
+      reversed an earlier payment - a collection failure, reported on its own columns).
+      Sum then divide for refund rates; never average daily rates.
+    columns:
+      - name: refund_day_key
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: activity_date
+        data_tests: [not_null]
+      - name: refund_amount
+        data_tests: [not_null]
+
+  - name: fct_outstanding_balances
+    description: >
+      Every opportunity whose money is not settled as of the last build: balance =
+      invoiced - net paid, computed from core.opportunities and core.payments (API
+      payments where the report never covered the opportunity). One row per
+      opportunity with |balance| >= 1. `population` says why the row exists (invoiced,
+      closed_no_invoice, cancelled_paid, service_not_closed); `balance_kind` says who
+      owes whom - never sum across kinds blindly. Aging runs from the completed or
+      service date (Invoice Sent At is not in the warehouse). Storage accounts excluded.
+    columns:
+      - name: balance_key
+        data_tests: [not_null, unique]
+      - name: entity_id
+        data_tests: [not_null]
+      - name: balance
+        data_tests: [not_null]
+      - name: population
+        data_tests:
+          - accepted_values:
+              values: ['invoiced', 'closed_no_invoice', 'cancelled_paid', 'service_not_closed']
+      - name: balance_kind
+        data_tests:
+          - accepted_values:
+              values: ['customer_owes', 'we_owe']
+      - name: external_opportunity_id
+        data_tests:
+          - relationships:
+              to: ref('opportunities')
+              field: external_opportunity_id

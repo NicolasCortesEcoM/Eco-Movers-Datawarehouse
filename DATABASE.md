@@ -269,6 +269,8 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `fct_campaign_spend_daily`         | table | Ad spend split per lead across lines of business, with CPL / CPA / CER. Spend on a day with no lead sits on line `unassigned`, `has_leads = false` — 63% of it today, so aggregate by month, never average daily CPLs |
 | `int_cancellation_detail`          | view  | One row per cancellation with geography, reason, timing, late flag, value, deposit, win-back. Base of the two marts below; open it when a number needs a face |
 | `fct_cancellations_by_zip`         | table | Cancellations by origin ZIP WITH the denominator (booked + cancelled), cohort by lead month, reasons as columns. Sum numerators and denominators to roll up; filter `booked_or_cancelled >= 20` before ranking |
+| `fct_refunds_daily` | table | Refunds, bounces and collected cash per (entity, line, branch, method, day); daily base for weekly/monthly reports |
+| `fct_outstanding_balances` | table | One row per unsettled opportunity: invoice (sum of jobs' actual cost) - net paid, population, balance_kind, aging |
 | `fct_cancellation_reasons_monthly` | table | Why customers cancel, by month it happened (period grain); share of month, how late, what it cost. Reason coverage from 2026-01-02 |
 | `int_booking_detail`               | view  | Every booking with its booking date (source on the row, incl. a measured lead-date proxy), cancellation date, lead time and exposure |
 | `fct_booking_survival`             | table | Share of bookings alive N days after booking and the hazard per window - when to call to reconfirm. Sum at_risk / cancelled to roll up |
