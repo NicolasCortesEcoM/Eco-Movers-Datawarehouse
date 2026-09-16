@@ -248,6 +248,13 @@ local.
 
 ## 5. Incidents worth remembering (root causes still relevant)
 
+- **2026-09-15 - `core.payments` forgot money nightly.** The Payments export is a rolling
+  90-day window and the model took the newest generation whole, so a payment left core
+  the day it aged out; raw still had every generation. Fixed by `int_report_payments_all`
+  (union all generations, dedupe by transaction identity, `is_current` for edits/voids)
+  and by reloading the ranges no generation covered (`scripts/load_report_export.py`).
+  Rule since then: **every report-fed table is accumulative** - audited the five keyed
+  reports the same day; they already were (`distinct on (key)` across generations).
 - **2026-07-22..08-08 - extraction silently dead 17 days.** `platform_rw` lacked
   `CREATE ON DATABASE`, so dlt's merge staging dataset failed *after* the API calls were
   spent; the SSH node piped the exit code away. Fixes: the grant, and every n8n SSH
@@ -304,6 +311,6 @@ local.
 | 1 | Grant access to the other three Google Ads child accounts | Nicolas | Google Ads manager |
 | 2 | Meta Business System User token | Nicolas | - |
 | 3 | Intuit Developer app + QuickBooks admin consent (Phase E prerequisites) | Nicolas | - |
-| 4 | Phase D: schedule `sales-person-activity-details`, `outstanding-balances`, `refunds`, `affiliates` | Nicolas (UI) + Claude (wire) | - |
+| 4 | Phase D: schedule `sales-person-activity-details` and `affiliates` (Outstanding Balances and Refunds are derivable from Payments + All Jobs - decided 2026-09-15; marts pending Nicolas's go) | Nicolas (UI) + Claude (wire) | - |
 | 6 | `report_ingest` quarantine after N failures (§4.6) | Claude | - |
 | 7 | Open the PR `warehouse-audit-and-sales-kpis` -> `main` | Nicolas | - |

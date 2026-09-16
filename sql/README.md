@@ -35,6 +35,13 @@ Same idea for Microsoft Advertising: `raw_microsoft_ads.accounts` and
 `raw_microsoft_ads.campaign_daily`, money columns as text (Microsoft sends decimal
 strings; staging casts). Applied to the droplet 2026-09-15.
 
+## Manual report exports
+
+`scripts/load_report_export.py --report payments --instance local file.xlsx` lands a
+hand-exported report in the exact n8n landing shape (position row keys, file mtime as
+`report_generated_at`, `_source_email = manual-export:<file>`), for ranges no scheduled
+window ever covered. Re-running the same file is a no-op.
+
 ## `34_report_retention.sql`
 
 Prunes the report landing tables: every generation is kept for 10 days, then one per

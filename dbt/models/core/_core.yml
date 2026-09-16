@@ -261,7 +261,8 @@ models:
   - name: payments
     description: >
       Every payment the business has received, from the Payments scheduled report.
-      Grain: one row per (source_instance_id, row position in the newest export).
+      Grain: one row per (source_instance_id, transaction identity, duplicate
+      ordinal), accumulated across every report generation.
 
       NOT a replacement for opportunity_payments and not merged with it. That model
       holds payments embedded in the API's enriched opportunity payload - 1,965 rows,
@@ -272,13 +273,15 @@ models:
       shared payment identifier to merge on, so merging them would either double count
       or invent a match.
 
-      A SNAPSHOT, NOT A LEDGER. It is the newest export taken whole, because the report
-      carries no stable per-payment key - its row key is the row's position in the
-      file. A payment that falls out of the report window disappears from here. Do not
-      treat it as a financial system of record and do not diff builds to find refunds.
+      ACCUMULATIVE (2026-09-15). The export is a rolling 90-day window, so every
+      generation is unioned and deduplicated by transaction identity (day, amount,
+      target, method, instrument) in int_report_payments_all; user-editable fields take
+      the newest generation's value. Nothing ages out. Refunds are the negative rows.
+      A payment edited or voided inside the newest window is excluded (the newest
+      export is the CRM's truth there); older history cannot age out.
     columns:
       - name: payment_key
-        description: Grain key - instance plus the row's position in the newest export.
+        description: instance:identity_hash:dup_seq - stable across generations.
         data_tests: [not_null, unique]
       - name: entity_id
         data_tests: [not_null]

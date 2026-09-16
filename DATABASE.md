@@ -50,7 +50,7 @@ Counts measured 2026-09-10.
 | `lines_of_business`    | one per job                                                        | 63,576 |   12 |
 | `leads`                | `(source_instance_id, external_lead_id)`                           | 36,932 |   33 |
 | `opportunity_charges`  | `(instance, external_job_id, charge_kind, seq)` — **job grain**    | 10,209 |   15 |
-| `payments`             | `(instance, row position in the newest Payments export)`           |  3,037 |   19 |
+| `payments`             | `(instance, transaction identity, dup ordinal)` - accumulative     | 36,890 |   19 |
 | `opportunity_payments` | `(instance, external_opportunity_id, seq)`                         |  2,006 |   13 |
 | `agents`               | one per CRM-written salesperson name                               |     68 |    8 |
 | `branches`             | `(source_instance_id, branch_name)` — **the timezone authority**   |      8 |   18 |
@@ -72,18 +72,28 @@ every conversion rate published before that date read high. See `AUDIT_PLAN.md` 
 
 `opportunity_payments` holds payments embedded in the API's enriched opportunity payload —
 only the opportunities a detail call reached, but with a real GUID and ordinal.
-`payments` is the Payments scheduled report taken whole: every payment in the report
-window at zero quota, carrying the payment **date**, method, card confirmation, terminal,
+`payments` is the Payments scheduled report, every generation accumulated: every payment
+since 2023 (local) / 2025-03 (ld) at zero quota, carrying the payment **date**, method, card confirmation, terminal,
 and payments made against a **job** or a **storage account** rather than an opportunity.
 
 They are **not merged, and must not be.** There is no shared payment identifier to merge
 on — SmartMoving emits no payment id and the report carries no GUID — so any union would
 either double count or invent a match.
 
-`payments` is a **snapshot, not a ledger**: it is the newest export, because the report's
-row key is the row's position in the file. A payment that falls out of the report window
-disappears from it. Never use it as a financial system of record, and never diff two
-builds of it to detect refunds.
+**REPORT-FED TABLES ARE ACCUMULATIVE (Nicolas, 2026-09-15).** Every scheduled export is
+a window (Payments: rolling 90 days), so a model that reads only the newest generation
+forgets rows as the window slides. The rule for every `int_report_*` model: union every
+generation ever landed, keep one row per business key with the newest generation's
+values. For the five keyed reports (Lead Status, All Jobs, Booked, Lost Leads,
+Cancellations) that is `distinct on (key)` and has always been so. Payments has no
+key, so `int_report_payments_all` deduplicates by **transaction identity** (day, amount,
+target, method, instrument), keeps identical same-day payments via `dup_seq`, takes
+user-editable fields from the newest generation, and drops a row the newest window
+should list but does not (`is_current` false = edited or voided in the CRM). Until
+2026-09-15 `core.payments` was the newest export whole and lost history nightly; the
+missing ranges were reloaded from manual exports with `scripts/load_report_export.py`
+(local 2026-01..09, ld 2026-01..09; 2023-2025 were already in raw from the September
+historical load). Refunds are the negative rows; there is no separate refunds table.
 
 ### WARNING: `core` also holds three tables that are not ours
 
@@ -248,7 +258,7 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `int_report_all_jobs_latest`       | view  | Newest All Jobs row per job — the ~60 single-source fields           |
 | `int_report_lost_leads_latest`     | view  | Newest Lost Leads row per opportunity                                |
 | `int_report_cancellation_latest`   | view  | Newest Cancellation Details row per opportunity — **when** a deal died and **how much** it cost |
-| `int_report_payments_latest`       | view  | The newest Payments generation, **whole**. It cannot be a per-row winner: the export carries no payment id, so its row key is the row's position in the file |
+| `int_report_payments_all`          | table | Every Payments generation unioned and deduplicated by transaction identity (no payment id exists); `dup_seq` keeps identical same-day payments; `is_current` drops rows edited/voided inside the newest window. Feeds `core.payments` |
 | `int_opportunity_line`             | view  | One line of business per opportunity, collapsed from its jobs. Shared by both cohort marts so the `min` tie-break exists once |
 | `fct_agent_leads_daily`            | table | Sales KPIs, cohort grain: (agent, line, day the lead arrived) — 12,643 rows |
 | `fct_lead_source_daily`            | table | Same cohort grain by **marketing channel** — 10,756 rows. Where ad spend attaches later |

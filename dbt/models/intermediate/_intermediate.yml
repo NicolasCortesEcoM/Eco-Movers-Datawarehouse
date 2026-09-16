@@ -104,6 +104,25 @@ models:
       - name: observed_at
         data_tests: [not_null]
 
+  - name: int_report_payments_all
+    description: >
+      Every payment any Payments generation ever listed, once. ACCUMULATIVE: the export
+      is a rolling 90-day window, so generations are unioned and deduplicated by
+      transaction identity (instance, day, amount, target, method, instrument);
+      user-editable fields take the newest generation's value; identical payments in
+      one generation keep their multiplicity via dup_seq. Replaces
+      int_report_payments_latest (2026-09-15), which forgot a payment the day it aged
+      out of the window. Feeds core.payments.
+    columns:
+      - name: payment_key
+        data_tests: [not_null, unique]
+      - name: identity_hash
+        data_tests: [not_null]
+      - name: payment_date_local
+        data_tests: [not_null]
+      - name: first_observed_at
+        data_tests: [not_null]
+
   - name: int_opportunity_line
     description: >
       One line of business per opportunity - every opportunity in core, not only the

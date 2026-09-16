@@ -1,5 +1,7 @@
 -- core.payments - every payment the business has received, as the CRM reports it.
--- Grain: one row per (source_instance_id, row position in the newest Payments export).
+-- Grain: one row per (source_instance_id, transaction identity, duplicate ordinal) -
+-- ACCUMULATIVE across every Payments generation ever landed, see
+-- int_report_payments_all for the identity and the deduplication rule.
 --
 -- ⚠️ NOT THE SAME THING AS core.opportunity_payments, AND BOTH ARE CORRECT.
 --
@@ -23,10 +25,13 @@
 -- union would either double count or invent a match. Two tables with clearly
 -- different scopes beat one table with a fabricated key.
 --
--- WHAT THIS CANNOT DO. It is a snapshot of the newest export, not an append-only
--- ledger: a payment that falls out of the report window disappears from here. Do not
--- use it as a financial system of record, and do not diff two builds of it to detect
--- refunds. It answers "what has been paid, against what, by what method, when".
+-- ACCUMULATIVE, NOT A SNAPSHOT (changed 2026-09-15). The Payments export is a rolling
+-- 90-day window; this model used to take the newest generation whole, so a payment
+-- vanished from core the day it aged out. Now every generation is unioned and
+-- deduplicated by transaction identity, so history from 2023 (local) / 2025 (ld) is
+-- here and nothing ages out. Refunds are the negative rows. A payment edited or
+-- voided inside the newest window is dropped (the newest export is the CRM's truth
+-- there); see `is_current` in the int model.
 --
 -- The opportunity link resolves through the quote crosswalk like every other report.
 -- Rows whose quote never resolves keep external_opportunity_id null rather than being
@@ -52,6 +57,10 @@ select
 
     p.payment_date_local,
     p.payment_amount,
+    p.dup_seq,
+    p.first_observed_at,
+    p.last_observed_at,
+    p.is_in_newest_generation,
     p.cc_fee,
     p.payment_method,
     p.payment_category,
@@ -61,7 +70,9 @@ select
 
     p.observed_at                                       as synced_at
 
-from {{ ref('int_report_payments_latest') }} p
+from {{ ref('int_report_payments_all') }} p
 left join {{ ref('int_opportunity_quote_crosswalk') }} x
   on  x.source_instance_id = p.source_instance_id
   and x.quote_number       = p.quote_number
+-- Superseded rows (edited/voided inside the newest window) stay in the int model only.
+where p.is_current
