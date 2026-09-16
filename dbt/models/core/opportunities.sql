@@ -84,6 +84,29 @@ job_service_date as (
 --
 -- Note this is a LAST RESORT in the pick_latest ordering below: a value that came
 -- straight from the opportunity always beats one inferred through its jobs.
+-- REALISED REVENUE from All Jobs: the sum of the opportunity's jobs' Total Actual
+-- Cost. Nicolas, 2026-09-15: revenue follows All Jobs, never the Booked report. A
+-- long-distance move is two jobs (pickup + delivery, sometimes months apart) and a
+-- commercial job may never appear in a Booked generation; the Booked figure was
+-- null for 301 of 810 closed ld opportunities. Where the two exist they agree
+-- (26,131 of 26,136 closed opportunities, 2026-09-15).
+jobs_actual as (
+    select
+        j.source_instance_id || ':' || j.external_opportunity_id as opportunity_key,
+        sum(aj.total_actual_cost)                               as jobs_actual_total
+    from (
+        -- int_job_latest_by_source has one row per (job, SOURCE); collapse to the
+        -- job first or every multi-source job is summed twice.
+        select distinct on (job_key) job_key, source_instance_id, external_opportunity_id
+        from {{ ref('int_job_latest_by_source') }}
+        where external_opportunity_id is not null
+        order by job_key, observed_at desc, source_priority
+    ) j
+    join {{ ref('int_report_all_jobs_latest') }} aj
+      on aj.job_key = j.job_key
+    group by 1
+),
+
 agent_from_jobs as (
     select distinct on (j.source_instance_id, j.external_opportunity_id)
         j.source_instance_id || ':' || j.external_opportunity_id as opportunity_key,
@@ -362,15 +385,12 @@ resolved as (
         coalesce(enr.created_at_utc, lds.created_at_utc, rpt.created_at_utc)
                                                     as created_at_utc,
 
-        -- REALISED revenue, and the only column in the warehouse that carries it.
-        -- Read straight off the Booked Opportunities report rather than through
-        -- pick_latest, because there is exactly one source: `estimated_final_total`
-        -- is a quote. `total_actual_cost` on All Jobs is the SAME realised figure,
-        -- at job grain - measured 2026-09-01, 2,552 of 2,554 single-job
-        -- opportunities agree to the cent, correlation 1.0000. Both are kept
-        -- because they differ in grain, not in meaning: this one is the only
-        -- opportunity-level realised total, All Jobs is the only per-job breakdown.
-        bkd_extra.invoiced_amount                           as invoiced_amount,
+        -- REALISED revenue: the sum of the jobs' Total Actual Cost (All Jobs), the
+        -- Booked report's figure only where no job row exists. Since 2026-09-15 -
+        -- see jobs_actual above. `estimated_final_total` is a quote, not revenue.
+        coalesce(nullif(ja.jobs_actual_total, 0), bkd_extra.invoiced_amount,
+                 ja.jobs_actual_total)                      as invoiced_amount,
+        bkd_extra.invoiced_amount                           as booked_report_invoiced_amount,
         bkd_extra.booked_date_local                         as booked_date_local,
         cxl.cancelled_date                                  as cancelled_date_local,
         cxl.cancelled_amount                                as cancelled_amount,
@@ -401,6 +421,7 @@ resolved as (
     left join rpt on rpt.opportunity_key = b.opportunity_key
     left join bkd on bkd.opportunity_key = b.opportunity_key
     left join bkd_extra on bkd_extra.opportunity_key = b.opportunity_key
+    left join jobs_actual ja on ja.opportunity_key = b.opportunity_key
     left join cxl       on cxl.opportunity_key       = b.opportunity_key
     left join agent_from_jobs ajo on ajo.opportunity_key = b.opportunity_key
     left join job_service_date jsd on jsd.opportunity_key = b.opportunity_key

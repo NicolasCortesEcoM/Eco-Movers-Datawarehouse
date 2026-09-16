@@ -206,6 +206,18 @@ completed/service date). First reading: $689K open on 301 invoiced opportunities
 it 90+ days and mostly commercial / Bill-To-Account customers that settle outside the
 CRM - QuickBooks closes that gap. Refund rate 2026: 0.5-1.5% of collected per month.
 
+**Revenue follows All Jobs (Nicolas, 2026-09-15).** `core.opportunities.invoiced_amount`
+is now the sum of the opportunity's jobs' Total Actual Cost (All Jobs), Booked report
+only as fallback; the old value stays as `booked_report_invoiced_amount`. Effect on
+closed/completed revenue: local $43.12M -> $43.45M (+164 opportunities that were never
+in a Booked generation), **ld $3.58M -> $5.57M** (+301). Every revenue mart moved with
+it. An LD opportunity is settled when Closed or when payments reach that total
+(`is_delivery_pending` in the balances mart: 40 today). `mart_payment_discrepancies`
+is the work queue for accounting fixes in SmartMoving (never auto-excluded): 4
+duplicate-entry suspects, 12 overpaid, 18 paid with no invoice, 2 cancelled holding
+money, 4 bounces not re-collected ($12K). Commercial / Bill-To-Account rows with no
+CRM payment stay unmarked until QuickBooks AR is crossed with them.
+
 **Booking survival and first-contact speed - done 2026-09-15.**
 `int_booking_detail` (booking date from job > Booked report > webhook > lead date as a
 measured proxy, source on the row) -> `fct_booking_survival` (share alive N days after

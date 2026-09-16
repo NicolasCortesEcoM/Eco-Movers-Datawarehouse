@@ -11,13 +11,13 @@
 -- the day; loose for storage, which bills monthly and is excluded here (no invoice
 -- amount exists for a storage account in the warehouse).
 --
--- THE INVOICE IS THE SUM OF THE OPPORTUNITY'S JOBS. `core.opportunities.invoiced_amount`
--- comes from the Booked report and is null for 301 of 810 closed ld opportunities
--- (never in a Booked generation) while `core.jobs.total_actual_cost` is there for all
--- of them; a long-distance move is two jobs (pickup, hourly, $0 + delivery,
--- mileage-rated, the money). Measured 2026-09-15: the two agree on 26,131 of 26,136
--- closed opportunities. So invoiced = sum of the non-deleted jobs' actual cost, and the
--- opportunity's figure only where no job carries one.
+-- THE INVOICE IS ALL JOBS' ACTUAL COST. `core.opportunities.invoiced_amount` is, since
+-- 2026-09-15, the sum of the opportunity's jobs' Total Actual Cost (Booked report only
+-- as a fallback) - Nicolas: revenue follows All Jobs, never Booked. A long-distance
+-- move is two jobs (pickup, hourly, $0 + delivery, mileage-rated, the money), often
+-- months apart, and the delivery-day collection is not always keyed into the CRM:
+-- an LD opportunity is SETTLED when its status is Closed OR when payments reach the
+-- All Jobs total. `is_delivery_pending` marks the LD rows still between those two.
 --
 -- BALANCE = invoiced - net paid. Net paid is sum(payment_amount): refunds subtract,
 -- and a bounce and its reversed payment cancel each other, so a bounced check leaves
@@ -80,7 +80,6 @@ jobs_agg as (
         max(job_number)                                     as job_number,
         max(completed_date_local)                           as completed_date_local,
         max(closed_date_local)                              as closed_date_local,
-        sum(total_actual_cost)                              as jobs_actual_total,
         count(*)                                            as job_count
     from {{ ref('jobs') }}
     where not is_deleted
@@ -95,7 +94,7 @@ opps as (
         j.closed_date_local,
         j.job_number,
         j.job_count,
-        coalesce(nullif(j.jobs_actual_total, 0), o.invoiced_amount) as invoice_total
+        o.invoiced_amount                                   as invoice_total
     from {{ ref('opportunities') }} o
     left join {{ ref('int_opportunity_line') }} l
       on  l.source_instance_id      = o.source_instance_id
@@ -211,6 +210,9 @@ select
     case when balance > 0 then 'customer_owes' else 'we_owe' end as balance_kind,
     (population = 'invoiced' and invoiced_amount > 0
      and abs(net_paid - 2 * invoiced_amount) < 1)           as is_exact_double,
+    -- LD: picked up, not yet closed, money still due - the delivery leg is open.
+    (line_of_business = 'long_distance' and status_label <> 'Closed' and balance > 0)
+                                                            as is_delivery_pending,
     payment_source,
     last_payment_date,
     last_refund_date,

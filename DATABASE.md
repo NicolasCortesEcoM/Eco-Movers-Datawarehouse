@@ -169,8 +169,14 @@ job:
 avg total_actual_cost 1,867             avg invoiced_amount 1,868
 ```
 
-They are the same number. `invoiced_amount` is not "the only realised-revenue column
-in the warehouse" — it is the only one **at opportunity grain**.
+They are the same number, and since 2026-09-15 `invoiced_amount` **is** the sum of the
+opportunity's jobs' `total_actual_cost` (All Jobs), with the Booked report's figure only
+where no job row exists. Nicolas's rule: **revenue follows All Jobs, never the Booked
+report** - a long-distance move is a pickup job and a delivery job months apart, and
+commercial jobs may never appear in a Booked generation (the Booked figure was null for
+301 of 810 closed ld opportunities). `booked_report_invoiced_amount` keeps the old value
+for comparison. An LD opportunity is settled when its status is Closed or when payments
+reach that total (`fct_outstanding_balances.is_delivery_pending`).
 
 ### The three money families
 
@@ -270,7 +276,8 @@ it **per field** via the `pick_latest` macro, which is why a report can add
 | `int_cancellation_detail`          | view  | One row per cancellation with geography, reason, timing, late flag, value, deposit, win-back. Base of the two marts below; open it when a number needs a face |
 | `fct_cancellations_by_zip`         | table | Cancellations by origin ZIP WITH the denominator (booked + cancelled), cohort by lead month, reasons as columns. Sum numerators and denominators to roll up; filter `booked_or_cancelled >= 20` before ranking |
 | `fct_refunds_daily` | table | Refunds, bounces and collected cash per (entity, line, branch, method, day); daily base for weekly/monthly reports |
-| `fct_outstanding_balances` | table | One row per unsettled opportunity: invoice (sum of jobs' actual cost) - net paid, population, balance_kind, aging |
+| `fct_outstanding_balances` | table | One row per unsettled opportunity: invoice (All Jobs actual cost) - net paid, population, balance_kind, aging, is_delivery_pending |
+| `mart_payment_discrepancies` | table | Work queue to fix in SmartMoving: duplicate-entry suspects, overpaid, paid with no invoice, cancelled holding money, bounces not re-collected |
 | `fct_cancellation_reasons_monthly` | table | Why customers cancel, by month it happened (period grain); share of month, how late, what it cost. Reason coverage from 2026-01-02 |
 | `int_booking_detail`               | view  | Every booking with its booking date (source on the row, incl. a measured lead-date proxy), cancellation date, lead time and exposure |
 | `fct_booking_survival`             | table | Share of bookings alive N days after booking and the hazard per window - when to call to reconfirm. Sum at_risk / cancelled to roll up |

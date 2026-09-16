@@ -485,3 +485,20 @@ models:
           - relationships:
               to: ref('opportunities')
               field: external_opportunity_id
+
+  - name: mart_payment_discrepancies
+    description: >
+      Work queue of opportunities whose money does not add up, to be corrected IN
+      SMARTMOVING: duplicate_entry_suspect, overpaid, paid_no_invoice,
+      cancelled_holding_money, bounce_not_recollected. Never filters anything upstream;
+      a row disappears once the CRM is fixed. Nicolas 2026-09-15.
+    columns:
+      - name: discrepancy_key
+        data_tests: [not_null, unique]
+      - name: discrepancy
+        data_tests:
+          - accepted_values:
+              values: ['duplicate_entry_suspect', 'overpaid', 'paid_no_invoice',
+                       'cancelled_holding_money', 'bounce_not_recollected']
+      - name: amount_off
+        data_tests: [not_null]
